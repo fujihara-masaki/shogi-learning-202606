@@ -1,0 +1,22 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+.pytest_cache/
+
+# SQLite データベース(初回起動時に自動生成される)
+backend/data/
+
+# Node
+node_modules/
+frontend/dist/
+
+# 環境変数
+.env
+.env.local
+
+# エディタ・OS
+.DS_Store
+.idea/
+.vscode/
