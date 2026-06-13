@@ -13,6 +13,7 @@ from ..schemas import (
     TsumeProblem,
     TsumeProblemCreate,
     TsumeProblemUpdate,
+    ValidationResponse,
 )
 from ..shogi_utils import validate_problem
 
@@ -60,6 +61,14 @@ def fetch_problem(conn: sqlite3.Connection, problem_id: int) -> sqlite3.Row:
     if row is None:
         raise HTTPException(status_code=404, detail="問題が見つかりません")
     return row
+
+
+@router.post("/validate", response_model=ValidationResponse)
+def validate_problem_body(body: TsumeProblemCreate):
+    errors = validate_problem(
+        body.initial_sfen, body.solution_moves, body.opponent_moves, body.mate_length
+    )
+    return ValidationResponse(valid=not errors, errors=errors)
 
 
 def validate_or_400(body: TsumeProblemCreate | TsumeProblemUpdate) -> None:
@@ -120,8 +129,8 @@ def create_problem(body: TsumeProblemCreate):
             """
             INSERT INTO tsume_problems
               (title, initial_sfen, mate_length, solution_moves, opponent_moves,
-               difficulty, tags, explanation)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+               difficulty, tags, explanation, is_favorite)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 body.title,
@@ -132,6 +141,7 @@ def create_problem(body: TsumeProblemCreate):
                 body.difficulty,
                 json.dumps(body.tags, ensure_ascii=False),
                 body.explanation,
+                1 if body.is_favorite else 0,
             ),
         )
         conn.commit()
@@ -151,7 +161,7 @@ def update_problem(problem_id: int, body: TsumeProblemUpdate):
             UPDATE tsume_problems SET
               title = ?, initial_sfen = ?, mate_length = ?, solution_moves = ?,
               opponent_moves = ?, difficulty = ?, tags = ?, explanation = ?,
-              updated_at = datetime('now')
+              is_favorite = ?, updated_at = datetime('now')
             WHERE id = ?
             """,
             (
@@ -163,6 +173,7 @@ def update_problem(problem_id: int, body: TsumeProblemUpdate):
                 body.difficulty,
                 json.dumps(body.tags, ensure_ascii=False),
                 body.explanation,
+                1 if body.is_favorite else 0,
                 problem_id,
             ),
         )
