@@ -26,6 +26,10 @@ export interface TsumeProblem {
   stats: ProblemStats;
 }
 
+export type TsumeProblemInput = Omit<TsumeProblem, "id" | "created_at" | "updated_at" | "stats">;
+
+export interface ValidationResponse { valid: boolean; errors: string[] }
+
 export interface ProblemResultInput {
   is_correct: boolean;
   elapsed_ms: number;
@@ -112,6 +116,22 @@ export function fetchProblems(query: ProblemQuery = {}): Promise<TsumeProblem[]>
 
 export function fetchProblem(id: number): Promise<TsumeProblem> {
   return request<TsumeProblem>(`/api/tsume-problems/${id}`);
+}
+
+export function createProblem(body: TsumeProblemInput): Promise<TsumeProblem> {
+  return request<TsumeProblem>(`/api/tsume-problems`, { method: "POST", body: JSON.stringify(body) });
+}
+
+export function updateProblem(id: number, body: TsumeProblemInput): Promise<TsumeProblem> {
+  return request<TsumeProblem>(`/api/tsume-problems/${id}`, { method: "PUT", body: JSON.stringify(body) });
+}
+
+export function deleteProblem(id: number): Promise<void> {
+  return request<void>(`/api/tsume-problems/${id}`, { method: "DELETE" });
+}
+
+export function validateProblem(body: TsumeProblemInput): Promise<ValidationResponse> {
+  return request<ValidationResponse>(`/api/tsume-problems/validate`, { method: "POST", body: JSON.stringify(body) });
 }
 
 export function postProblemResult(id: number, body: ProblemResultInput): Promise<unknown> {

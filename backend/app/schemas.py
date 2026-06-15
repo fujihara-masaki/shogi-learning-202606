@@ -13,6 +13,7 @@ class TsumeProblemBase(BaseModel):
     difficulty: int = 1
     tags: list[str] = []
     explanation: str = ""
+    is_favorite: bool = False
 
 
 class TsumeProblemCreate(TsumeProblemBase):
@@ -49,6 +50,11 @@ class ProblemResult(ProblemResultCreate):
     problem_id: int
     answered_at: str
 
+
+
+class ValidationResponse(BaseModel):
+    valid: bool
+    errors: list[str] = []
 
 class FavoriteUpdate(BaseModel):
     is_favorite: bool
