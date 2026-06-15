@@ -7,6 +7,7 @@ export interface EditorPosition { board: BoardState; hands: Hands; turn: Color; 
 export const PIECES: PieceCode[] = ["P", "L", "N", "S", "G", "B", "R", "K", "+P", "+L", "+N", "+S", "+B", "+R"];
 export const HAND_PIECES = ["R", "B", "G", "S", "N", "L", "P"] as const;
 export const PIECE_LABEL: Record<string, string> = { P:"歩", L:"香", N:"桂", S:"銀", G:"金", B:"角", R:"飛", K:"玉", "+P":"と", "+L":"成香", "+N":"成桂", "+S":"成銀", "+B":"馬", "+R":"龍" };
+const RANKS = "abcdefghi";
 export function emptyPosition(): EditorPosition { return { board: Array.from({length:9},()=>Array<EditorPiece|null>(9).fill(null)), hands: { b:{}, w:{} }, turn:"b", moveNumber:1 }; }
 export function initialPosition(): EditorPosition { return parseSfen("lnsgkgsnl/1r5b1/ppppppppp/9/9/9/PPPPPPPPP/1B5R1/LNSGKGSNL b - 1"); }
 function clone(p: EditorPosition): EditorPosition { return { board: p.board.map(r=>r.map(x=>x?{...x}:null)), hands:{ b:{...p.hands.b}, w:{...p.hands.w} }, turn:p.turn, moveNumber:p.moveNumber }; }
@@ -28,3 +29,15 @@ export function toSfen(pos: EditorPosition): string {
 export function setHand(pos: EditorPosition, color: Color, piece: string, count: number): EditorPosition { const next=clone(pos); next.hands[color][piece]=Math.max(0, count); return next; }
 export function parseMoveList(text: string): string[] { return text.split(/[\n,]/).map(s=>s.trim()).filter(Boolean); }
 export function validateUsiMoves(moves: string[]): string[] { const re=/^(?:[1-9][a-i][1-9][a-i]\+?|[PLNSGBR]\*[1-9][a-i])$/; return moves.filter(m=>!re.test(m)); }
+export function squareToUsi(row: number, col: number): string { return `${9 - col}${RANKS[row]}`; }
+export function usiToSquare(sq: string): [number, number] { const file=Number(sq[0]); const row=RANKS.indexOf(sq[1]); if(file<1||file>9||row<0) throw new Error(`USI座標が不正です: ${sq}`); return [row, 9-file]; }
+export function demote(code: PieceCode): string { return code.replace("+", ""); }
+function promote(code: PieceCode): PieceCode { return (code.startsWith("+") ? code : `+${code}`) as PieceCode; }
+export function isPromotableMove(piece: EditorPiece, fromRow: number, toRow: number): boolean { if (["G", "K"].includes(piece.code) || piece.code.startsWith("+")) return false; return piece.color === "b" ? fromRow <= 2 || toRow <= 2 : fromRow >= 6 || toRow >= 6; }
+export function applyRecordedMove(pos: EditorPosition, usi: string): EditorPosition {
+  const bad = validateUsiMoves([usi]); if (bad.length) throw new Error(`USI形式が不正です: ${usi}`);
+  const next = clone(pos); const color = next.turn;
+  if (usi.includes("*")) { const code = usi[0] as PieceCode; const [toRow,toCol]=usiToSquare(usi.slice(2,4)); if ((next.hands[color][code]??0)<=0) throw new Error(`${color === "b" ? "先手" : "後手"}の持ち駒に${PIECE_LABEL[code]}がありません`); if(next.board[toRow][toCol]) throw new Error("駒のあるマスには打てません"); next.hands[color][code]-=1; next.board[toRow][toCol]={color, code}; }
+  else { const [fromRow,fromCol]=usiToSquare(usi.slice(0,2)); const [toRow,toCol]=usiToSquare(usi.slice(2,4)); const piece=next.board[fromRow][fromCol]; if(!piece) throw new Error("移動元に駒がありません"); if(piece.color!==color) throw new Error("手番側の駒を選んでください"); const captured=next.board[toRow][toCol]; if(captured?.color===color) throw new Error("自分の駒があるマスには移動できません"); if(captured){ const handCode=demote(captured.code); next.hands[color][handCode]=(next.hands[color][handCode]??0)+1; } next.board[fromRow][fromCol]=null; next.board[toRow][toCol]={ color, code: usi.endsWith("+") ? promote(piece.code) : piece.code }; }
+  next.turn = color === "b" ? "w" : "b"; next.moveNumber += 1; return next;
+}

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { emptyPosition, parseMoveList, parseSfen, toSfen, validateUsiMoves } from "./editor";
+import { applyRecordedMove, emptyPosition, parseMoveList, parseSfen, toSfen, validateUsiMoves } from "./editor";
 
 describe("editor SFEN utilities", () => {
   it("generates and restores an empty board SFEN", () => {
@@ -24,5 +24,24 @@ describe("USI input parser", () => {
   });
   it("finds invalid USI moves", () => {
     expect(validateUsiMoves(["5e5d", "P*5e", "bad"])).toEqual(["bad"]);
+  });
+});
+
+describe("recorded move application", () => {
+  it("applies board moves, drops, captures, and alternates turns", () => {
+    const pos = parseSfen("4k4/9/9/9/9/9/9/4P4/4K4 b R 1");
+    const afterMove = applyRecordedMove(pos, "5h5g");
+    expect(toSfen(afterMove)).toBe("4k4/9/9/9/9/9/4P4/9/4K4 w R 2");
+    afterMove.hands.w.P = 1;
+    const afterDrop = applyRecordedMove(afterMove, "P*5h");
+    expect(toSfen(afterDrop)).toBe("4k4/9/9/9/9/9/4P4/4p4/4K4 b R 3");
+  });
+
+  it("adds captured pieces to the mover hand as demoted pieces", () => {
+    const pos = parseSfen("4k4/9/9/9/9/9/9/4p4/4K4 b - 1");
+    pos.board[7][4] = { color: "w", code: "+P" };
+    pos.board[8][4] = { color: "b", code: "K" };
+    const next = applyRecordedMove(pos, "5i5h");
+    expect(next.hands.b.P).toBe(1);
   });
 });

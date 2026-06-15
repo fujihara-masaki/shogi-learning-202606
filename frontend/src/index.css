@@ -631,3 +631,9 @@ select {
 .problem-editor-page .problem-item a { color: inherit; text-decoration: none; }
 .edit-button { display: flex; align-items: center; padding: 0 8px; border-left: 1px solid #eee5d6; color: var(--accent); text-decoration: none; font-size: 0.8rem; }
 .edit-button:hover { background: #f0ece2; }
+.solution-recorder { background: #fff; border: 1px solid #d8d2c4; border-radius: 10px; padding: 12px; }
+.solution-recorder h2 { margin-top: 0; }
+.recorder-layout { display: flex; gap: 14px; align-items: flex-start; flex-wrap: wrap; }
+.recorder-hands { display: flex; flex-direction: column; gap: 8px; min-width: 190px; }
+.recorded-moves { min-width: 140px; max-height: 240px; overflow-y: auto; margin: 0; padding-left: 24px; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; }
+.inline-check { display: inline-flex !important; flex-direction: row !important; align-items: center; gap: 6px; font-weight: 400 !important; }

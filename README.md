@@ -102,7 +102,7 @@ curl -X POST http://localhost:8000/api/tsume-problems \
 2. 盤面エディタで「配置する駒」を選び、9×9盤のマスをクリックして駒を置きます。「移動」で盤上の駒を移動、「削除」で駒を消せます。
 3. 先手/後手の持ち駒は右側の数値入力で編集し、手番はフォームのセレクトで切り替えます。
 4. 「現在の局面からSFEN生成」でフォームの `initial_sfen` に反映します。既存の SFEN を貼り付けた場合は「SFENを盤面へ反映」で復元できます。
-5. `title`、`mate_length`、`difficulty`、`tags`、`solution_moves`、`opponent_moves`、`explanation`、`is_favorite` を入力します。手順は USI 形式で、カンマ区切りまたは1行1手で入力できます。
+5. `title`、`mate_length`、`difficulty`、`tags`、`explanation`、`is_favorite` を入力します。解法手順は「盤面で解法手順を記録」で実際に駒を動かすと、攻め方の手が `solution_moves`、玉方の応手が `opponent_moves` に自動入力されます。必要に応じて USI 形式のテキストを直接編集することもできます。
 6. 「検証して保存」を押すと、ブラウザ側で SFEN/USI/手数を確認し、サーバー側でも python-shogi による合法手順と最終詰みを検証してから保存します。
 7. 左の問題一覧から既存問題を選ぶと同じフォームで編集できます。削除ボタンで問題を削除できます。保存した問題は詰め将棋画面の一覧に表示され、通常の問題としてプレイできます。
 
