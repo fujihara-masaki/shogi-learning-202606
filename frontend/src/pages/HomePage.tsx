@@ -6,6 +6,7 @@ const MENU = [
   { to: "/review", title: "復習", desc: "間違えた問題・お気に入りに再挑戦", enabled: true },
   { to: "/openings", title: "定跡学習", desc: "戦型別の定跡学習 (Coming Soon)", enabled: false },
   { to: "/history", title: "履歴", desc: "解答履歴とタイムアタック結果", enabled: true },
+  { to: "/problem-editor", title: "問題作成", desc: "盤面エディタで詰め将棋問題を作成・編集", enabled: true },
 ];
 
 export default function HomePage() {

@@ -1,6 +1,6 @@
 // 詰め将棋画面: 難易度選択・問題一覧・盤面プレイ。
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import {
   fetchProblems,
   postProblemResult,
@@ -139,6 +139,7 @@ export default function TsumePage() {
                   {p.mate_length}手詰 / 正解{p.stats.correct_count} 不正解{p.stats.wrong_count}
                 </span>
               </button>
+              <Link className="edit-button" to={`/problem-editor/${p.id}`}>編集</Link>
               <button
                 type="button"
                 className={`fav-button ${p.is_favorite ? "fav-on" : ""}`}
