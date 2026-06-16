@@ -68,10 +68,10 @@ test("tsume page plays an existing one-move problem and shows wrong/correct feed
   await expect(page.getByTestId("shogi-board")).toBeVisible();
 
   await playGoldDrop(page, "42");
-  await expect(page.getByText(/不正解/)).toBeVisible();
+  await expect(page.getByTestId("tsume-feedback")).toContainText("不正解");
   await page.getByRole("button", { name: "もう一度" }).click();
   await playGoldDrop(page, "52");
-  await expect(page.getByText(/正解/)).toBeVisible();
+  await expect(page.getByTestId("tsume-feedback")).toContainText("正解");
 });
 
 test("problem editor renders the board editor and required fields", async ({ page }) => {
@@ -146,7 +146,7 @@ test("creates a new problem, plays it, edits it, and deletes it", async ({ page 
   await expect(createdProblemItem).toBeVisible();
   await createdProblemItem.getByRole("button").first().click();
   await playGoldDrop(page, "52");
-  await expect(page.getByText(/正解/)).toBeVisible();
+  await expect(page.getByTestId("tsume-feedback")).toContainText("正解");
 
   await page.getByTestId("problem-item").filter({ hasText: title }).getByRole("link", { name: "編集" }).click();
   const editedTitle = `${title} edited`;
