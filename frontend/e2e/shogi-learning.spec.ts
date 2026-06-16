@@ -60,11 +60,11 @@ test("home shows the main feature links", async ({ page }) => {
 
 test("tsume page plays an existing one-move problem and shows wrong/correct feedback", async ({ page, request }) => {
   const title = `${E2E_PREFIX} tsume feedback ${Date.now()}`;
-  await createE2eProblem(request, title);
+  const problem = await createE2eProblem(request, title);
 
   await page.goto("/tsume");
-  await page.getByRole("button", { name: /1手詰/ }).click();
-  await page.getByRole("button", { name: new RegExp(title) }).click();
+  await page.getByTestId("difficulty-filter").getByRole("button", { name: "1手詰", exact: true }).click();
+  await page.getByTestId(`problem-select-${problem.id}`).click();
   await expect(page.getByTestId("shogi-board")).toBeVisible();
 
   await playGoldDrop(page, "42");
@@ -141,13 +141,14 @@ test("creates a new problem, plays it, edits it, and deletes it", async ({ page 
   await expect(page.getByText("保存しました")).toBeVisible();
 
   await page.goto("/tsume");
-  await page.getByRole("button", { name: /1手詰/ }).click();
-  await expect(page.getByRole("button", { name: new RegExp(title) })).toBeVisible();
-  await page.getByRole("button", { name: new RegExp(title) }).click();
+  await page.getByTestId("difficulty-filter").getByRole("button", { name: "1手詰", exact: true }).click();
+  const createdProblemItem = page.getByTestId("problem-item").filter({ hasText: title });
+  await expect(createdProblemItem).toBeVisible();
+  await createdProblemItem.getByRole("button").first().click();
   await playGoldDrop(page, "52");
   await expect(page.getByText(/正解/)).toBeVisible();
 
-  await page.locator(".problem-item").filter({ hasText: title }).getByRole("link", { name: "編集" }).click();
+  await page.getByTestId("problem-item").filter({ hasText: title }).getByRole("link", { name: "編集" }).click();
   const editedTitle = `${title} edited`;
   await page.getByLabel("title").fill(editedTitle);
   await page.getByLabel("explanation").fill("edited by E2E");
