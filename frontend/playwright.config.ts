@@ -15,13 +15,13 @@ export default defineConfig({
   },
   webServer: [
     {
-      command: `cd ../backend && SHOGI_DB_PATH=../frontend/.e2e/shogi-e2e.db python3 -m uvicorn app.main:app --host 127.0.0.1 --port ${backendPort}`,
+      command: "node scripts/start-e2e-backend.mjs",
       url: `http://127.0.0.1:${backendPort}/api/health`,
       reuseExistingServer: !process.env.CI,
       timeout: 30_000,
     },
     {
-      command: `VITE_API_BASE=http://127.0.0.1:${backendPort} npm run dev -- --host 127.0.0.1 --port ${frontendPort}`,
+      command: "node scripts/start-e2e-frontend.mjs",
       url: `http://127.0.0.1:${frontendPort}`,
       reuseExistingServer: !process.env.CI,
       timeout: 30_000,
