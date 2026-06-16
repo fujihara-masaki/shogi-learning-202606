@@ -161,9 +161,9 @@ test("creates a new problem, plays it, edits it, and deletes it", async ({ page 
   await page.getByRole("link", { name: "詰め将棋" }).click();
   await expect(page.getByText(editedTitle)).toHaveCount(0);
   await page.getByRole("link", { name: "履歴" }).click();
-  await expect(page.getByRole("heading", { name: "学習履歴" })).toBeVisible();
+  await expect(page.getByTestId("history-page")).toContainText("履歴");
   await page.getByRole("link", { name: "復習" }).click();
-  await expect(page.getByRole("heading", { name: "復習" })).toBeVisible();
+  await expect(page.getByTestId("review-page")).toContainText("復習");
 });
 
 test("time attack setup starts and displays a problem", async ({ page }) => {

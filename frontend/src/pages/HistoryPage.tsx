@@ -38,7 +38,7 @@ export default function HistoryPage() {
   }, []);
 
   return (
-    <div className="history-page">
+    <div className="history-page" data-testid="history-page">
       <h1>履歴</h1>
       {error && <div className="banner banner-error">{error}</div>}
 
