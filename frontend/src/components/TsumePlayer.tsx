@@ -25,10 +25,10 @@ export default function TsumePlayer({ problem, onTerminal }: Props) {
   const statusBanner = () => {
     switch (session.status) {
       case "cleared":
-        return <div className="banner banner-success">🎉 正解!クリアしました</div>;
+        return <div className="banner banner-success" data-testid="tsume-feedback">🎉 正解!クリアしました</div>;
       case "wrong":
         return (
-          <div className="banner banner-error">
+          <div className="banner banner-error" data-testid="tsume-feedback">
             ✗ 不正解{session.wrongMoveText ? `(${session.wrongMoveText})` : ""}
             <div className="banner-actions">
               <button type="button" onClick={session.retry}>
@@ -41,13 +41,13 @@ export default function TsumePlayer({ problem, onTerminal }: Props) {
           </div>
         );
       case "opponent":
-        return <div className="banner banner-info">玉方の応手…</div>;
+        return <div className="banner banner-info" data-testid="tsume-feedback">玉方の応手…</div>;
       case "showing":
-        return <div className="banner banner-info">答えを再生中…</div>;
+        return <div className="banner banner-info" data-testid="tsume-feedback">答えを再生中…</div>;
       case "shown":
-        return <div className="banner banner-info">答えの表示が終わりました</div>;
+        return <div className="banner banner-info" data-testid="tsume-feedback">答えの表示が終わりました</div>;
       default:
-        return <div className="banner banner-info">{problem.mate_length}手詰:先手番です</div>;
+        return <div className="banner banner-info" data-testid="tsume-feedback">{problem.mate_length}手詰:先手番です</div>;
     }
   };
 

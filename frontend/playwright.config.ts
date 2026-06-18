@@ -1,0 +1,33 @@
+import { defineConfig, devices } from "@playwright/test";
+
+const backendPort = 8000;
+const frontendPort = 5173;
+
+export default defineConfig({
+  testDir: "./e2e",
+  timeout: 30_000,
+  expect: { timeout: 8_000 },
+  fullyParallel: false,
+  reporter: [["html", { open: "never" }], ["list"]],
+  use: {
+    baseURL: `http://127.0.0.1:${frontendPort}`,
+    trace: "retain-on-failure",
+  },
+  webServer: [
+    {
+      command: "node scripts/start-e2e-backend.mjs",
+      url: `http://127.0.0.1:${backendPort}/api/health`,
+      reuseExistingServer: !process.env.CI,
+      timeout: 30_000,
+    },
+    {
+      command: "node scripts/start-e2e-frontend.mjs",
+      url: `http://127.0.0.1:${frontendPort}`,
+      reuseExistingServer: !process.env.CI,
+      timeout: 30_000,
+    },
+  ],
+  projects: [
+    { name: "chromium", use: { ...devices["Desktop Chrome"] } },
+  ],
+});

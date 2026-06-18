@@ -51,7 +51,39 @@ cd frontend && npx vitest run
 
 # 型チェック + ビルド / Lint
 cd frontend && npm run build && npm run lint
+
+# E2E (Playwright)
+cd frontend && npm run e2e
 ```
+
+### E2Eテスト (Playwright)
+
+E2Eテストは、ブラウザ上でホーム、詰め将棋プレイ、問題作成UI、盤面からの手順記録、作成問題のプレイ、編集・削除、タイムアタックの基本表示を自動確認するためのテストです。
+
+初回セットアップ:
+
+```bash
+cd frontend
+npm install
+npx playwright install chromium
+```
+
+実行コマンド:
+
+```bash
+# ヘッドレス実行
+npm run e2e
+
+# ブラウザを表示して実行
+npm run e2e:headed
+
+# 失敗時などのHTMLレポート確認
+npm run e2e:report
+```
+
+Playwright設定で backend と frontend を自動起動します。事前に手動起動する必要はありません。E2E実行時の backend は `frontend/.e2e/shogi-e2e.db` を `SHOGI_DB_PATH` に指定するため、通常利用のSQLite DBとは分離されます。テストは開始前・終了後にタイトルが `[e2e]` で始まる問題を削除します。
+
+Windows / macOS / Linux のいずれでも動くように、Playwright の `webServer.command` では `SHOGI_DB_PATH=... command` のようなシェル依存の環境変数指定を使わず、`frontend/scripts/start-e2e-backend.mjs` と `frontend/scripts/start-e2e-frontend.mjs` から Node.js 経由で環境変数を渡しています。WindowsでPythonランチャー名が異なる場合は、`PYTHON` 環境変数に `python` / `py` / 仮想環境内の実行ファイルを指定してから `npm run e2e` を実行してください。ポートを変更したい場合は `E2E_BACKEND_PORT` / `E2E_FRONTEND_PORT` を指定できます。
 
 ## 画面
 
