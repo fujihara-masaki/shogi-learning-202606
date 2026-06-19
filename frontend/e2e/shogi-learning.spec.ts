@@ -53,7 +53,7 @@ test.afterEach(async ({ request }) => {
 test("home shows the main feature links", async ({ page }) => {
   await page.goto("/");
   await expect(page.getByRole("heading", { name: "将棋学習アプリ" })).toBeVisible();
-  for (const name of ["詰め将棋", "タイムアタック", "復習", "履歴", "問題作成"]) {
+  for (const name of ["詰め将棋", "タイムアタック", "復習", "履歴", "定跡学習", "問題作成"]) {
     await expect(page.getByRole("link", { name }).first()).toBeVisible();
   }
 });
@@ -164,6 +164,42 @@ test("creates a new problem, plays it, edits it, and deletes it", async ({ page 
   await expect(page.getByTestId("history-page")).toContainText("履歴");
   await page.getByRole("link", { name: "復習" }).click();
   await expect(page.getByTestId("review-page")).toContainText("復習");
+});
+
+
+test("opening list navigates to a study page", async ({ page }) => {
+  await page.goto("/openings");
+  await expect(page.getByRole("heading", { name: "定跡学習" })).toBeVisible();
+  await expect(page.getByTestId("opening-card")).toHaveCount(3);
+  await page.getByTestId("opening-card").filter({ hasText: "居飛車急戦の基本" }).getByRole("link", { name: "学習する" }).click();
+  await expect(page.getByTestId("opening-study-page")).toBeVisible();
+  await expect(page.getByTestId("opening-current-move")).toContainText("▲7六歩");
+});
+
+test("opening study accepts correct moves and supports wrong feedback, undo, and reset", async ({ page }) => {
+  await page.goto("/openings/static-rook-rapid-attack");
+  const board = page.getByTestId("shogi-board");
+
+  await board.locator('[data-square="27"]').click();
+  await board.locator('[data-square="26"]').click();
+  await expect(page.getByTestId("opening-feedback")).toContainText("不正解");
+  await expect(page.getByTestId("opening-current-move")).toContainText("▲7六歩");
+
+  await board.locator('[data-square="77"]').click();
+  await board.locator('[data-square="76"]').click();
+  await expect(page.getByTestId("opening-feedback")).toContainText("正解");
+  await expect(page.getByTestId("opening-current-move")).toContainText("△3四歩");
+  await expect(page.getByText("7g7f")).toBeVisible();
+
+  await page.getByRole("button", { name: "1手戻る" }).click();
+  await expect(page.getByTestId("opening-current-move")).toContainText("▲7六歩");
+  await expect(page.getByText("まだ指し手はありません")).toBeVisible();
+
+  await board.locator('[data-square="77"]').click();
+  await board.locator('[data-square="76"]').click();
+  await page.getByRole("button", { name: "最初から" }).click();
+  await expect(page.getByTestId("opening-current-move")).toContainText("▲7六歩");
+  await expect(page.getByText("まだ指し手はありません")).toBeVisible();
 });
 
 test("time attack setup starts and displays a problem", async ({ page }) => {

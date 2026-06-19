@@ -637,3 +637,64 @@ select {
 .recorder-hands { display: flex; flex-direction: column; gap: 8px; min-width: 190px; }
 .recorded-moves { min-width: 140px; max-height: 240px; overflow-y: auto; margin: 0; padding-left: 24px; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; }
 .inline-check { display: inline-flex !important; flex-direction: row !important; align-items: center; gap: 6px; font-weight: 400 !important; }
+
+/* ---- 定跡学習 ---- */
+.opening-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.opening-card,
+.opening-current {
+  border: 1px solid #d8d2c4;
+  border-radius: 10px;
+  background: #fff;
+  padding: 16px;
+}
+
+.opening-card {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.opening-card h2,
+.opening-current h2,
+.opening-current h3 {
+  margin-top: 0;
+}
+
+.opening-category {
+  display: inline-block;
+  margin: 0 0 8px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #e8f2ec;
+  color: var(--accent);
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.primary-link {
+  display: inline-block;
+  align-self: flex-start;
+  padding: 8px 14px;
+  border-radius: 6px;
+  background: var(--accent);
+  color: #fff;
+  text-decoration: none;
+  font-weight: 700;
+}
+
+.primary-link:hover {
+  background: #235a3b;
+}
+
+.opening-study-page .player-side {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
