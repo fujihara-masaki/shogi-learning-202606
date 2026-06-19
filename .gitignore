@@ -20,3 +20,8 @@ frontend/dist/
 .DS_Store
 .idea/
 .vscode/
+
+# E2E artifacts
+frontend/.e2e/
+frontend/playwright-report/
+frontend/test-results/

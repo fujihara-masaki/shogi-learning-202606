@@ -1,6 +1,6 @@
 // 詰め将棋画面: 難易度選択・問題一覧・盤面プレイ。
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import {
   fetchProblems,
   postProblemResult,
@@ -102,7 +102,7 @@ export default function TsumePage() {
       <h1>詰め将棋</h1>
       {error && <div className="banner banner-error">{error}</div>}
       <div className="filter-bar">
-        <div className="segmented">
+        <div className="segmented" data-testid="difficulty-filter">
           {MATE_LENGTHS.map((m) => (
             <button
               key={m.value}
@@ -127,18 +127,20 @@ export default function TsumePage() {
         </button>
       </div>
       <div className="tsume-layout">
-        <aside className="problem-list">
+        <aside className="problem-list" data-testid="problem-list">
           {visibleProblems.map((p) => (
             <div
               key={p.id}
               className={`problem-item ${p.id === selectedId ? "active" : ""}`}
+              data-testid="problem-item"
             >
-              <button type="button" className="problem-link" onClick={() => selectProblem(p.id)}>
-                <span className="problem-title">{p.title}</span>
+              <button type="button" className="problem-link" data-testid={`problem-select-${p.id}`} onClick={() => selectProblem(p.id)}>
+                <span className="problem-title" data-testid="problem-title">{p.title}</span>
                 <span className="muted">
                   {p.mate_length}手詰 / 正解{p.stats.correct_count} 不正解{p.stats.wrong_count}
                 </span>
               </button>
+              <Link className="edit-button" to={`/problem-editor/${p.id}`}>編集</Link>
               <button
                 type="button"
                 className={`fav-button ${p.is_favorite ? "fav-on" : ""}`}

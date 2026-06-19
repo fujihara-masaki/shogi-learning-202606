@@ -1,7 +1,7 @@
 # 将棋学習アプリ(個人利用)
 
 将棋盤 GUI で駒を操作しながら詰め将棋を学習するローカル Web アプリです。
-第1段階(詰め将棋 MVP)として、詰め将棋・タイムアタック・復習・学習履歴を実装しています。
+詰め将棋・タイムアタック・復習・学習履歴に加え、固定データによる定跡学習MVPを実装しています。
 
 - フロントエンド: React + Vite + TypeScript + [tsshogi](https://www.npmjs.com/package/tsshogi)(局面管理・合法手判定)
 - バックエンド: FastAPI + SQLite + [python-shogi](https://pypi.org/project/python-shogi/)(問題データの検証)
@@ -51,17 +51,68 @@ cd frontend && npx vitest run
 
 # 型チェック + ビルド / Lint
 cd frontend && npm run build && npm run lint
+
+# E2E (Playwright / backend・frontend自動起動)
+cd frontend && npm run test:e2e
+```
+
+### E2Eテスト (Playwright)
+
+E2Eテストは、ブラウザ上でホーム、詰め将棋プレイ、問題作成UI、盤面からの手順記録、作成問題のプレイ、編集・削除、定跡学習、タイムアタックの基本表示を自動確認するためのテストです。
+
+初回セットアップ:
+
+```bash
+cd frontend
+npm install
+npx playwright install chromium
+```
+
+実行コマンド:
+
+```bash
+# ヘッドレス実行 (backend / frontend を自動起動)
+npm run test:e2e
+
+# ブラウザを表示して実行
+npm run test:e2e:headed
+
+# 失敗時などのHTMLレポート確認
+npm run test:e2e:report
+```
+
+互換用に `npm run e2e` / `npm run e2e:headed` / `npm run e2e:report` も同じ内容で利用できます。
+
+Playwright設定で backend と frontend を自動起動します。事前に手動起動する必要はありません。E2E実行時の backend は既定で `frontend/.e2e/shogi-e2e.db` を `SHOGI_DB_PATH` に指定するため、通常利用のSQLite DBとは分離されます。テストは開始前・終了後にタイトルが `[e2e]` で始まる問題を削除します。
+
+Windows / macOS / Linux のいずれでも動くように、Playwright の `webServer.command` では `SHOGI_DB_PATH=... command` のようなシェル依存の環境変数指定を使わず、`frontend/scripts/start-e2e-backend.mjs` と `frontend/scripts/start-e2e-frontend.mjs` から Node.js 経由で環境変数を渡しています。frontend 起動時は `VITE_API_BASE=http://127.0.0.1:${E2E_BACKEND_PORT}` を `env` 経由で渡します。backend 起動時は `SHOGI_DB_PATH` と `E2E_BACKEND_PORT` を `env` 経由で渡し、`python -m uvicorn app.main:app` を起動します。
+
+WindowsでPythonランチャー名が異なる場合や、Windows Store版 Python が先に見つかって `No module named uvicorn` になる場合は、`PYTHON` 環境変数に仮想環境内の実行ファイルを指定してから実行してください。
+
+PowerShell例:
+
+```powershell
+$env:PYTHON = "..\backend\.venv\Scripts\python.exe"
+npm run test:e2e
+```
+
+ポートやE2E用DBを変更したい場合は、`E2E_BACKEND_PORT` / `E2E_FRONTEND_PORT` / `SHOGI_DB_PATH` を指定できます。
+
+```bash
+E2E_BACKEND_PORT=18000 E2E_FRONTEND_PORT=15173 SHOGI_DB_PATH=./.e2e/custom.db npm run test:e2e
 ```
 
 ## 画面
 
 | 画面 | 内容 |
 | --- | --- |
-| ホーム | 各機能へのメニュー(定跡学習は Coming Soon) |
+| ホーム | 各機能へのメニュー |
 | 詰め将棋 | 難易度(1/3/5手詰)・タグで絞り込み、問題選択、ランダム出題、ヒント、答えを見る、解説、お気に入り |
+| 定跡学習 | 固定サンプル定跡の一覧、盤面上での期待手入力、ヒント、1手戻る、最初から |
 | タイムアタック | 難易度・問題数(5/10問)選択、タイマー、正解数・ミス数・合計時間の表示と保存 |
 | 復習 | 間違えたことのある問題一覧・お気に入り一覧から再挑戦 |
 | 履歴 | 正答率・平均解答時間・最近の解答・タイムアタック履歴 |
+| 問題作成 | 盤面エディタ、SFEN生成/復元、詰め将棋問題の作成・編集・削除 |
 
 ### 操作方法
 
@@ -77,7 +128,7 @@ cd frontend && npm run build && npm run lint
 **いずれもタイトルに `[sample]` が付いた動作確認用の練習データです。**
 詰将棋としての成立(手順の合法性・最終局面の詰み・余詰めなし・玉方応手の強制)は
 python-shogi による機械検証済みですが、作品としての洗練はされていません。
-本格的な問題はユーザー自身が API で登録・差し替えしてください。
+本格的な問題は「問題作成」画面、または API で登録・差し替えしてください。
 
 ```bash
 # 問題の追加例(登録時に手順の合法性と詰みがサーバー側で検証されます)
@@ -95,6 +146,27 @@ curl -X POST http://localhost:8000/api/tsume-problems \
   }'
 ```
 
+## 定跡学習 MVP の使い方
+
+1. ホームまたは上部ナビゲーションの「定跡学習」を開きます(`/openings`)。
+2. 定跡一覧で、定跡名・戦型・説明・手数を確認し、「学習する」を押します。
+3. 学習画面では、右側に現在の推奨手、USI、解説、狙いが表示されます。盤面上でその手を実際に指します。
+4. 期待手と一致すると「正解」と表示され、次の局面・次の推奨手へ進みます。一致しない場合は不正解メッセージとヒントが表示されます。
+5. 「ヒント」で現在手のヒントを表示できます。「1手戻る」で直前の手を取り消し、「最初から」で定跡の初期局面へ戻ります。
+6. 現在の定跡データは `frontend/src/shogi/openings.ts` の固定データです。DB化、AI評価値、外部棋譜DB連携は今後の拡張対象です。
+
+定跡データは、将来の分岐対応を考慮してノードと候補手のツリー形式にしています。各手は USI形式、表示用表記、解説、狙い、ヒントを持ちます。
+
+## 問題作成 UI の使い方
+
+1. ホームまたは上部ナビゲーションの「問題作成」を開きます(`/problem-editor`)。
+2. 盤面エディタで「配置する駒」を選び、9×9盤のマスをクリックして駒を置きます。「移動」で盤上の駒を移動、「削除」で駒を消せます。
+3. 先手/後手の持ち駒は右側の数値入力で編集し、手番はフォームのセレクトで切り替えます。
+4. 「現在の局面からSFEN生成」でフォームの `initial_sfen` に反映します。既存の SFEN を貼り付けた場合は「SFENを盤面へ反映」で復元できます。
+5. `title`、`mate_length`、`difficulty`、`tags`、`explanation`、`is_favorite` を入力します。解法手順は「盤面で解法手順を記録」で実際に駒を動かすと、攻め方の手が `solution_moves`、玉方の応手が `opponent_moves` に自動入力されます。必要に応じて USI 形式のテキストを直接編集することもできます。
+6. 「検証して保存」を押すと、ブラウザ側で SFEN/USI/手数を確認し、サーバー側でも python-shogi による合法手順と最終詰みを検証してから保存します。
+7. 左の問題一覧から既存問題を選ぶと同じフォームで編集できます。削除ボタンで問題を削除できます。保存した問題は詰め将棋画面の一覧に表示され、通常の問題としてプレイできます。
+
 ## API 一覧
 
 | メソッド | パス | 内容 |
@@ -102,6 +174,7 @@ curl -X POST http://localhost:8000/api/tsume-problems \
 | GET | /api/tsume-problems | 問題一覧(`mate_length` / `tag` / `favorite` / `random_order` / `limit`) |
 | GET | /api/tsume-problems/{id} | 問題詳細 |
 | POST | /api/tsume-problems | 問題作成(詰み手順をサーバー側で検証) |
+| POST | /api/tsume-problems/validate | SFEN・USI手順・手数・最終詰みの検証 |
 | PUT | /api/tsume-problems/{id} | 問題更新 |
 | DELETE | /api/tsume-problems/{id} | 問題削除 |
 | POST | /api/tsume-problems/{id}/result | 解答結果の記録 |
@@ -126,14 +199,13 @@ SQLite に以下のテーブルを作成します(`backend/app/database.py`)。
 - **玉方の応手は登録された手を自動実行**します(最善応手の自動探索はしません)。サンプル問題は応手が唯一の合法手であることを検証済みです。
 - 合法手判定(二歩・行き所のない駒・自玉放置など)は tsshogi に準拠しています。**打ち歩詰めの禁止は移動候補のハイライトには反映されません**が、正解判定が手順照合のため実害はありません。
 - タイムアタックで問題数が選択数に満たない難易度では、同じ問題が循環して出題されます。
-- 問題の作成・編集 UI はなく、API(または DB 直接編集)で行います。
-- 戦型別定跡学習は未実装です(`opening_lines` テーブルと拡張しやすい構成のみ用意)。
+- 定跡学習MVPはフロントエンドの固定データで動作します。分岐対応を見据えたツリー構造ですが、現時点のUIは各局面の先頭候補手を期待手として扱います。DB化・AI評価値・外部棋譜DB連携は未対応です。
 
 ## 今後の拡張案
 
-1. 戦型別定跡学習(矢倉・角換わり・四間飛車など): `opening_lines` への定跡ツリー登録、手順再生、次の一手クイズ、分岐表示
+1. 定跡学習の拡張: `opening_lines` へのDB化、分岐候補の選択UI、手順再生、到達局面の復習
 2. 別解(複数解)対応: 解答判定をサーバー側の詰み探索で行う
-3. 問題作成・編集 UI(盤面エディタ)
+3. 盤面エディタの合法配置チェック強化とKIF/CSA読み込み
 4. 棋譜(KIF/CSA)の読み込み・再生
 5. 間隔反復(SRS)による出題スケジューリング
 6. 駒画像への差し替え(`ShogiBoard.tsx` の `PieceFace` を変更)
