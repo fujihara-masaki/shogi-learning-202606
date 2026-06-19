@@ -34,7 +34,7 @@ export default function ReviewPage() {
   const list = tab === "wrong" ? wrongProblems : favoriteProblems;
 
   return (
-    <div className="review-page">
+    <div className="review-page" data-testid="review-page">
       <h1>復習</h1>
       {error && <div className="banner banner-error">{error}</div>}
       <div className="segmented">

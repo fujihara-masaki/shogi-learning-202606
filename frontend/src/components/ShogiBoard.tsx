@@ -175,7 +175,7 @@ export default function ShogiBoard({
   const bottomColor = flipped ? Color.WHITE : Color.BLACK;
 
   return (
-    <div className="board-wrapper">
+    <div className="board-wrapper" data-testid="shogi-board">
       {renderHand(topColor, topColor === Color.WHITE ? "☖後手" : "☗先手")}
       <div className="board-with-coords">
         <div className="file-coords">
