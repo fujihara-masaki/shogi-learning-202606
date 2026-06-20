@@ -52,8 +52,8 @@ cd frontend && npx vitest run
 # 型チェック + ビルド / Lint
 cd frontend && npm run build && npm run lint
 
-# E2E (Playwright)
-cd frontend && npm run e2e
+# E2E (Playwright / backend・frontend自動起動)
+cd frontend && npm run test:e2e
 ```
 
 ### E2Eテスト (Playwright)
@@ -71,19 +71,36 @@ npx playwright install chromium
 実行コマンド:
 
 ```bash
-# ヘッドレス実行
-npm run e2e
+# ヘッドレス実行 (backend / frontend を自動起動)
+npm run test:e2e
 
 # ブラウザを表示して実行
-npm run e2e:headed
+npm run test:e2e:headed
 
 # 失敗時などのHTMLレポート確認
-npm run e2e:report
+npm run test:e2e:report
 ```
 
-Playwright設定で backend と frontend を自動起動します。事前に手動起動する必要はありません。E2E実行時の backend は `frontend/.e2e/shogi-e2e.db` を `SHOGI_DB_PATH` に指定するため、通常利用のSQLite DBとは分離されます。テストは開始前・終了後にタイトルが `[e2e]` で始まる問題を削除します。
+互換用に `npm run e2e` / `npm run e2e:headed` / `npm run e2e:report` も同じ内容で利用できます。
 
-Windows / macOS / Linux のいずれでも動くように、Playwright の `webServer.command` では `SHOGI_DB_PATH=... command` のようなシェル依存の環境変数指定を使わず、`frontend/scripts/start-e2e-backend.mjs` と `frontend/scripts/start-e2e-frontend.mjs` から Node.js 経由で環境変数を渡しています。WindowsでPythonランチャー名が異なる場合は、`PYTHON` 環境変数に `python` / `py` / 仮想環境内の実行ファイルを指定してから `npm run e2e` を実行してください。ポートを変更したい場合は `E2E_BACKEND_PORT` / `E2E_FRONTEND_PORT` を指定できます。
+Playwright設定で backend と frontend を自動起動します。事前に手動起動する必要はありません。E2E実行時の backend は既定で `frontend/.e2e/shogi-e2e.db` を `SHOGI_DB_PATH` に指定するため、通常利用のSQLite DBとは分離されます。テストは開始前・終了後にタイトルが `[e2e]` で始まる問題を削除します。
+
+Windows / macOS / Linux のいずれでも動くように、Playwright の `webServer.command` では `SHOGI_DB_PATH=... command` のようなシェル依存の環境変数指定を使わず、`frontend/scripts/start-e2e-backend.mjs` と `frontend/scripts/start-e2e-frontend.mjs` から Node.js 経由で環境変数を渡しています。frontend 起動時は `VITE_API_BASE=http://127.0.0.1:${E2E_BACKEND_PORT}` を `env` 経由で渡します。backend 起動時は `SHOGI_DB_PATH` と `E2E_BACKEND_PORT` を `env` 経由で渡し、`python -m uvicorn app.main:app` を起動します。
+
+WindowsでPythonランチャー名が異なる場合や、Windows Store版 Python が先に見つかって `No module named uvicorn` になる場合は、`PYTHON` 環境変数に仮想環境内の実行ファイルを指定してから実行してください。
+
+PowerShell例:
+
+```powershell
+$env:PYTHON = "..\backend\.venv\Scripts\python.exe"
+npm run test:e2e
+```
+
+ポートやE2E用DBを変更したい場合は、`E2E_BACKEND_PORT` / `E2E_FRONTEND_PORT` / `SHOGI_DB_PATH` を指定できます。
+
+```bash
+E2E_BACKEND_PORT=18000 E2E_FRONTEND_PORT=15173 SHOGI_DB_PATH=./.e2e/custom.db npm run test:e2e
+```
 
 ## 画面
 
