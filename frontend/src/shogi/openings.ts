@@ -217,3 +217,41 @@ export function expectedOpeningMove(opening: OpeningLine, path: number[]): Openi
 export function isExpectedOpeningMove(move: Move, expected: OpeningMoveNode | null): boolean {
   return Boolean(expected && move.usi === expected.usi);
 }
+
+export interface ImportedOpeningLike {
+  id: number;
+  name: string;
+  opening_type: string;
+  initial_sfen: string;
+  moves: Array<{ usi: string; comment?: string }>;
+  tags?: Array<{ label?: string; tag: string }>;
+  source?: { name: string; license_name: string; license_url: string };
+}
+
+export function openingFromImportedLine(imported: ImportedOpeningLike): OpeningLine {
+  const build = (index: number): OpeningMoveNode[] => {
+    const move = imported.moves[index];
+    if (!move) return [];
+    return [
+      {
+        id: `imported-${imported.id}-${index + 1}`,
+        usi: move.usi,
+        notation: move.usi,
+        explanation: move.comment || "インポートした定跡手です。",
+        aim: imported.source?.license_name
+          ? `出典: ${imported.source.name} / ライセンス: ${imported.source.license_name}`
+          : `出典: ${imported.source?.name || "インポートデータ"}`,
+        hint: `USI ${move.usi} の手を指します。`,
+        next: build(index + 1),
+      },
+    ];
+  };
+  return {
+    id: String(imported.id),
+    name: imported.name,
+    category: imported.opening_type,
+    description: imported.tags?.map((tag) => tag.label || tag.tag).join("、") || "インポートした定跡ライン",
+    initialSfen: imported.initial_sfen,
+    moves: build(0),
+  };
+}

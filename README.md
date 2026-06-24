@@ -146,6 +146,26 @@ curl -X POST http://localhost:8000/api/tsume-problems \
   }'
 ```
 
+## 定跡データの取り込み
+
+再利用許諾済みの SFEN/USI 定跡データは `data/openings/*.sfen` に配置し、backend のインポートスクリプトで SQLite に取り込めます。KIF/CSA は今後の拡張対象です。
+
+対応形式:
+
+```text
+startpos moves 7g7f 3c3d 2h5h
+sfen <盤面> <手番> <持ち駒> <手数> moves ...
+```
+
+実行例:
+
+```bash
+cd backend
+python scripts/import_openings.py ../data/openings --license-name CC0 --license-url https://example.com/license
+```
+
+取り込み時に、各手の前後 SFEN、USI 指し手、ライセンス情報を `opening_sources` / `opening_positions` / `opening_moves` / `opening_tags` に保存します。分類はMVPとして簡易ルールです。中飛車は「序盤40手以内に飛車が5筋にいる」場合に `nakabisha` タグを付与します。棒銀・向かい飛車も簡易的に判定します。
+
 ## 定跡学習 MVP の使い方
 
 1. ホームまたは上部ナビゲーションの「定跡学習」を開きます(`/openings`)。
@@ -183,6 +203,9 @@ curl -X POST http://localhost:8000/api/tsume-problems \
 | GET | /api/time-attack/results | タイムアタック履歴 |
 | GET | /api/stats | 全体・難易度別の正答率、最近の解答 |
 | GET | /api/review-problems | 間違えたことのある問題(復習用) |
+| GET | /api/openings/tags | インポート済み定跡タグ一覧 |
+| GET | /api/openings | インポート済み定跡一覧(`tag` で絞り込み可能) |
+| GET | /api/openings/{id} | インポート済み定跡詳細(各手前後のSFENとUSI) |
 
 ## DB スキーマ
 
@@ -191,7 +214,11 @@ SQLite に以下のテーブルを作成します(`backend/app/database.py`)。
 - `tsume_problems` — 問題(SFEN 初期局面、USI 手順の JSON、タグ、解説、お気に入り)
 - `problem_results` — 問題ごとの解答履歴(正解/不正解、解答時間、ミス数)
 - `time_attack_results` — タイムアタック結果
-- `opening_lines` — 第2段階の戦型別定跡学習用(SFEN + USI 手順 + 手ごとのコメント。テーブルのみ作成済み)
+- `opening_lines` — 戦型別定跡ライン(SFEN + USI 手順 + タグ)
+- `opening_sources` — 取り込み元ファイルとライセンス情報
+- `opening_positions` — 定跡ラインの各 ply の SFEN
+- `opening_moves` — 各手の USI と指し手前後の SFEN
+- `opening_tags` — 中飛車・棒銀・向かい飛車などの簡易分類タグ
 
 ## 既知の制限
 
@@ -199,7 +226,7 @@ SQLite に以下のテーブルを作成します(`backend/app/database.py`)。
 - **玉方の応手は登録された手を自動実行**します(最善応手の自動探索はしません)。サンプル問題は応手が唯一の合法手であることを検証済みです。
 - 合法手判定(二歩・行き所のない駒・自玉放置など)は tsshogi に準拠しています。**打ち歩詰めの禁止は移動候補のハイライトには反映されません**が、正解判定が手順照合のため実害はありません。
 - タイムアタックで問題数が選択数に満たない難易度では、同じ問題が循環して出題されます。
-- 定跡学習MVPはフロントエンドの固定データで動作します。分岐対応を見据えたツリー構造ですが、現時点のUIは各局面の先頭候補手を期待手として扱います。DB化・AI評価値・外部棋譜DB連携は未対応です。
+- 定跡学習MVPは固定サンプルとインポート済みSFEN/USIデータを扱えます。分岐対応を見据えたツリー構造ですが、現時点のUIは各局面の先頭候補手を期待手として扱います。AI評価値・外部棋譜DB連携・KIF/CSA取り込みは未対応です。
 
 ## 今後の拡張案
 

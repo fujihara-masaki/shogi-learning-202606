@@ -45,9 +45,19 @@ CREATE TABLE IF NOT EXISTS time_attack_results (
     played_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
+CREATE TABLE IF NOT EXISTS opening_sources (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    file_path TEXT NOT NULL,
+    license_name TEXT NOT NULL DEFAULT '',
+    license_url TEXT NOT NULL DEFAULT '',
+    imported_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
 -- 第2段階(戦型別定跡学習)用。局面は SFEN、手順は USI の JSON 配列で保存する。
 CREATE TABLE IF NOT EXISTS opening_lines (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
+    source_id INTEGER REFERENCES opening_sources(id) ON DELETE SET NULL,
     name TEXT NOT NULL,
     opening_type TEXT NOT NULL,     -- 矢倉 / 角換わり / 四間飛車 など
     initial_sfen TEXT NOT NULL,
@@ -58,10 +68,44 @@ CREATE TABLE IF NOT EXISTS opening_lines (
     updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
+CREATE TABLE IF NOT EXISTS opening_positions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    line_id INTEGER NOT NULL REFERENCES opening_lines(id) ON DELETE CASCADE,
+    ply INTEGER NOT NULL,
+    sfen TEXT NOT NULL,
+    UNIQUE(line_id, ply)
+);
+
+CREATE TABLE IF NOT EXISTS opening_moves (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    line_id INTEGER NOT NULL REFERENCES opening_lines(id) ON DELETE CASCADE,
+    ply INTEGER NOT NULL,
+    usi TEXT NOT NULL,
+    from_sfen TEXT NOT NULL,
+    to_sfen TEXT NOT NULL,
+    comment TEXT NOT NULL DEFAULT '',
+    UNIQUE(line_id, ply)
+);
+
+CREATE TABLE IF NOT EXISTS opening_tags (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    line_id INTEGER NOT NULL REFERENCES opening_lines(id) ON DELETE CASCADE,
+    tag TEXT NOT NULL,
+    score REAL NOT NULL DEFAULT 1.0,
+    reason TEXT NOT NULL DEFAULT '',
+    UNIQUE(line_id, tag)
+);
+
 CREATE INDEX IF NOT EXISTS idx_problem_results_problem
     ON problem_results(problem_id);
 CREATE INDEX IF NOT EXISTS idx_tsume_problems_mate_length
     ON tsume_problems(mate_length);
+CREATE INDEX IF NOT EXISTS idx_opening_tags_tag
+    ON opening_tags(tag);
+CREATE INDEX IF NOT EXISTS idx_opening_positions_line
+    ON opening_positions(line_id, ply);
+CREATE INDEX IF NOT EXISTS idx_opening_moves_line
+    ON opening_moves(line_id, ply);
 """
 
 
@@ -78,10 +122,17 @@ def get_connection() -> sqlite3.Connection:
     return conn
 
 
+def _ensure_opening_line_columns(conn: sqlite3.Connection) -> None:
+    columns = {row["name"] for row in conn.execute("PRAGMA table_info(opening_lines)").fetchall()}
+    if "source_id" not in columns:
+        conn.execute("ALTER TABLE opening_lines ADD COLUMN source_id INTEGER REFERENCES opening_sources(id) ON DELETE SET NULL")
+
+
 def init_db() -> None:
     conn = get_connection()
     try:
         conn.executescript(SCHEMA)
+        _ensure_opening_line_columns(conn)
         conn.commit()
     finally:
         conn.close()
