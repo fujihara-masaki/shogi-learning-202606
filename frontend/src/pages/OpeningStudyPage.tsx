@@ -1,6 +1,7 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, Navigate, useParams } from "react-router-dom";
 import { type Move, type Square } from "tsshogi";
+import { fetchOpening } from "../api/client";
 import MoveHistory from "../components/MoveHistory";
 import ShogiBoard from "../components/ShogiBoard";
 import {
@@ -8,21 +9,61 @@ import {
   expectedOpeningMove,
   findOpening,
   isExpectedOpeningMove,
+  openingFromImportedLine,
+  type OpeningLine,
 } from "../shogi/openings";
 
 export default function OpeningStudyPage() {
   const { id } = useParams();
-  const opening = id ? findOpening(id) : undefined;
+  return <OpeningStudyContent key={id ?? "missing"} id={id} />;
+}
+
+function OpeningStudyContent({ id }: { id: string | undefined }) {
+  const staticOpening = id ? findOpening(id) : undefined;
+  const [importedOpening, setImportedOpening] = useState<OpeningLine | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [path, setPath] = useState<number[]>([]);
   const [feedback, setFeedback] = useState<string | null>(null);
   const [hintVisible, setHintVisible] = useState(false);
   const [lastMoveTo, setLastMoveTo] = useState<Square | null>(null);
 
+  useEffect(() => {
+    if (!id || staticOpening || !/^\d+$/.test(id)) return;
+    let cancelled = false;
+    fetchOpening(Number(id))
+      .then((opening) => {
+        if (!cancelled) setImportedOpening(openingFromImportedLine(opening));
+      })
+      .catch((e) => {
+        if (!cancelled) setLoadError(`定跡の取得に失敗しました: ${e}`);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [id, staticOpening]);
+
+  const opening = staticOpening ?? importedOpening;
   const state = useMemo(() => (opening ? applyOpeningPath(opening, path) : null), [opening, path]);
   const expected = useMemo(() => (opening ? expectedOpeningMove(opening, path) : null), [opening, path]);
 
-  if (!opening || !state) {
+  if (loadError) {
+    return (
+      <div className="opening-study-page" data-testid="opening-study-page">
+        <Link to="/openings">← 定跡一覧へ</Link>
+        <div className="banner banner-error">{loadError}</div>
+      </div>
+    );
+  }
+  if (!id) {
     return <Navigate to="/openings" replace />;
+  }
+  if (!opening || !state) {
+    return (
+      <div className="opening-study-page" data-testid="opening-study-page">
+        <Link to="/openings">← 定跡一覧へ</Link>
+        <p className="muted">定跡を読み込み中...</p>
+      </div>
+    );
   }
 
   const completed = expected === null;
@@ -36,7 +77,6 @@ export default function OpeningStudyPage() {
     }
     setPath((prev) => [...prev, 0]);
     setFeedback(`正解: ${expected.notation}`);
-    setHintVisible(false);
     setLastMoveTo(move.to);
   }
 

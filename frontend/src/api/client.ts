@@ -166,3 +166,71 @@ export function fetchTimeAttackResults(): Promise<TimeAttackResult[]> {
 export function fetchStats(): Promise<StatsResponse> {
   return request<StatsResponse>("/api/stats");
 }
+
+export interface OpeningTagSummary {
+  tag: string;
+  label: string;
+  count: number;
+  max_score: number;
+}
+
+export interface OpeningSourceSummary {
+  id: number | null;
+  name: string;
+  license_name: string;
+  license_url: string;
+}
+
+export interface OpeningSummary {
+  id: number;
+  name: string;
+  opening_type: string;
+  initial_sfen: string;
+  move_count: number;
+  tags: string[];
+  source: OpeningSourceSummary;
+}
+
+export interface ImportedOpeningMove {
+  ply: number;
+  usi: string;
+  from_sfen: string;
+  to_sfen: string;
+  comment: string;
+}
+
+export interface ImportedOpeningPosition {
+  ply: number;
+  sfen: string;
+}
+
+export interface ImportedOpeningTag {
+  tag: string;
+  label: string;
+  score: number;
+  reason: string;
+}
+
+export interface ImportedOpeningDetail {
+  id: number;
+  name: string;
+  opening_type: string;
+  initial_sfen: string;
+  moves: ImportedOpeningMove[];
+  positions: ImportedOpeningPosition[];
+  tags: ImportedOpeningTag[];
+  source: OpeningSourceSummary;
+}
+
+export function fetchOpeningTags(): Promise<OpeningTagSummary[]> {
+  return request<OpeningTagSummary[]>("/api/openings/tags");
+}
+
+export function fetchOpenings(tag?: string): Promise<OpeningSummary[]> {
+  const qs = tag ? `?tag=${encodeURIComponent(tag)}` : "";
+  return request<OpeningSummary[]>(`/api/openings${qs}`);
+}
+
+export function fetchOpening(id: number): Promise<ImportedOpeningDetail> {
+  return request<ImportedOpeningDetail>(`/api/openings/${id}`);
+}
