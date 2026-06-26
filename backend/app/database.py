@@ -45,6 +45,32 @@ CREATE TABLE IF NOT EXISTS time_attack_results (
     played_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
+CREATE TABLE IF NOT EXISTS opening_categories (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name_ja TEXT NOT NULL UNIQUE,
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    description TEXT NOT NULL DEFAULT '',
+    source_url TEXT NOT NULL DEFAULT '',
+    license TEXT NOT NULL DEFAULT ''
+);
+
+CREATE TABLE IF NOT EXISTS opening_types (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    category_id INTEGER NOT NULL REFERENCES opening_categories(id) ON DELETE CASCADE,
+    parent_id INTEGER REFERENCES opening_types(id) ON DELETE SET NULL,
+    name_ja TEXT NOT NULL,
+    name_kana TEXT NOT NULL DEFAULT '',
+    name_en TEXT NOT NULL DEFAULT '',
+    aliases TEXT NOT NULL DEFAULT '[]',
+    description_short TEXT NOT NULL DEFAULT '',
+    source_name TEXT NOT NULL DEFAULT '',
+    source_url TEXT NOT NULL DEFAULT '',
+    license TEXT NOT NULL DEFAULT '',
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    is_active INTEGER NOT NULL DEFAULT 1,
+    UNIQUE(category_id, name_ja)
+);
+
 CREATE TABLE IF NOT EXISTS opening_sources (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL,
@@ -110,6 +136,10 @@ CREATE INDEX IF NOT EXISTS idx_tsume_problems_mate_length
     ON tsume_problems(mate_length);
 CREATE INDEX IF NOT EXISTS idx_opening_tags_tag
     ON opening_tags(tag);
+CREATE INDEX IF NOT EXISTS idx_opening_types_category
+    ON opening_types(category_id, sort_order);
+CREATE INDEX IF NOT EXISTS idx_opening_types_parent
+    ON opening_types(parent_id);
 CREATE INDEX IF NOT EXISTS idx_opening_positions_line
     ON opening_positions(line_id, ply);
 CREATE INDEX IF NOT EXISTS idx_opening_line_moves_line

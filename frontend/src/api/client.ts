@@ -167,6 +167,34 @@ export function fetchStats(): Promise<StatsResponse> {
   return request<StatsResponse>("/api/stats");
 }
 
+
+export interface OpeningCategory {
+  id: number;
+  name_ja: string;
+  sort_order: number;
+  description: string;
+  source_url: string;
+  license: string;
+}
+
+export interface OpeningType {
+  id: number;
+  category_id: number;
+  category_name_ja: string;
+  parent_id: number | null;
+  name_ja: string;
+  name_kana: string;
+  name_en: string;
+  aliases: string[];
+  description_short: string;
+  source_name: string;
+  source_url: string;
+  license: string;
+  sort_order: number;
+  is_active: boolean;
+  opening_line_count: number;
+}
+
 export interface OpeningTagSummary {
   tag: string;
   label: string;
@@ -220,6 +248,19 @@ export interface ImportedOpeningDetail {
   positions: ImportedOpeningPosition[];
   tags: ImportedOpeningTag[];
   source: OpeningSourceSummary;
+}
+
+export function fetchOpeningCategories(): Promise<OpeningCategory[]> {
+  return request<OpeningCategory[]>("/api/opening-categories");
+}
+
+export function fetchOpeningTypes(categoryId?: number): Promise<OpeningType[]> {
+  const qs = categoryId ? `?category_id=${encodeURIComponent(String(categoryId))}` : "";
+  return request<OpeningType[]>(`/api/opening-types${qs}`);
+}
+
+export function fetchOpeningType(id: number): Promise<OpeningType> {
+  return request<OpeningType>(`/api/opening-types/${id}`);
 }
 
 export function fetchOpeningTags(): Promise<OpeningTagSummary[]> {

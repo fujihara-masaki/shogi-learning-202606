@@ -167,6 +167,21 @@ test("creates a new problem, plays it, edits it, and deletes it", async ({ page 
 });
 
 
+
+test("opening page shows opening categories and representative types", async ({ page }) => {
+  await page.goto("/openings");
+  await expect(page.getByTestId("opening-category-list")).toContainText("相居飛車");
+  await expect(page.getByTestId("opening-category-list")).toContainText("対抗型");
+  await expect(page.getByTestId("opening-type-list")).toContainText("矢倉");
+  await expect(page.getByTestId("opening-type-list")).toContainText("四間飛車");
+  await expect(page.getByLabel("データ出典")).toContainText("CC BY-SA");
+
+  await page.getByTestId("opening-category-card").filter({ hasText: "奇襲・B級戦法" }).click();
+  await expect(page.getByTestId("opening-type-list")).toContainText("嬉野流");
+  await expect(page.getByTestId("opening-type-list")).toContainText("定跡手順は準備中");
+});
+
+
 test("opening list navigates to a seeded opening study page", async ({ page }) => {
   await page.goto("/openings");
   await expect(page.getByRole("heading", { name: "定跡学習" })).toBeVisible();
