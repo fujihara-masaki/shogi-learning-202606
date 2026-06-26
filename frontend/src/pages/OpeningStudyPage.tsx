@@ -80,6 +80,14 @@ function OpeningStudyContent({ id }: { id: string | undefined }) {
     setLastMoveTo(move.to);
   }
 
+  function stepForward() {
+    if (!expected) return;
+    setPath((prev) => [...prev, 0]);
+    setFeedback(`再生: ${expected.notation}`);
+    setHintVisible(false);
+    setLastMoveTo(null);
+  }
+
   function undo() {
     setPath((prev) => prev.slice(0, -1));
     setFeedback(null);
@@ -90,6 +98,20 @@ function OpeningStudyContent({ id }: { id: string | undefined }) {
   function reset() {
     setPath([]);
     setFeedback(null);
+    setHintVisible(false);
+    setLastMoveTo(null);
+  }
+
+  function goToEnd() {
+    if (!opening) return;
+    const nextPath: number[] = [];
+    let choices = opening.moves;
+    while (choices.length > 0) {
+      nextPath.push(0);
+      choices = choices[0].next ?? [];
+    }
+    setPath(nextPath);
+    setFeedback("最後まで再生しました");
     setHintVisible(false);
     setLastMoveTo(null);
   }
@@ -118,11 +140,17 @@ function OpeningStudyContent({ id }: { id: string | undefined }) {
             <button type="button" onClick={() => setHintVisible((v) => !v)} disabled={completed}>
               ヒント
             </button>
+            <button type="button" onClick={stepForward} disabled={completed}>
+              1手進む
+            </button>
             <button type="button" onClick={undo} disabled={path.length === 0}>
               1手戻る
             </button>
-            <button type="button" onClick={reset}>
-              最初から
+            <button type="button" onClick={reset} disabled={path.length === 0}>
+              最初に戻る
+            </button>
+            <button type="button" onClick={goToEnd} disabled={completed}>
+              最後まで進む
             </button>
           </div>
           {hintVisible && expected && <div className="hint-box">ヒント: {expected.hint}</div>}

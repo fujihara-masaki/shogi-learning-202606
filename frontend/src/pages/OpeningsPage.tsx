@@ -56,7 +56,7 @@ export default function OpeningsPage() {
                 <p className="muted">ライセンス: {opening.source.license_name}</p>
               )}
             </div>
-            <Link className="primary-link" to={`/openings/${opening.id}`}>再生する</Link>
+            <Link className="primary-link" to={`/openings/${opening.id}`}>学習する</Link>
           </article>
         ))}
         {!hasImported && staticOpenings.map((opening) => (

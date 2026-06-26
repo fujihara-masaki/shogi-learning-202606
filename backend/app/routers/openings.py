@@ -8,7 +8,7 @@ from fastapi import APIRouter, HTTPException, Query
 
 from ..database import get_connection
 
-router = APIRouter(prefix="/api/openings", tags=["openings"])
+router = APIRouter(tags=["openings"])
 
 TAG_LABELS = {
     "nakabisha": "中飛車",
@@ -41,7 +41,7 @@ def _line_row_to_summary(row: Any) -> dict[str, Any]:
     }
 
 
-@router.get("/tags")
+@router.get("/api/openings/tags")
 def list_opening_tags() -> list[dict[str, Any]]:
     conn = get_connection()
     try:
@@ -66,7 +66,8 @@ def list_opening_tags() -> list[dict[str, Any]]:
         conn.close()
 
 
-@router.get("")
+@router.get("/api/openings")
+@router.get("/openings")
 def list_openings(tag: str | None = Query(default=None)) -> list[dict[str, Any]]:
     conn = get_connection()
     try:
@@ -84,7 +85,7 @@ def list_openings(tag: str | None = Query(default=None)) -> list[dict[str, Any]]
                 ol.opening_type,
                 ol.initial_sfen,
                 ol.tags,
-                (SELECT COUNT(*) FROM opening_moves om WHERE om.line_id = ol.id) AS move_count,
+                (SELECT COUNT(*) FROM opening_line_moves om WHERE om.line_id = ol.id) AS move_count,
                 os.name AS source_name,
                 os.license_name,
                 os.license_url
@@ -100,7 +101,9 @@ def list_openings(tag: str | None = Query(default=None)) -> list[dict[str, Any]]
         conn.close()
 
 
-@router.get("/{line_id}")
+@router.get("/api/openings/{line_id}")
+@router.get("/api/opening-lines/{line_id}")
+@router.get("/opening-lines/{line_id}")
 def get_opening(line_id: int) -> dict[str, Any]:
     conn = get_connection()
     try:
@@ -131,7 +134,7 @@ def get_opening(line_id: int) -> dict[str, Any]:
             (line_id,),
         ).fetchall()
         moves = conn.execute(
-            "SELECT ply, usi, from_sfen, to_sfen, comment FROM opening_moves WHERE line_id = ? ORDER BY ply",
+            "SELECT ply, usi, from_sfen, to_sfen, comment, variation_group, parent_move_id, sort_order FROM opening_line_moves WHERE line_id = ? ORDER BY variation_group, ply, sort_order",
             (line_id,),
         ).fetchall()
         tags = conn.execute(
@@ -150,6 +153,9 @@ def get_opening(line_id: int) -> dict[str, Any]:
                     "from_sfen": move["from_sfen"],
                     "to_sfen": move["to_sfen"],
                     "comment": move["comment"],
+                    "variation_group": move["variation_group"],
+                    "parent_move_id": move["parent_move_id"],
+                    "sort_order": move["sort_order"],
                 }
                 for move in moves
             ],
@@ -165,5 +171,39 @@ def get_opening(line_id: int) -> dict[str, Any]:
                 "license_url": row["license_url"] or "",
             },
         }
+    finally:
+        conn.close()
+
+
+@router.get("/api/opening-lines/{line_id}/moves")
+@router.get("/opening-lines/{line_id}/moves")
+def get_opening_moves(line_id: int) -> list[dict[str, Any]]:
+    conn = get_connection()
+    try:
+        exists = conn.execute("SELECT 1 FROM opening_lines WHERE id = ?", (line_id,)).fetchone()
+        if not exists:
+            raise HTTPException(status_code=404, detail="opening not found")
+        rows = conn.execute(
+            """
+            SELECT ply, usi, from_sfen, to_sfen, comment, variation_group, parent_move_id, sort_order
+            FROM opening_line_moves
+            WHERE line_id = ?
+            ORDER BY variation_group, ply, sort_order
+            """,
+            (line_id,),
+        ).fetchall()
+        return [
+            {
+                "ply": row["ply"],
+                "usi": row["usi"],
+                "from_sfen": row["from_sfen"],
+                "to_sfen": row["to_sfen"],
+                "comment": row["comment"],
+                "variation_group": row["variation_group"],
+                "parent_move_id": row["parent_move_id"],
+                "sort_order": row["sort_order"],
+            }
+            for row in rows
+        ]
     finally:
         conn.close()
