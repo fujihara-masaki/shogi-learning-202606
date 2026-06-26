@@ -62,6 +62,8 @@ def test_opening_catalog_seed_apis(client):
     category_names = {category["name_ja"] for category in category_body}
     assert {"相居飛車", "対抗型", "相振り飛車", "奇襲・B級戦法", "囲い・構想"}.issubset(category_names)
     assert all(category["license"] == "CC BY-SA" for category in category_body)
+    assert any(category["source_url"] == "https://ja.wikibooks.org/wiki/将棋の戦法一覧" for category in category_body)
+    assert not any("/wiki/将棋/将棋の戦法一覧" in category["source_url"] for category in category_body)
 
     types = client.get("/opening-types")
     assert types.status_code == 200
@@ -69,6 +71,8 @@ def test_opening_catalog_seed_apis(client):
     type_names = {opening_type["name_ja"] for opening_type in type_body}
     assert {"矢倉", "角換わり", "四間飛車", "嬉野流", "美濃囲い", "雁木"}.issubset(type_names)
     assert all(opening_type["license"] == "CC BY-SA" for opening_type in type_body)
+    assert any(opening_type["source_url"] == "https://ja.wikibooks.org/wiki/将棋の戦法一覧" for opening_type in type_body)
+    assert not any("/wiki/将棋/将棋の戦法一覧" in opening_type["source_url"] for opening_type in type_body)
 
     taikou = next(category for category in category_body if category["name_ja"] == "対抗型")
     filtered = client.get(f"/opening-types?category_id={taikou['id']}")
