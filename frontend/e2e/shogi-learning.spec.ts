@@ -167,13 +167,13 @@ test("creates a new problem, plays it, edits it, and deletes it", async ({ page 
 });
 
 
-test("opening list navigates to a study page", async ({ page }) => {
+test("opening list navigates to a seeded opening study page", async ({ page }) => {
   await page.goto("/openings");
   await expect(page.getByRole("heading", { name: "定跡学習" })).toBeVisible();
   await expect(page.getByTestId("opening-card")).toHaveCount(3);
-  await page.getByTestId("opening-card").filter({ hasText: "居飛車急戦の基本" }).getByRole("link", { name: "学習する" }).click();
+  await page.getByTestId("opening-card").filter({ hasText: "棒銀" }).getByRole("link", { name: "学習する" }).click();
   await expect(page.getByTestId("opening-study-page")).toBeVisible();
-  await expect(page.getByTestId("opening-current-move")).toContainText("▲7六歩");
+  await expect(page.getByTestId("opening-current-move")).toContainText("7g7f");
 });
 
 test("opening study accepts correct moves and supports wrong feedback, undo, and reset", async ({ page }) => {
@@ -197,7 +197,7 @@ test("opening study accepts correct moves and supports wrong feedback, undo, and
 
   await board.locator('[data-square="77"]').click();
   await board.locator('[data-square="76"]').click();
-  await page.getByRole("button", { name: "最初から" }).click();
+  await page.getByRole("button", { name: "最初に戻る" }).click();
   await expect(page.getByTestId("opening-current-move")).toContainText("▲7六歩");
   await expect(page.getByText("まだ指し手はありません")).toBeVisible();
 });
@@ -210,4 +210,20 @@ test("time attack setup starts and displays a problem", async ({ page }) => {
   await page.getByRole("button", { name: "スタート" }).click();
   await expect(page.getByText(/第 1 \/ 5 問/)).toBeVisible();
   await expect(page.getByTestId("shogi-board")).toBeVisible();
+});
+
+test("seeded opening replay controls move forward, backward, reset, and finish", async ({ page }) => {
+  await page.goto("/openings");
+  await page.getByTestId("opening-card").filter({ hasText: "中飛車" }).getByRole("link", { name: "学習する" }).click();
+  await expect(page.getByTestId("opening-current-move")).toContainText("7g7f");
+
+  await page.getByRole("button", { name: "1手進む" }).click();
+  await expect(page.getByTestId("opening-current-move")).toContainText("3c3d");
+  await page.getByRole("button", { name: "1手戻る" }).click();
+  await expect(page.getByTestId("opening-current-move")).toContainText("7g7f");
+  await page.getByRole("button", { name: "1手進む" }).click();
+  await page.getByRole("button", { name: "最初に戻る" }).click();
+  await expect(page.getByText("まだ指し手はありません")).toBeVisible();
+  await page.getByRole("button", { name: "最後まで進む" }).click();
+  await expect(page.getByTestId("opening-feedback")).toContainText("この定跡手順を完了しました");
 });

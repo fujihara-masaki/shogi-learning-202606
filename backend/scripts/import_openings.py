@@ -167,7 +167,7 @@ def import_file(path: Path, *, license_name: str, license_url: str) -> int:
                 [(line_id, ply, sfen) for ply, sfen in enumerate(positions)],
             )
             conn.executemany(
-                "INSERT INTO opening_moves(line_id, ply, usi, from_sfen, to_sfen) VALUES (?, ?, ?, ?, ?)",
+                "INSERT INTO opening_line_moves(line_id, ply, usi, from_sfen, to_sfen) VALUES (?, ?, ?, ?, ?)",
                 [(line_id, ply, usi, before, after) for ply, usi, before, after in move_rows],
             )
             conn.executemany(

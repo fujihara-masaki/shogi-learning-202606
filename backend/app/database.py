@@ -76,7 +76,7 @@ CREATE TABLE IF NOT EXISTS opening_positions (
     UNIQUE(line_id, ply)
 );
 
-CREATE TABLE IF NOT EXISTS opening_moves (
+CREATE TABLE IF NOT EXISTS opening_line_moves (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     line_id INTEGER NOT NULL REFERENCES opening_lines(id) ON DELETE CASCADE,
     ply INTEGER NOT NULL,
@@ -84,8 +84,16 @@ CREATE TABLE IF NOT EXISTS opening_moves (
     from_sfen TEXT NOT NULL,
     to_sfen TEXT NOT NULL,
     comment TEXT NOT NULL DEFAULT '',
-    UNIQUE(line_id, ply)
+    variation_group TEXT NOT NULL DEFAULT 'main',
+    parent_move_id INTEGER REFERENCES opening_line_moves(id) ON DELETE CASCADE,
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    UNIQUE(line_id, ply, variation_group, sort_order)
 );
+
+CREATE VIEW IF NOT EXISTS opening_moves AS
+    SELECT id, line_id, ply, usi, from_sfen, to_sfen, comment
+    FROM opening_line_moves
+    WHERE variation_group = 'main';
 
 CREATE TABLE IF NOT EXISTS opening_tags (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -104,8 +112,8 @@ CREATE INDEX IF NOT EXISTS idx_opening_tags_tag
     ON opening_tags(tag);
 CREATE INDEX IF NOT EXISTS idx_opening_positions_line
     ON opening_positions(line_id, ply);
-CREATE INDEX IF NOT EXISTS idx_opening_moves_line
-    ON opening_moves(line_id, ply);
+CREATE INDEX IF NOT EXISTS idx_opening_line_moves_line
+    ON opening_line_moves(line_id, ply);
 """
 
 
@@ -128,11 +136,41 @@ def _ensure_opening_line_columns(conn: sqlite3.Connection) -> None:
         conn.execute("ALTER TABLE opening_lines ADD COLUMN source_id INTEGER REFERENCES opening_sources(id) ON DELETE SET NULL")
 
 
+def _migrate_opening_moves(conn: sqlite3.Connection) -> None:
+    tables = {row["name"] for row in conn.execute("SELECT name FROM sqlite_master WHERE type IN ('table', 'view')").fetchall()}
+    if "opening_moves" in tables:
+        info = conn.execute("SELECT type FROM sqlite_master WHERE name = 'opening_moves'").fetchone()
+        if info and info["type"] == "table":
+            conn.execute("ALTER TABLE opening_moves RENAME TO opening_line_moves")
+            columns = {row["name"] for row in conn.execute("PRAGMA table_info(opening_line_moves)").fetchall()}
+            if "variation_group" not in columns:
+                conn.execute("ALTER TABLE opening_line_moves ADD COLUMN variation_group TEXT NOT NULL DEFAULT 'main'")
+            if "parent_move_id" not in columns:
+                conn.execute("ALTER TABLE opening_line_moves ADD COLUMN parent_move_id INTEGER REFERENCES opening_line_moves(id) ON DELETE CASCADE")
+            if "sort_order" not in columns:
+                conn.execute("ALTER TABLE opening_line_moves ADD COLUMN sort_order INTEGER NOT NULL DEFAULT 0")
+    objects = {
+        row["name"]
+        for row in conn.execute("SELECT name FROM sqlite_master WHERE type IN ('table', 'view')").fetchall()
+    }
+    if "opening_line_moves" in objects:
+        conn.execute(
+            """
+            CREATE VIEW IF NOT EXISTS opening_moves AS
+                SELECT id, line_id, ply, usi, from_sfen, to_sfen, comment
+                FROM opening_line_moves
+                WHERE variation_group = 'main'
+            """
+        )
+
+
 def init_db() -> None:
     conn = get_connection()
     try:
+        _migrate_opening_moves(conn)
         conn.executescript(SCHEMA)
         _ensure_opening_line_columns(conn)
+        _migrate_opening_moves(conn)
         conn.commit()
     finally:
         conn.close()
