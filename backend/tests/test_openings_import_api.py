@@ -2,7 +2,7 @@ import os
 from pathlib import Path
 
 from app.database import init_db
-from scripts.import_openings import import_file, parse_usi_line, classify_opening, board_snapshots
+from scripts.import_openings import import_file, parse_usi_line, classify_opening, board_snapshots, infer_opening_type
 
 
 def test_import_opening_file_and_query_api(client, tmp_path):
@@ -55,6 +55,39 @@ def test_parse_sfen_line_and_classify_nakabisha():
     tags = classify_opening(positions, parsed.moves)
     assert any(tag.tag == "nakabisha" for tag in tags)
 
+
+
+def test_infer_opening_type_from_import_metadata(client):
+    from app.database import get_connection
+
+    conn = get_connection()
+    try:
+        cases = [
+            ("棒銀戦法", "棒銀"),
+            ("右四間", "右四間飛車"),
+            ("角換わり腰掛け銀", "角換わり腰掛け銀"),
+            ("ゴキ中", "ゴキゲン中飛車"),
+            ("分類できない謎の序盤", "未分類"),
+        ]
+        for text, expected in cases:
+            _, name, _ = infer_opening_type(conn, [text])
+            assert name == expected
+    finally:
+        conn.close()
+
+
+def test_import_opening_file_uses_filename_opening_classification(client, tmp_path):
+    path = tmp_path / "右四間.sfen"
+    path.write_text("startpos moves 7g7f 3c3d\n", encoding="utf-8")
+
+    imported = import_file(path, license_name="CC0", license_url="https://example.test/license")
+    assert imported == 1
+
+    lines = client.get("/api/openings")
+    assert lines.status_code == 200
+    imported_line = next(line for line in lines.json() if line["name"].startswith("右四間 #"))
+    assert imported_line["opening_type"] == "右四間飛車"
+    assert imported_line["opening_type_id"] is not None
 
 def test_opening_catalog_seed_apis(client):
     categories = client.get("/opening-categories")
