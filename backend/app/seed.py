@@ -233,16 +233,37 @@ def seed_opening_catalog_if_empty(conn) -> None:
         )
     category_rows = conn.execute("SELECT id, name_ja FROM opening_categories").fetchall()
     category_ids = {row["name_ja"]: row["id"] for row in category_rows}
-    existing = {
-        (row["category_id"], row["name_ja"])
-        for row in conn.execute("SELECT category_id, name_ja FROM opening_types").fetchall()
+    existing_by_name = {
+        row["name_ja"]: row
+        for row in conn.execute("SELECT id, category_id, name_ja FROM opening_types ORDER BY id").fetchall()
     }
     inserted: dict[str, int] = {}
     for category_name, parent_name, name_ja, name_kana, name_en, aliases, description, source_name, source_url, license_name, sort_order in OPENING_TYPE_SEEDS:
         category_id = category_ids[category_name]
-        if (category_id, name_ja) in existing:
-            row = conn.execute("SELECT id FROM opening_types WHERE category_id = ? AND name_ja = ?", (category_id, name_ja)).fetchone()
-            inserted[name_ja] = row["id"]
+        existing_row = existing_by_name.get(name_ja)
+        if existing_row:
+            conn.execute(
+                """
+                UPDATE opening_types
+                SET category_id = ?, name_kana = ?, name_en = ?, aliases = ?,
+                    description_short = ?, source_name = ?, source_url = ?, license = ?,
+                    sort_order = ?, is_active = 1
+                WHERE id = ?
+                """,
+                (
+                    category_id,
+                    name_kana,
+                    name_en,
+                    json.dumps(aliases, ensure_ascii=False),
+                    description,
+                    source_name,
+                    source_url,
+                    license_name,
+                    sort_order,
+                    existing_row["id"],
+                ),
+            )
+            inserted[name_ja] = existing_row["id"]
             continue
         parent_id = inserted.get(parent_name) if parent_name else None
         cur = conn.execute(

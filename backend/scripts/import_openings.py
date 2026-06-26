@@ -26,6 +26,7 @@ if str(ROOT / "backend") not in sys.path:
     sys.path.insert(0, str(ROOT / "backend"))
 
 from app.database import get_connection, init_db  # noqa: E402
+from app.seed import seed_opening_catalog_if_empty  # noqa: E402
 
 TAG_LABELS = {
     "nakabisha": "中飛車",
@@ -301,8 +302,18 @@ def import_file(path: Path, *, license_name: str, license_url: str) -> int:
         conn.close()
 
 
+def ensure_opening_catalog_seeded() -> None:
+    conn = get_connection()
+    try:
+        seed_opening_catalog_if_empty(conn)
+        conn.commit()
+    finally:
+        conn.close()
+
+
 def import_directory(directory: Path, *, license_name: str, license_url: str) -> int:
     init_db()
+    ensure_opening_catalog_seeded()
     count = 0
     for path in sorted(directory.glob("*.sfen")):
         count += import_file(path, license_name=license_name, license_url=license_url)

@@ -2,7 +2,7 @@ import os
 from pathlib import Path
 
 from app.database import init_db
-from scripts.import_openings import import_file, parse_usi_line, classify_opening, board_snapshots, infer_opening_type
+from scripts.import_openings import import_directory, import_file, parse_usi_line, classify_opening, board_snapshots, infer_opening_type
 
 
 def test_import_opening_file_and_query_api(client, tmp_path):
@@ -88,6 +88,91 @@ def test_import_opening_file_uses_filename_opening_classification(client, tmp_pa
     imported_line = next(line for line in lines.json() if line["name"].startswith("右四間 #"))
     assert imported_line["opening_type"] == "右四間飛車"
     assert imported_line["opening_type_id"] is not None
+
+
+def test_import_directory_seeds_opening_catalog_for_fresh_database(tmp_path):
+    db_path = tmp_path / "fresh-import.db"
+    import_dir = tmp_path / "openings"
+    import_dir.mkdir()
+    path = import_dir / "ゴキ中.sfen"
+    path.write_text("startpos moves 7g7f 3c3d 2h5h\n", encoding="utf-8")
+    os.environ["SHOGI_DB_PATH"] = str(db_path)
+    try:
+        imported = import_directory(import_dir, license_name="CC0", license_url="https://example.test/license")
+        assert imported == 1
+
+        import sqlite3
+
+        conn = sqlite3.connect(db_path)
+        conn.row_factory = sqlite3.Row
+        try:
+            line = conn.execute(
+                """
+                SELECT opening_lines.opening_type_id, opening_lines.opening_type, opening_types.name_ja
+                FROM opening_lines
+                LEFT JOIN opening_types ON opening_types.id = opening_lines.opening_type_id
+                WHERE opening_lines.name = 'ゴキ中 #1'
+                """
+            ).fetchone()
+            assert line is not None
+            assert line["opening_type_id"] is not None
+            assert line["opening_type"] == "ゴキゲン中飛車"
+            assert line["name_ja"] == "ゴキゲン中飛車"
+        finally:
+            conn.close()
+    finally:
+        os.environ.pop("SHOGI_DB_PATH", None)
+
+
+def test_seed_opening_catalog_updates_same_name_types_without_duplicates(tmp_path):
+    db_path = tmp_path / "legacy-catalog.db"
+    os.environ["SHOGI_DB_PATH"] = str(db_path)
+    try:
+        init_db()
+
+        from app.database import get_connection
+        from app.seed import seed_opening_catalog_if_empty
+
+        conn = get_connection()
+        try:
+            conn.execute("INSERT INTO opening_categories(name_ja, sort_order) VALUES ('奇襲・B級戦法', 40)")
+            conn.execute("INSERT INTO opening_categories(name_ja, sort_order) VALUES ('囲い・構想', 50)")
+            conn.execute("INSERT INTO opening_categories(name_ja, sort_order) VALUES ('対抗型', 20)")
+            conn.execute("INSERT INTO opening_categories(name_ja, sort_order) VALUES ('相居飛車', 10)")
+            old_right = conn.execute(
+                "INSERT INTO opening_types(category_id, name_ja, aliases) VALUES (1, '右四間飛車', '[]')"
+            ).lastrowid
+            old_gangi = conn.execute(
+                "INSERT INTO opening_types(category_id, name_ja, aliases) VALUES (2, '雁木', '[]')"
+            ).lastrowid
+            conn.execute(
+                "INSERT INTO opening_lines(opening_type_id, name, opening_type, initial_sfen) VALUES (?, '右四間飛車', '右四間飛車', 'startpos')",
+                (old_right,),
+            )
+
+            seed_opening_catalog_if_empty(conn)
+            conn.commit()
+
+            rows = conn.execute(
+                "SELECT name_ja, COUNT(*) AS c FROM opening_types WHERE name_ja IN ('右四間飛車', '雁木') GROUP BY name_ja"
+            ).fetchall()
+            assert {row["name_ja"]: row["c"] for row in rows} == {"右四間飛車": 1, "雁木": 1}
+
+            right = conn.execute("SELECT id, category_id FROM opening_types WHERE name_ja = '右四間飛車'").fetchone()
+            gangi = conn.execute("SELECT id, category_id FROM opening_types WHERE name_ja = '雁木'").fetchone()
+            taikou = conn.execute("SELECT id FROM opening_categories WHERE name_ja = '対抗型'").fetchone()
+            aiibisha = conn.execute("SELECT id FROM opening_categories WHERE name_ja = '相居飛車'").fetchone()
+            assert right["id"] == old_right
+            assert right["category_id"] == taikou["id"]
+            assert gangi["id"] == old_gangi
+            assert gangi["category_id"] == aiibisha["id"]
+
+            line = conn.execute("SELECT opening_type_id FROM opening_lines WHERE name = '右四間飛車'").fetchone()
+            assert line["opening_type_id"] == old_right
+        finally:
+            conn.close()
+    finally:
+        os.environ.pop("SHOGI_DB_PATH", None)
 
 def test_opening_catalog_seed_apis(client):
     categories = client.get("/opening-categories")
