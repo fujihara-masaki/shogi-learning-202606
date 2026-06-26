@@ -84,6 +84,7 @@ CREATE TABLE IF NOT EXISTS opening_sources (
 CREATE TABLE IF NOT EXISTS opening_lines (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     source_id INTEGER REFERENCES opening_sources(id) ON DELETE SET NULL,
+    opening_type_id INTEGER REFERENCES opening_types(id) ON DELETE SET NULL,
     name TEXT NOT NULL,
     opening_type TEXT NOT NULL,     -- 矢倉 / 角換わり / 四間飛車 など
     initial_sfen TEXT NOT NULL,
@@ -136,6 +137,8 @@ CREATE INDEX IF NOT EXISTS idx_tsume_problems_mate_length
     ON tsume_problems(mate_length);
 CREATE INDEX IF NOT EXISTS idx_opening_tags_tag
     ON opening_tags(tag);
+CREATE INDEX IF NOT EXISTS idx_opening_lines_type
+    ON opening_lines(opening_type_id);
 CREATE INDEX IF NOT EXISTS idx_opening_types_category
     ON opening_types(category_id, sort_order);
 CREATE INDEX IF NOT EXISTS idx_opening_types_parent
@@ -164,6 +167,8 @@ def _ensure_opening_line_columns(conn: sqlite3.Connection) -> None:
     columns = {row["name"] for row in conn.execute("PRAGMA table_info(opening_lines)").fetchall()}
     if "source_id" not in columns:
         conn.execute("ALTER TABLE opening_lines ADD COLUMN source_id INTEGER REFERENCES opening_sources(id) ON DELETE SET NULL")
+    if "opening_type_id" not in columns:
+        conn.execute("ALTER TABLE opening_lines ADD COLUMN opening_type_id INTEGER REFERENCES opening_types(id) ON DELETE SET NULL")
 
 
 def _migrate_opening_moves(conn: sqlite3.Connection) -> None:
@@ -194,12 +199,53 @@ def _migrate_opening_moves(conn: sqlite3.Connection) -> None:
         )
 
 
+def _backfill_opening_line_type_ids(conn: sqlite3.Connection) -> None:
+    objects = {
+        row["name"]
+        for row in conn.execute("SELECT name FROM sqlite_master WHERE type = 'table'").fetchall()
+    }
+    if not {"opening_lines", "opening_types"}.issubset(objects):
+        return
+    columns = {row["name"] for row in conn.execute("PRAGMA table_info(opening_lines)").fetchall()}
+    if "opening_type_id" not in columns:
+        return
+    conn.execute(
+        """
+        UPDATE opening_lines
+        SET opening_type_id = (
+            SELECT ot.id
+            FROM opening_types ot
+            WHERE ot.name_ja = opening_lines.name
+            ORDER BY ot.id
+            LIMIT 1
+        )
+        WHERE opening_type_id IS NULL
+          AND EXISTS (SELECT 1 FROM opening_types ot WHERE ot.name_ja = opening_lines.name)
+        """
+    )
+    conn.execute(
+        """
+        UPDATE opening_lines
+        SET opening_type_id = (
+            SELECT ot.id
+            FROM opening_types ot
+            WHERE ot.name_ja = opening_lines.opening_type
+            ORDER BY ot.id
+            LIMIT 1
+        )
+        WHERE opening_type_id IS NULL
+          AND EXISTS (SELECT 1 FROM opening_types ot WHERE ot.name_ja = opening_lines.opening_type)
+        """
+    )
+
+
 def init_db() -> None:
     conn = get_connection()
     try:
         _migrate_opening_moves(conn)
         conn.executescript(SCHEMA)
         _ensure_opening_line_columns(conn)
+        _backfill_opening_line_type_ids(conn)
         _migrate_opening_moves(conn)
         conn.commit()
     finally:

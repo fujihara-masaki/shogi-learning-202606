@@ -19,6 +19,7 @@ def test_import_opening_file_and_query_api(client, tmp_path):
     assert lines.status_code == 200
     body = lines.json()
     imported_line = next(line for line in body if line["source"]["license_name"] == "CC0")
+    assert imported_line["opening_type_id"] is not None
 
     detail = client.get(f"/api/openings/{imported_line['id']}")
     assert detail.status_code == 200
@@ -84,3 +85,9 @@ def test_opening_catalog_seed_apis(client):
     detail = client.get(f"/opening-types/{detail_id}")
     assert detail.status_code == 200
     assert detail.json()["name_ja"] == "矢倉"
+
+    nakabisha_id = next(opening_type["id"] for opening_type in type_body if opening_type["name_ja"] == "中飛車")
+    nakabisha_lines = client.get(f"/opening-types/{nakabisha_id}/lines")
+    assert nakabisha_lines.status_code == 200
+    assert any(line["name"] == "中飛車" and line["opening_type_id"] == nakabisha_id for line in nakabisha_lines.json())
+    assert next(opening_type for opening_type in type_body if opening_type["name_ja"] == "中飛車")["opening_line_count"] == len(nakabisha_lines.json())

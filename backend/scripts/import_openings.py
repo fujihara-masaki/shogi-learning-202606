@@ -33,6 +33,11 @@ TAG_LABELS = {
     "mukaibisha": "向かい飛車",
 }
 
+OPENING_TYPE_TAGS = {
+    "nakabisha": "中飛車",
+    "mukaibisha": "向かい飛車",
+}
+
 
 @dataclass(frozen=True)
 class ParsedLine:
@@ -146,13 +151,20 @@ def import_file(path: Path, *, license_name: str, license_url: str) -> int:
             primary = max(tags, key=lambda t: t.score)
             tag_values = [tag.tag for tag in tags]
             name = f"{path.stem} #{line_no}"
+            opening_type_name = OPENING_TYPE_TAGS.get(primary.tag)
+            type_row = (
+                conn.execute("SELECT id FROM opening_types WHERE name_ja = ?", (opening_type_name,)).fetchone()
+                if opening_type_name
+                else None
+            )
             cur = conn.execute(
                 """
-                INSERT INTO opening_lines(source_id, name, opening_type, initial_sfen, moves, comments, tags)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO opening_lines(source_id, opening_type_id, name, opening_type, initial_sfen, moves, comments, tags)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     source_id,
+                    type_row["id"] if type_row else None,
                     name,
                     TAG_LABELS.get(primary.tag, primary.tag),
                     positions[0],
