@@ -137,8 +137,6 @@ CREATE INDEX IF NOT EXISTS idx_tsume_problems_mate_length
     ON tsume_problems(mate_length);
 CREATE INDEX IF NOT EXISTS idx_opening_tags_tag
     ON opening_tags(tag);
-CREATE INDEX IF NOT EXISTS idx_opening_lines_type
-    ON opening_lines(opening_type_id);
 CREATE INDEX IF NOT EXISTS idx_opening_types_category
     ON opening_types(category_id, sort_order);
 CREATE INDEX IF NOT EXISTS idx_opening_types_parent
@@ -169,6 +167,12 @@ def _ensure_opening_line_columns(conn: sqlite3.Connection) -> None:
         conn.execute("ALTER TABLE opening_lines ADD COLUMN source_id INTEGER REFERENCES opening_sources(id) ON DELETE SET NULL")
     if "opening_type_id" not in columns:
         conn.execute("ALTER TABLE opening_lines ADD COLUMN opening_type_id INTEGER REFERENCES opening_types(id) ON DELETE SET NULL")
+
+
+def _ensure_opening_line_indexes(conn: sqlite3.Connection) -> None:
+    columns = {row["name"] for row in conn.execute("PRAGMA table_info(opening_lines)").fetchall()}
+    if "opening_type_id" in columns:
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_opening_lines_type ON opening_lines(opening_type_id)")
 
 
 def _migrate_opening_moves(conn: sqlite3.Connection) -> None:
@@ -245,6 +249,7 @@ def init_db() -> None:
         _migrate_opening_moves(conn)
         conn.executescript(SCHEMA)
         _ensure_opening_line_columns(conn)
+        _ensure_opening_line_indexes(conn)
         _backfill_opening_line_type_ids(conn)
         _migrate_opening_moves(conn)
         conn.commit()

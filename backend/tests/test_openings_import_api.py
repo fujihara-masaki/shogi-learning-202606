@@ -91,3 +91,75 @@ def test_opening_catalog_seed_apis(client):
     assert nakabisha_lines.status_code == 200
     assert any(line["name"] == "中飛車" and line["opening_type_id"] == nakabisha_id for line in nakabisha_lines.json())
     assert next(opening_type for opening_type in type_body if opening_type["name_ja"] == "中飛車")["opening_line_count"] == len(nakabisha_lines.json())
+
+
+def test_init_db_migrates_existing_opening_lines_type_id_column_and_index(tmp_path):
+    db_path = tmp_path / "legacy.db"
+    os.environ["SHOGI_DB_PATH"] = str(db_path)
+    try:
+        import sqlite3
+
+        conn = sqlite3.connect(db_path)
+        try:
+            conn.executescript(
+                """
+                CREATE TABLE opening_categories (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    name_ja TEXT NOT NULL UNIQUE,
+                    sort_order INTEGER NOT NULL DEFAULT 0,
+                    description TEXT NOT NULL DEFAULT '',
+                    source_url TEXT NOT NULL DEFAULT '',
+                    license TEXT NOT NULL DEFAULT ''
+                );
+                CREATE TABLE opening_types (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    category_id INTEGER NOT NULL REFERENCES opening_categories(id) ON DELETE CASCADE,
+                    parent_id INTEGER REFERENCES opening_types(id) ON DELETE SET NULL,
+                    name_ja TEXT NOT NULL,
+                    name_kana TEXT NOT NULL DEFAULT '',
+                    name_en TEXT NOT NULL DEFAULT '',
+                    aliases TEXT NOT NULL DEFAULT '[]',
+                    description_short TEXT NOT NULL DEFAULT '',
+                    source_name TEXT NOT NULL DEFAULT '',
+                    source_url TEXT NOT NULL DEFAULT '',
+                    license TEXT NOT NULL DEFAULT '',
+                    sort_order INTEGER NOT NULL DEFAULT 0,
+                    is_active INTEGER NOT NULL DEFAULT 1,
+                    UNIQUE(category_id, name_ja)
+                );
+                CREATE TABLE opening_lines (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    source_id INTEGER REFERENCES opening_sources(id) ON DELETE SET NULL,
+                    name TEXT NOT NULL,
+                    opening_type TEXT NOT NULL,
+                    initial_sfen TEXT NOT NULL,
+                    moves TEXT NOT NULL DEFAULT '[]',
+                    comments TEXT NOT NULL DEFAULT '[]',
+                    tags TEXT NOT NULL DEFAULT '[]',
+                    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+                );
+                INSERT INTO opening_categories(name_ja) VALUES ('対抗型');
+                INSERT INTO opening_types(category_id, name_ja) VALUES (1, '中飛車');
+                INSERT INTO opening_lines(name, opening_type, initial_sfen) VALUES ('中飛車', '振り飛車', 'startpos');
+                """
+            )
+            conn.commit()
+        finally:
+            conn.close()
+
+        init_db()
+
+        conn = sqlite3.connect(db_path)
+        conn.row_factory = sqlite3.Row
+        try:
+            columns = {row["name"] for row in conn.execute("PRAGMA table_info(opening_lines)").fetchall()}
+            assert "opening_type_id" in columns
+            index = conn.execute("SELECT 1 FROM sqlite_master WHERE type = 'index' AND name = 'idx_opening_lines_type'").fetchone()
+            assert index is not None
+            row = conn.execute("SELECT opening_type_id FROM opening_lines WHERE name = '中飛車'").fetchone()
+            assert row["opening_type_id"] == 1
+        finally:
+            conn.close()
+    finally:
+        os.environ.pop("SHOGI_DB_PATH", None)
