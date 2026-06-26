@@ -213,6 +213,7 @@ export interface OpeningSummary {
   id: number;
   name: string;
   opening_type: string;
+  opening_type_id: number | null;
   initial_sfen: string;
   move_count: number;
   tags: string[];
@@ -243,6 +244,7 @@ export interface ImportedOpeningDetail {
   id: number;
   name: string;
   opening_type: string;
+  opening_type_id: number | null;
   initial_sfen: string;
   moves: ImportedOpeningMove[];
   positions: ImportedOpeningPosition[];
@@ -257,6 +259,10 @@ export function fetchOpeningCategories(): Promise<OpeningCategory[]> {
 export function fetchOpeningTypes(categoryId?: number): Promise<OpeningType[]> {
   const qs = categoryId ? `?category_id=${encodeURIComponent(String(categoryId))}` : "";
   return request<OpeningType[]>(`/api/opening-types${qs}`);
+}
+
+export function fetchOpeningTypeLines(id: number): Promise<OpeningSummary[]> {
+  return request<OpeningSummary[]>(`/api/opening-types/${id}/lines`);
 }
 
 export function fetchOpeningType(id: number): Promise<OpeningType> {

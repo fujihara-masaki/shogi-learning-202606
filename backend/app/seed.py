@@ -247,12 +247,16 @@ def seed_openings_if_empty(conn) -> None:
         return
     for opening in SAMPLE_OPENING_LINES:
         positions, move_rows = _opening_snapshots(shogi.STARTING_SFEN, opening["moves"])
+        type_row = conn.execute(
+            "SELECT id FROM opening_types WHERE name_ja = ?", (opening["name"],)
+        ).fetchone()
         cur = conn.execute(
             """
-            INSERT INTO opening_lines(name, opening_type, initial_sfen, moves, comments, tags)
-            VALUES (?, ?, ?, ?, ?, ?)
+            INSERT INTO opening_lines(opening_type_id, name, opening_type, initial_sfen, moves, comments, tags)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
             """,
             (
+                type_row["id"] if type_row else None,
                 opening["name"],
                 opening["opening_type"],
                 shogi.STARTING_SFEN,
