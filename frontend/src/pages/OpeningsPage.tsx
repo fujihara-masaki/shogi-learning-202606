@@ -49,10 +49,7 @@ export default function OpeningsPage() {
   }, [selectedTag, selectedCategoryId]);
 
   useEffect(() => {
-    if (!selectedType || selectedType.opening_line_count === 0) {
-      setTypeLines([]);
-      return;
-    }
+    if (!selectedType || selectedType.opening_line_count === 0) return;
     let cancelled = false;
     fetchOpeningTypeLines(selectedType.id)
       .then((lines) => {
@@ -65,6 +62,26 @@ export default function OpeningsPage() {
       cancelled = true;
     };
   }, [selectedType]);
+
+  function resetSelectedTypeLines() {
+    setSelectedType(null);
+    setTypeLines([]);
+  }
+
+  function handleTagChange(tag: string) {
+    setSelectedTag(tag);
+    resetSelectedTypeLines();
+  }
+
+  function handleCategorySelect(categoryId: number | null) {
+    setSelectedCategoryId(categoryId);
+    resetSelectedTypeLines();
+  }
+
+  function handleTypeLinesClick(type: OpeningType) {
+    setSelectedType(type);
+    setTypeLines([]);
+  }
 
   const hasImported = imported.length > 0;
   const staticOpenings = useMemo(() => (selectedTag || selectedCategoryId ? [] : OPENING_LINES), [selectedTag, selectedCategoryId]);
@@ -83,7 +100,7 @@ export default function OpeningsPage() {
       </section>
 
       <div className="filter-bar">
-        <select value={selectedTag} onChange={(e) => setSelectedTag(e.target.value)} aria-label="戦型タグ">
+        <select value={selectedTag} onChange={(e) => handleTagChange(e.target.value)} aria-label="戦型タグ">
           <option value="">定跡タグ: すべて</option>
           {tags.map((tag) => (
             <option key={tag.tag} value={tag.tag}>{tag.label} ({tag.count})</option>
@@ -94,11 +111,11 @@ export default function OpeningsPage() {
       <section>
         <h2>戦型カテゴリ</h2>
         <div className="opening-category-grid" data-testid="opening-category-list">
-          <button className={!selectedCategoryId ? "opening-category-card active" : "opening-category-card"} onClick={() => setSelectedCategoryId(null)} type="button">
+          <button className={!selectedCategoryId ? "opening-category-card active" : "opening-category-card"} onClick={() => handleCategorySelect(null)} type="button">
             <strong>すべて</strong><span>全カテゴリの戦型を表示</span>
           </button>
           {categories.map((category) => (
-            <button key={category.id} className={selectedCategoryId === category.id ? "opening-category-card active" : "opening-category-card"} onClick={() => setSelectedCategoryId(category.id)} type="button" data-testid="opening-category-card">
+            <button key={category.id} className={selectedCategoryId === category.id ? "opening-category-card active" : "opening-category-card"} onClick={() => handleCategorySelect(category.id)} type="button" data-testid="opening-category-card">
               <strong>{category.name_ja}</strong><span>{category.description}</span>
             </button>
           ))}
@@ -118,7 +135,7 @@ export default function OpeningsPage() {
                 <p className="muted">出典: {type.source_name} / ライセンス: {type.license}</p>
               </div>
               {type.opening_line_count > 0 ? (
-                <button type="button" className="primary-link" onClick={() => setSelectedType(type)}>
+                <button type="button" className="primary-link" onClick={() => handleTypeLinesClick(type)}>
                   関連定跡ラインを見る ({type.opening_line_count})
                 </button>
               ) : <strong className="muted">定跡手順は準備中</strong>}
