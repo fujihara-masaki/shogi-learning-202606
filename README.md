@@ -166,6 +166,12 @@ python scripts/import_openings.py ../data/openings --license-name CC0 --license-
 
 取り込み時に、各手の前後 SFEN、USI 指し手、ライセンス情報を `opening_sources` / `opening_positions` / `opening_moves` / `opening_tags` に保存します。分類はMVPとして簡易ルールです。中飛車は「序盤40手以内に飛車が5筋にいる」場合に `nakabisha` タグを付与します。棒銀・向かい飛車も簡易的に判定します。
 
+### 戦型一覧 seed データの出典とライセンス
+
+`opening_categories` / `opening_types` の初期 seed データは、Wikibooks「将棋の戦法一覧」、Wikipedia「将棋の戦法」、Wikipediaカテゴリ「将棋の戦法」を参考に、アプリ用に手作業で確認・短い説明文として整理したものです。実行時に外部 Web ページをスクレイピングせず、DB 初期化時にローカル seed として投入します。
+
+これらの参考元は CC BY-SA ライセンスのコンテンツを含むため、アプリ内の「データ出典」表示および各 API レスポンスの `source_url` / `license` に出典と `CC BY-SA` を明記しています。
+
 ## 定跡学習 MVP の使い方
 
 1. ホームまたは上部ナビゲーションの「定跡学習」を開きます(`/openings`)。
@@ -214,7 +220,7 @@ SQLite に以下のテーブルを作成します(`backend/app/database.py`)。
 - `tsume_problems` — 問題(SFEN 初期局面、USI 手順の JSON、タグ、解説、お気に入り)
 - `problem_results` — 問題ごとの解答履歴(正解/不正解、解答時間、ミス数)
 - `time_attack_results` — タイムアタック結果
-- `opening_lines` — 戦型別定跡ライン(SFEN + USI 手順 + タグ)
+- `opening_lines` — 戦型別定跡ライン(SFEN + USI 手順 + タグ、`opening_type_id` による戦型カタログ紐づけ)
 - `opening_sources` — 取り込み元ファイルとライセンス情報
 - `opening_positions` — 定跡ラインの各 ply の SFEN
 - `opening_moves` — 各手の USI と指し手前後の SFEN

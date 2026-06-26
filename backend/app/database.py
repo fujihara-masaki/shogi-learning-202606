@@ -45,6 +45,32 @@ CREATE TABLE IF NOT EXISTS time_attack_results (
     played_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
+CREATE TABLE IF NOT EXISTS opening_categories (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name_ja TEXT NOT NULL UNIQUE,
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    description TEXT NOT NULL DEFAULT '',
+    source_url TEXT NOT NULL DEFAULT '',
+    license TEXT NOT NULL DEFAULT ''
+);
+
+CREATE TABLE IF NOT EXISTS opening_types (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    category_id INTEGER NOT NULL REFERENCES opening_categories(id) ON DELETE CASCADE,
+    parent_id INTEGER REFERENCES opening_types(id) ON DELETE SET NULL,
+    name_ja TEXT NOT NULL,
+    name_kana TEXT NOT NULL DEFAULT '',
+    name_en TEXT NOT NULL DEFAULT '',
+    aliases TEXT NOT NULL DEFAULT '[]',
+    description_short TEXT NOT NULL DEFAULT '',
+    source_name TEXT NOT NULL DEFAULT '',
+    source_url TEXT NOT NULL DEFAULT '',
+    license TEXT NOT NULL DEFAULT '',
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    is_active INTEGER NOT NULL DEFAULT 1,
+    UNIQUE(category_id, name_ja)
+);
+
 CREATE TABLE IF NOT EXISTS opening_sources (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL,
@@ -58,6 +84,7 @@ CREATE TABLE IF NOT EXISTS opening_sources (
 CREATE TABLE IF NOT EXISTS opening_lines (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     source_id INTEGER REFERENCES opening_sources(id) ON DELETE SET NULL,
+    opening_type_id INTEGER REFERENCES opening_types(id) ON DELETE SET NULL,
     name TEXT NOT NULL,
     opening_type TEXT NOT NULL,     -- 矢倉 / 角換わり / 四間飛車 など
     initial_sfen TEXT NOT NULL,
@@ -110,10 +137,16 @@ CREATE INDEX IF NOT EXISTS idx_tsume_problems_mate_length
     ON tsume_problems(mate_length);
 CREATE INDEX IF NOT EXISTS idx_opening_tags_tag
     ON opening_tags(tag);
+CREATE INDEX IF NOT EXISTS idx_opening_types_category
+    ON opening_types(category_id, sort_order);
+CREATE INDEX IF NOT EXISTS idx_opening_types_parent
+    ON opening_types(parent_id);
 CREATE INDEX IF NOT EXISTS idx_opening_positions_line
     ON opening_positions(line_id, ply);
 CREATE INDEX IF NOT EXISTS idx_opening_line_moves_line
     ON opening_line_moves(line_id, ply);
+CREATE INDEX IF NOT EXISTS idx_opening_lines_type
+    ON opening_lines(opening_type_id);
 """
 
 
@@ -134,6 +167,8 @@ def _ensure_opening_line_columns(conn: sqlite3.Connection) -> None:
     columns = {row["name"] for row in conn.execute("PRAGMA table_info(opening_lines)").fetchall()}
     if "source_id" not in columns:
         conn.execute("ALTER TABLE opening_lines ADD COLUMN source_id INTEGER REFERENCES opening_sources(id) ON DELETE SET NULL")
+    if "opening_type_id" not in columns:
+        conn.execute("ALTER TABLE opening_lines ADD COLUMN opening_type_id INTEGER REFERENCES opening_types(id) ON DELETE SET NULL")
 
 
 def _migrate_opening_moves(conn: sqlite3.Connection) -> None:

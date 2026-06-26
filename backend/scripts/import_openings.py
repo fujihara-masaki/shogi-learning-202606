@@ -26,6 +26,7 @@ if str(ROOT / "backend") not in sys.path:
     sys.path.insert(0, str(ROOT / "backend"))
 
 from app.database import get_connection, init_db  # noqa: E402
+from app.seed import find_opening_type_id, seed_opening_catalog_if_empty  # noqa: E402
 
 TAG_LABELS = {
     "nakabisha": "中飛車",
@@ -135,6 +136,7 @@ def import_file(path: Path, *, license_name: str, license_url: str) -> int:
             (path.stem, str(path), license_name, license_url),
         )
         source_id = int(cur.lastrowid)
+        seed_opening_catalog_if_empty(conn)
         imported = 0
         for line_no, raw in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
             text = raw.strip()
@@ -146,15 +148,18 @@ def import_file(path: Path, *, license_name: str, license_url: str) -> int:
             primary = max(tags, key=lambda t: t.score)
             tag_values = [tag.tag for tag in tags]
             name = f"{path.stem} #{line_no}"
+            opening_type = TAG_LABELS.get(primary.tag, primary.tag)
+            opening_type_id = find_opening_type_id(conn, opening_type)
             cur = conn.execute(
                 """
-                INSERT INTO opening_lines(source_id, name, opening_type, initial_sfen, moves, comments, tags)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO opening_lines(source_id, opening_type_id, name, opening_type, initial_sfen, moves, comments, tags)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     source_id,
+                    opening_type_id,
                     name,
-                    TAG_LABELS.get(primary.tag, primary.tag),
+                    opening_type,
                     positions[0],
                     json.dumps(parsed.moves, ensure_ascii=False),
                     json.dumps([], ensure_ascii=False),

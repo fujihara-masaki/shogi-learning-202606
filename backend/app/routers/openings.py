@@ -28,6 +28,7 @@ def _line_row_to_summary(row: Any) -> dict[str, Any]:
     return {
         "id": row["id"],
         "name": row["name"],
+        "opening_type_id": row["opening_type_id"],
         "opening_type": row["opening_type"],
         "initial_sfen": row["initial_sfen"],
         "move_count": row["move_count"],
@@ -82,6 +83,7 @@ def list_openings(tag: str | None = Query(default=None)) -> list[dict[str, Any]]
                 ol.id,
                 ol.source_id,
                 ol.name,
+                ol.opening_type_id,
                 ol.opening_type,
                 ol.initial_sfen,
                 ol.tags,
@@ -113,6 +115,7 @@ def get_opening(line_id: int) -> dict[str, Any]:
                 ol.id,
                 ol.source_id,
                 ol.name,
+                ol.opening_type_id,
                 ol.opening_type,
                 ol.initial_sfen,
                 ol.moves,
@@ -144,6 +147,7 @@ def get_opening(line_id: int) -> dict[str, Any]:
         return {
             "id": row["id"],
             "name": row["name"],
+            "opening_type_id": row["opening_type_id"],
             "opening_type": row["opening_type"],
             "initial_sfen": row["initial_sfen"],
             "moves": [
@@ -205,5 +209,135 @@ def get_opening_moves(line_id: int) -> list[dict[str, Any]]:
             }
             for row in rows
         ]
+    finally:
+        conn.close()
+
+
+def _category_row(row: Any) -> dict[str, Any]:
+    return {
+        "id": row["id"],
+        "name_ja": row["name_ja"],
+        "sort_order": row["sort_order"],
+        "description": row["description"],
+        "source_url": row["source_url"],
+        "license": row["license"],
+    }
+
+
+def _type_row(row: Any) -> dict[str, Any]:
+    return {
+        "id": row["id"],
+        "category_id": row["category_id"],
+        "category_name_ja": row["category_name_ja"],
+        "parent_id": row["parent_id"],
+        "name_ja": row["name_ja"],
+        "name_kana": row["name_kana"],
+        "name_en": row["name_en"],
+        "aliases": _json_list(row["aliases"]),
+        "description_short": row["description_short"],
+        "source_name": row["source_name"],
+        "source_url": row["source_url"],
+        "license": row["license"],
+        "sort_order": row["sort_order"],
+        "is_active": bool(row["is_active"]),
+        "opening_line_count": row["opening_line_count"],
+    }
+
+
+@router.get("/api/opening-categories")
+@router.get("/opening-categories")
+def list_opening_categories() -> list[dict[str, Any]]:
+    conn = get_connection()
+    try:
+        rows = conn.execute(
+            """
+            SELECT id, name_ja, sort_order, description, source_url, license
+            FROM opening_categories
+            ORDER BY sort_order, id
+            """
+        ).fetchall()
+        return [_category_row(row) for row in rows]
+    finally:
+        conn.close()
+
+
+@router.get("/api/opening-types")
+@router.get("/opening-types")
+def list_opening_types(category_id: int | None = Query(default=None)) -> list[dict[str, Any]]:
+    conn = get_connection()
+    try:
+        params: list[Any] = []
+        where = "WHERE ot.is_active = 1"
+        if category_id is not None:
+            where += " AND ot.category_id = ?"
+            params.append(category_id)
+        rows = conn.execute(
+            f"""
+            SELECT ot.*, oc.name_ja AS category_name_ja,
+                   (SELECT COUNT(*) FROM opening_lines ol WHERE ol.opening_type_id = ot.id) AS opening_line_count
+            FROM opening_types ot
+            JOIN opening_categories oc ON oc.id = ot.category_id
+            {where}
+            ORDER BY oc.sort_order, ot.sort_order, ot.id
+            """,
+            params,
+        ).fetchall()
+        return [_type_row(row) for row in rows]
+    finally:
+        conn.close()
+
+
+@router.get("/api/opening-types/{opening_type_id}/lines")
+@router.get("/opening-types/{opening_type_id}/lines")
+def list_opening_type_lines(opening_type_id: int) -> list[dict[str, Any]]:
+    conn = get_connection()
+    try:
+        exists = conn.execute("SELECT 1 FROM opening_types WHERE id = ?", (opening_type_id,)).fetchone()
+        if not exists:
+            raise HTTPException(status_code=404, detail="opening type not found")
+        rows = conn.execute(
+            """
+            SELECT
+                ol.id,
+                ol.source_id,
+                ol.name,
+                ol.opening_type_id,
+                ol.opening_type,
+                ol.initial_sfen,
+                ol.tags,
+                (SELECT COUNT(*) FROM opening_line_moves om WHERE om.line_id = ol.id) AS move_count,
+                os.name AS source_name,
+                os.license_name,
+                os.license_url
+            FROM opening_lines ol
+            LEFT JOIN opening_sources os ON os.id = ol.source_id
+            WHERE ol.opening_type_id = ?
+            ORDER BY ol.id DESC
+            """,
+            (opening_type_id,),
+        ).fetchall()
+        return [_line_row_to_summary(row) for row in rows]
+    finally:
+        conn.close()
+
+
+@router.get("/api/opening-types/{opening_type_id}")
+@router.get("/opening-types/{opening_type_id}")
+def get_opening_type(opening_type_id: int) -> dict[str, Any]:
+    conn = get_connection()
+    try:
+        row = conn.execute(
+            """
+            SELECT ot.*, oc.name_ja AS category_name_ja,
+                   (SELECT COUNT(*) FROM opening_lines ol WHERE ol.opening_type_id = ot.id) AS opening_line_count
+            FROM opening_types ot
+            JOIN opening_categories oc ON oc.id = ot.category_id
+            WHERE ot.id = ?
+            """,
+            (opening_type_id,),
+        ).fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="opening type not found")
+        return _type_row(row)
     finally:
         conn.close()

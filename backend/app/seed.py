@@ -153,6 +153,37 @@ SAMPLE_OPENING_LINES = [
     },
 ]
 
+OPENING_CATEGORY_SEEDS = [
+    {"name_ja": "相居飛車", "sort_order": 10, "description": "双方が居飛車で戦う代表的な序盤分類です。", "source_url": "https://ja.wikibooks.org/wiki/将棋の戦法一覧", "license": "CC BY-SA"},
+    {"name_ja": "対抗型", "sort_order": 20, "description": "居飛車対振り飛車の対抗形です。", "source_url": "https://ja.wikipedia.org/wiki/将棋の戦法", "license": "CC BY-SA"},
+    {"name_ja": "相振り飛車", "sort_order": 30, "description": "双方が振り飛車に構える戦型です。", "source_url": "https://ja.wikipedia.org/wiki/Category:将棋の戦法", "license": "CC BY-SA"},
+    {"name_ja": "奇襲・B級戦法", "sort_order": 40, "description": "意表を突く構想や力戦志向の戦法です。", "source_url": "https://ja.wikibooks.org/wiki/将棋の戦法一覧", "license": "CC BY-SA"},
+    {"name_ja": "囲い・構想", "sort_order": 50, "description": "序盤構想や玉の囲いに関する項目です。", "source_url": "https://ja.wikipedia.org/wiki/将棋の戦法", "license": "CC BY-SA"},
+]
+
+OPENING_TYPE_SEEDS = [
+    ("相居飛車", None, "矢倉", "やぐら", "Yagura", ["矢倉戦法"], "相居飛車を代表する堅陣志向の戦型です。", "Wikibooks 将棋の戦法一覧", "https://ja.wikibooks.org/wiki/将棋の戦法一覧", "CC BY-SA", 10),
+    ("相居飛車", None, "角換わり", "かくがわり", "Bishop Exchange", [], "角交換後の持ち角を活かして駒組みする相居飛車です。", "Wikipedia 将棋の戦法", "https://ja.wikipedia.org/wiki/将棋の戦法", "CC BY-SA", 20),
+    ("相居飛車", None, "相掛かり", "あいがかり", "Double Wing Attack", [], "双方が飛車先を伸ばして主導権を争う戦型です。", "Wikipedia 将棋の戦法", "https://ja.wikipedia.org/wiki/将棋の戦法", "CC BY-SA", 30),
+    ("相居飛車", None, "横歩取り", "よこふどり", "Side Pawn Picker", [], "飛車先交換から横歩を取る激しい相居飛車です。", "Wikipedia 将棋の戦法", "https://ja.wikipedia.org/wiki/将棋の戦法", "CC BY-SA", 40),
+    ("対抗型", None, "中飛車", "なかびしゃ", "Central Rook", [], "飛車を5筋に振って中央から戦う振り飛車です。", "Wikibooks 将棋の戦法一覧", "https://ja.wikibooks.org/wiki/将棋の戦法一覧", "CC BY-SA", 10),
+    ("対抗型", None, "四間飛車", "しけんびしゃ", "Fourth File Rook", [], "飛車を4筋に振る代表的な振り飛車です。", "Wikipedia 将棋の戦法", "https://ja.wikipedia.org/wiki/将棋の戦法", "CC BY-SA", 20),
+    ("対抗型", None, "三間飛車", "さんけんびしゃ", "Third File Rook", [], "飛車を3筋に振り石田流などへ発展します。", "Wikipedia 将棋の戦法", "https://ja.wikipedia.org/wiki/将棋の戦法", "CC BY-SA", 30),
+    ("対抗型", None, "向かい飛車", "むかいびしゃ", "Opposing Rook", [], "相手飛車の向かい側に飛車を振る戦型です。", "Wikibooks 将棋の戦法一覧", "https://ja.wikibooks.org/wiki/将棋の戦法一覧", "CC BY-SA", 40),
+    ("対抗型", None, "角交換振り飛車", "かくこうかんふりびしゃ", "Bishop Exchange Ranging Rook", [], "角交換を含みにする現代的な振り飛車構想です。", "Wikipediaカテゴリ 将棋の戦法", "https://ja.wikipedia.org/wiki/Category:将棋の戦法", "CC BY-SA", 50),
+    ("相振り飛車", None, "相振り飛車", "あいふりびしゃ", "Double Ranging Rook", [], "双方が飛車を振って戦う大分類です。", "Wikipedia 将棋の戦法", "https://ja.wikipedia.org/wiki/将棋の戦法", "CC BY-SA", 10),
+    ("奇襲・B級戦法", None, "嬉野流", "うれしのりゅう", "Ureshino Opening", [], "初手▲6八銀などから独自の構想で戦います。", "Wikipediaカテゴリ 将棋の戦法", "https://ja.wikipedia.org/wiki/Category:将棋の戦法", "CC BY-SA", 10),
+    ("奇襲・B級戦法", None, "鬼殺し", "おにごろし", "Demon Killer", [], "桂跳ねを絡めて急戦を狙う奇襲戦法です。", "Wikibooks 将棋の戦法一覧", "https://ja.wikibooks.org/wiki/将棋の戦法一覧", "CC BY-SA", 20),
+    ("奇襲・B級戦法", None, "早石田", "はやいしだ", "Quick Ishida", [], "早い段階で石田流を目指す三間飛車系の急戦です。", "Wikipedia 将棋の戦法", "https://ja.wikipedia.org/wiki/将棋の戦法", "CC BY-SA", 30),
+    ("奇襲・B級戦法", None, "筋違い角", "すじちがいかく", "Wrong Diagonal Bishop", [], "序盤早々に角交換して筋違いに角を打つ戦法です。", "Wikipediaカテゴリ 将棋の戦法", "https://ja.wikipedia.org/wiki/Category:将棋の戦法", "CC BY-SA", 40),
+    ("奇襲・B級戦法", None, "右四間飛車", "みぎしけんびしゃ", "Right Fourth File Rook", [], "右辺に飛車を寄せて4筋突破を狙う急戦構想です。", "Wikibooks 将棋の戦法一覧", "https://ja.wikibooks.org/wiki/将棋の戦法一覧", "CC BY-SA", 50),
+    ("囲い・構想", None, "美濃囲い", "みのがこい", "Mino Castle", [], "振り飛車で多用される軽く堅い囲いです。", "Wikipedia 将棋の戦法", "https://ja.wikipedia.org/wiki/将棋の戦法", "CC BY-SA", 10),
+    ("囲い・構想", None, "穴熊", "あなぐま", "Anaguma", ["穴熊囲い"], "玉を端深く囲う堅陣です。", "Wikipedia 将棋の戦法", "https://ja.wikipedia.org/wiki/将棋の戦法", "CC BY-SA", 20),
+    ("囲い・構想", None, "舟囲い", "ふながこい", "Boat Castle", [], "居飛車対振り飛車で急戦に用いられる囲いです。", "Wikipediaカテゴリ 将棋の戦法", "https://ja.wikipedia.org/wiki/Category:将棋の戦法", "CC BY-SA", 30),
+    ("囲い・構想", None, "左美濃", "ひだりみの", "Left Mino", [], "居飛車側が左辺に美濃形を作る構想です。", "Wikipediaカテゴリ 将棋の戦法", "https://ja.wikipedia.org/wiki/Category:将棋の戦法", "CC BY-SA", 40),
+    ("囲い・構想", None, "雁木", "がんぎ", "Gangi", [], "金銀を盛り上げる相居飛車の構想です。", "Wikipedia 将棋の戦法", "https://ja.wikipedia.org/wiki/将棋の戦法", "CC BY-SA", 50),
+]
+
 
 def _opening_snapshots(initial_sfen: str, moves: list[str]) -> tuple[list[str], list[tuple[int, str, str, str]]]:
     import shogi
@@ -172,6 +203,65 @@ def _opening_snapshots(initial_sfen: str, moves: list[str]) -> tuple[list[str], 
     return positions, move_rows
 
 
+
+def seed_opening_catalog_if_empty(conn) -> None:
+    conn.executemany(
+        """
+        INSERT OR IGNORE INTO opening_categories(name_ja, sort_order, description, source_url, license)
+        VALUES (:name_ja, :sort_order, :description, :source_url, :license)
+        """,
+        OPENING_CATEGORY_SEEDS,
+    )
+    category_rows = conn.execute("SELECT id, name_ja FROM opening_categories").fetchall()
+    category_ids = {row["name_ja"]: row["id"] for row in category_rows}
+    existing = {
+        (row["category_id"], row["name_ja"])
+        for row in conn.execute("SELECT category_id, name_ja FROM opening_types").fetchall()
+    }
+    inserted: dict[str, int] = {}
+    for category_name, parent_name, name_ja, name_kana, name_en, aliases, description, source_name, source_url, license_name, sort_order in OPENING_TYPE_SEEDS:
+        category_id = category_ids[category_name]
+        if (category_id, name_ja) in existing:
+            row = conn.execute("SELECT id FROM opening_types WHERE category_id = ? AND name_ja = ?", (category_id, name_ja)).fetchone()
+            inserted[name_ja] = row["id"]
+            continue
+        parent_id = inserted.get(parent_name) if parent_name else None
+        cur = conn.execute(
+            """
+            INSERT INTO opening_types(category_id, parent_id, name_ja, name_kana, name_en, aliases,
+                                      description_short, source_name, source_url, license, sort_order, is_active)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
+            """,
+            (category_id, parent_id, name_ja, name_kana, name_en, json.dumps(aliases, ensure_ascii=False),
+             description, source_name, source_url, license_name, sort_order),
+        )
+        inserted[name_ja] = int(cur.lastrowid)
+
+
+def find_opening_type_id(conn, name: str | None) -> int | None:
+    if not name:
+        return None
+    row = conn.execute("SELECT id FROM opening_types WHERE name_ja = ? AND is_active = 1 ORDER BY id LIMIT 1", (name,)).fetchone()
+    if row:
+        return int(row["id"])
+    rows = conn.execute("SELECT id, aliases FROM opening_types WHERE is_active = 1").fetchall()
+    for row in rows:
+        try:
+            aliases = json.loads(row["aliases"] or "[]")
+        except json.JSONDecodeError:
+            aliases = []
+        if name in aliases:
+            return int(row["id"])
+    return None
+
+
+def backfill_opening_line_type_ids(conn) -> None:
+    rows = conn.execute("SELECT id, name, opening_type FROM opening_lines WHERE opening_type_id IS NULL").fetchall()
+    for row in rows:
+        opening_type_id = find_opening_type_id(conn, row["name"]) or find_opening_type_id(conn, row["opening_type"])
+        if opening_type_id is not None:
+            conn.execute("UPDATE opening_lines SET opening_type_id = ? WHERE id = ?", (opening_type_id, row["id"]))
+
 def seed_openings_if_empty(conn) -> None:
     import shogi
 
@@ -180,13 +270,15 @@ def seed_openings_if_empty(conn) -> None:
         return
     for opening in SAMPLE_OPENING_LINES:
         positions, move_rows = _opening_snapshots(shogi.STARTING_SFEN, opening["moves"])
+        opening_type_id = find_opening_type_id(conn, opening["name"]) or find_opening_type_id(conn, opening["opening_type"])
         cur = conn.execute(
             """
-            INSERT INTO opening_lines(name, opening_type, initial_sfen, moves, comments, tags)
-            VALUES (?, ?, ?, ?, ?, ?)
+            INSERT INTO opening_lines(name, opening_type_id, opening_type, initial_sfen, moves, comments, tags)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 opening["name"],
+                opening_type_id,
                 opening["opening_type"],
                 shogi.STARTING_SFEN,
                 json.dumps(opening["moves"], ensure_ascii=False),
@@ -241,7 +333,9 @@ def seed_if_empty() -> None:
                         p["explanation"],
                     ),
                 )
+        seed_opening_catalog_if_empty(conn)
         seed_openings_if_empty(conn)
+        backfill_opening_line_type_ids(conn)
         conn.commit()
     finally:
         conn.close()
