@@ -220,7 +220,7 @@ SQLite に以下のテーブルを作成します(`backend/app/database.py`)。
 - `tsume_problems` — 問題(SFEN 初期局面、USI 手順の JSON、タグ、解説、お気に入り)
 - `problem_results` — 問題ごとの解答履歴(正解/不正解、解答時間、ミス数)
 - `time_attack_results` — タイムアタック結果
-- `opening_lines` — 戦型別定跡ライン(SFEN + USI 手順 + タグ、`opening_type_id` による戦型カタログ紐づけ)
+- `opening_lines` — 戦型別定跡ライン(SFEN + USI 手順 + タグ)
 - `opening_sources` — 取り込み元ファイルとライセンス情報
 - `opening_positions` — 定跡ラインの各 ply の SFEN
 - `opening_moves` — 各手の USI と指し手前後の SFEN
