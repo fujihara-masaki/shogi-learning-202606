@@ -166,6 +166,12 @@ python scripts/import_openings.py ../data/openings --license-name CC0 --license-
 
 取り込み時に、各手の前後 SFEN、USI 指し手、ライセンス情報を `opening_sources` / `opening_positions` / `opening_moves` / `opening_tags` に保存します。分類はMVPとして簡易ルールです。中飛車は「序盤40手以内に飛車が5筋にいる」場合に `nakabisha` タグを付与します。棒銀・向かい飛車も簡易的に判定します。
 
+### 戦型一覧 seed データの出典とライセンス
+
+`opening_categories` / `opening_types` の初期 seed データは、Wikibooks「将棋の戦法一覧」、Wikipedia「将棋の戦法」、Wikipediaカテゴリ「将棋の戦法」を参考に、アプリ用に手作業で確認・短い説明文として整理したものです。実行時に外部 Web ページをスクレイピングせず、DB 初期化時にローカル seed として投入します。
+
+これらの参考元は CC BY-SA ライセンスのコンテンツを含むため、アプリ内の「データ出典」表示および各 API レスポンスの `source_url` / `license` に出典と `CC BY-SA` を明記しています。
+
 ## 定跡学習 MVP の使い方
 
 1. ホームまたは上部ナビゲーションの「定跡学習」を開きます(`/openings`)。
