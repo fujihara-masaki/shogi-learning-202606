@@ -216,6 +216,7 @@ import時の `opening_type_id` 推定は、ファイル名・行テキストな�
 | GET | /api/openings/tags | インポート済み定跡タグ一覧 |
 | GET | /api/openings | インポート済み定跡一覧(`tag` で絞り込み可能) |
 | GET | /api/openings/{id} | インポート済み定跡詳細(各手前後のSFENとUSI) |
+| GET | /api/book/candidates?sfen={SFEN} | 現在局面SFENに一致する外部定跡候補手と出典・ライセンス情報 |
 
 ## DB スキーマ
 
@@ -229,6 +230,9 @@ SQLite に以下のテーブルを作成します(`backend/app/database.py`)。
 - `opening_positions` — 定跡ラインの各 ply の SFEN
 - `opening_moves` — 各手の USI と指し手前後の SFEN
 - `opening_tags` — 中飛車・棒銀・向かい飛車などの簡易分類タグ
+- `book_sources` — 外部定跡データの出典・ライセンス・取り込みメタデータ
+- `book_positions` — 外部定跡データの局面 SFEN
+- `book_moves` — 外部定跡データの候補手 USI・評価値・深さ
 
 ## 既知の制限
 
@@ -280,6 +284,10 @@ PYTHONPATH=. python -m app.importers.yaneuraou_book \
 ```
 
 `--limit` は取り込む局面数を制限します。pytest 用 fixture は数局面の小さなファイルだけを置き、大規模な `book.db` 本体はコミットしない方針です。
+
+### 局面候補手 API
+
+`GET /api/book/candidates?sfen=<current_sfen>` は、`book_positions.sfen` に完全一致する局面を検索し、紐づく `book_moves` を `sort_order` などで安定ソートして返します。候補がある場合は `found: true` と `candidates` 配列に `move_usi`、`rank`、`score`、`depth`、`source_name`、`license`、`source_url` などを含め、候補がない場合は `found: false` と空配列を返します。
 
 ### ライセンス表示方針
 
