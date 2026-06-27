@@ -187,6 +187,24 @@ CREATE INDEX IF NOT EXISTS idx_book_sources_imported_at ON book_sources(imported
 CREATE INDEX IF NOT EXISTS idx_book_positions_source ON book_positions(source_id);
 CREATE INDEX IF NOT EXISTS idx_book_positions_sfen ON book_positions(sfen);
 CREATE INDEX IF NOT EXISTS idx_book_moves_position ON book_moves(position_id, sort_order);
+
+CREATE TABLE IF NOT EXISTS learning_samples (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    book_source_id INTEGER NOT NULL REFERENCES book_sources(id) ON DELETE CASCADE,
+    book_position_id INTEGER NOT NULL REFERENCES book_positions(id) ON DELETE CASCADE,
+    opening_key TEXT NOT NULL DEFAULT 'unclassified',
+    opening_name TEXT NOT NULL DEFAULT '未分類',
+    sfen TEXT NOT NULL,
+    sample_rank INTEGER NOT NULL,
+    sample_reason TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    UNIQUE(book_source_id, book_position_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_learning_samples_source_opening
+    ON learning_samples(book_source_id, opening_key, sample_rank);
+CREATE INDEX IF NOT EXISTS idx_learning_samples_position
+    ON learning_samples(book_position_id);
 """
 
 

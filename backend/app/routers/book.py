@@ -117,6 +117,33 @@ def get_book_source(source_id: int) -> dict[str, Any]:
         conn.close()
 
 
+@router.get("/api/book/sources/{source_id}/learning-samples/summary")
+def get_learning_sample_summary(source_id: int) -> dict[str, Any]:
+    conn = get_connection()
+    try:
+        source = conn.execute("SELECT id, name, version, license_name, source_url FROM book_sources WHERE id = ?", (source_id,)).fetchone()
+        if not source:
+            raise HTTPException(status_code=404, detail="book source not found")
+        rows = conn.execute(
+            """
+            SELECT opening_key, opening_name, COUNT(*) AS sample_count
+            FROM learning_samples
+            WHERE book_source_id = ?
+            GROUP BY opening_key, opening_name
+            ORDER BY sample_count DESC, opening_key
+            """,
+            (source_id,),
+        ).fetchall()
+        return {
+            "source": dict(source),
+            "total_samples": sum(row["sample_count"] for row in rows),
+            "unclassified_samples": sum(row["sample_count"] for row in rows if row["opening_key"] == "unclassified"),
+            "openings": [dict(row) for row in rows],
+        }
+    finally:
+        conn.close()
+
+
 @router.get("/api/licenses")
 def list_licenses() -> dict[str, Any]:
     conn = get_connection()
