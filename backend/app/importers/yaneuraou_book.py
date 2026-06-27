@@ -13,7 +13,7 @@ from pathlib import Path
 
 from app.database import get_connection, init_db
 
-SFEN_RE = re.compile(r"^(?:sfen\s+)?(.+\s[bw]\s(?:-|[RBGSNLP0-9+]+)\s\d+)$")
+SFEN_RE = re.compile(r"^(?:sfen\s+)?(.+\s[bw]\s(?:-|[RBGSNLPrbgsnlp0-9+]+)\s\d+)$")
 USI_RE = re.compile(r"^(?:[1-9][a-i][1-9][a-i][+]?|[RBGSNLP]\*[1-9][a-i])$")
 
 
@@ -68,62 +68,81 @@ def parse_move_line(text: str) -> ParsedMove | None:
     return ParsedMove(parts[0], ints[0] if ints else None, ints[1] if len(ints) > 1 else None, " ".join(rest), text)
 
 
-def parse_book(path: Path, *, limit: int | None = None) -> tuple[list[ParsedPosition], int, int]:
-    positions: list[ParsedPosition] = []
-    invalid = 0
-    duplicates = 0
+@dataclass
+class ParseStats:
+    positions_read: int = 0
+    moves_read: int = 0
+    invalid_lines: int = 0
+    duplicate_positions: int = 0
+
+
+def iter_book_positions(path: Path, *, limit: int | None = None, stats: ParseStats | None = None):
     current: ParsedPosition | None = None
     skipping_duplicate = False
     seen: set[str] = set()
-    for line_no, raw in enumerate(path.read_text(encoding="utf-8-sig").splitlines(), start=1):
-        text = raw.strip()
-        if not text or text.startswith("#"):
-            continue
-        m = SFEN_RE.match(text)
-        if m:
-            if limit is not None and len(positions) >= limit:
-                current = None
-                break
-            sfen = m.group(1)
-            if sfen in seen:
-                duplicates += 1
-                current = None
-                skipping_duplicate = True
+    with path.open(encoding="utf-8-sig") as f:
+        for line_no, raw in enumerate(f, start=1):
+            text = raw.strip()
+            if not text or text.startswith("#"):
                 continue
-            seen.add(sfen)
-            skipping_duplicate = False
-            current = ParsedPosition(sfen=sfen, line_no=line_no, moves=[])
-            positions.append(current)
-            continue
-        move = parse_move_line(text)
-        if move and current is not None:
-            current.moves.append(move)
-        elif move and skipping_duplicate:
-            continue
-        else:
-            invalid += 1
-    return positions, invalid, duplicates
+            m = SFEN_RE.match(text)
+            if m:
+                if current is not None:
+                    yield current
+                    current = None
+                if limit is not None and stats is not None and stats.positions_read >= limit:
+                    break
+                sfen = m.group(1)
+                if sfen in seen:
+                    if stats is not None:
+                        stats.duplicate_positions += 1
+                    skipping_duplicate = True
+                    continue
+                seen.add(sfen)
+                skipping_duplicate = False
+                current = ParsedPosition(sfen=sfen, line_no=line_no, moves=[])
+                if stats is not None:
+                    stats.positions_read += 1
+                continue
+            move = parse_move_line(text)
+            if move and current is not None:
+                current.moves.append(move)
+                if stats is not None:
+                    stats.moves_read += 1
+            elif move and skipping_duplicate:
+                continue
+            elif stats is not None:
+                stats.invalid_lines += 1
+    if current is not None:
+        yield current
+
+
+def parse_book(path: Path, *, limit: int | None = None) -> tuple[list[ParsedPosition], int, int]:
+    stats = ParseStats()
+    positions = list(iter_book_positions(path, limit=limit, stats=stats))
+    return positions, stats.invalid_lines, stats.duplicate_positions
 
 
 def import_book(path: Path, *, name: str, version: str = "", source_url: str = "", license_name: str = "", license_text: str = "", copyright_notice: str = "", note: str = "", dry_run: bool = False, limit: int | None = None) -> ImportResult:
     init_db()
     file_hash = sha256_file(path)
-    positions, invalid, duplicates = parse_book(path, limit=limit)
-    move_count = sum(len(p.moves) for p in positions)
+    stats = ParseStats()
     if dry_run:
-        return ImportResult(None, file_hash, len(positions), move_count, invalid, duplicates, 0, 0, True)
+        for _ in iter_book_positions(path, limit=limit, stats=stats):
+            pass
+        return ImportResult(None, file_hash, stats.positions_read, stats.moves_read, stats.invalid_lines, stats.duplicate_positions, 0, 0, True)
     conn = get_connection()
     try:
         cur = conn.execute(
             """
             INSERT INTO book_sources(name, version, source_url, license_name, license_text, copyright_notice, file_name, file_sha256, position_count, move_count, note)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, 0, ?)
             """,
-            (name, version, source_url, license_name, license_text, copyright_notice, path.name, file_hash, len(positions), move_count, note),
+            (name, version, source_url, license_name, license_text, copyright_notice, path.name, file_hash, note),
         )
         source_id = int(cur.lastrowid)
         imported_moves = 0
-        for pos in positions:
+        for pos in iter_book_positions(path, limit=limit, stats=stats):
             cur = conn.execute("INSERT INTO book_positions(source_id, sfen, line_no) VALUES (?, ?, ?)", (source_id, pos.sfen, pos.line_no))
             position_id = int(cur.lastrowid)
             conn.executemany(
@@ -131,8 +150,9 @@ def import_book(path: Path, *, name: str, version: str = "", source_url: str = "
                 [(position_id, m.usi, m.score, m.depth, m.pv, m.raw, i) for i, m in enumerate(pos.moves)],
             )
             imported_moves += len(pos.moves)
+        conn.execute("UPDATE book_sources SET position_count = ?, move_count = ? WHERE id = ?", (stats.positions_read, stats.moves_read, source_id))
         conn.commit()
-        return ImportResult(source_id, file_hash, len(positions), move_count, invalid, duplicates, len(positions), imported_moves, False)
+        return ImportResult(source_id, file_hash, stats.positions_read, stats.moves_read, stats.invalid_lines, stats.duplicate_positions, stats.positions_read, imported_moves, False)
     except Exception:
         conn.rollback()
         raise

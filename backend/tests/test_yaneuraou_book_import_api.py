@@ -21,8 +21,8 @@ def test_dry_run_does_not_write_db(tmp_path):
     init_db()
     result = import_book(FIXTURE, name="sample", license_name="MIT License", license_text=MIT, dry_run=True)
     assert result.dry_run is True
-    assert result.positions_read == 3
-    assert result.moves_read == 5
+    assert result.positions_read == 4
+    assert result.moves_read == 6
     assert result.duplicate_positions == 1
     assert count_rows("book_sources") == 0
 
@@ -42,7 +42,7 @@ def test_duplicate_sfen_is_counted_without_breaking_import(tmp_path):
     result = import_book(FIXTURE, name="sample", license_name="MIT License", license_text=MIT)
     assert result.duplicate_positions == 1
     assert result.invalid_lines == 1
-    assert result.imported_positions == 3
+    assert result.imported_positions == 4
 
 
 def test_book_source_and_license_api(client):
@@ -57,3 +57,15 @@ def test_book_source_and_license_api(client):
     licenses = client.get("/api/licenses")
     assert licenses.status_code == 200
     assert licenses.json()["book_sources"][0]["license_name"] == "MIT License"
+
+
+def test_lowercase_white_hand_sfen_imports(tmp_path):
+    os.environ["SHOGI_DB_PATH"] = str(tmp_path / "lowercase.db")
+    result = import_book(FIXTURE, name="sample", license_name="MIT License", license_text=MIT)
+    assert result.imported_positions == 4
+    conn = get_connection()
+    try:
+        row = conn.execute("SELECT sfen FROM book_positions WHERE sfen LIKE ?", ("% rb2p 4",)).fetchone()
+    finally:
+        conn.close()
+    assert row is not None
