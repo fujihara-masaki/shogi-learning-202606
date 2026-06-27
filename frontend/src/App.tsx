@@ -7,6 +7,7 @@ import HistoryPage from "./pages/HistoryPage";
 import ProblemEditorPage from "./pages/ProblemEditorPage";
 import OpeningsPage from "./pages/OpeningsPage";
 import OpeningStudyPage from "./pages/OpeningStudyPage";
+import LicensesPage from "./pages/LicensesPage";
 
 export default function App() {
   return (
@@ -21,6 +22,7 @@ export default function App() {
         <NavLink to="/history">履歴</NavLink>
         <NavLink to="/openings">定跡学習</NavLink>
         <NavLink to="/problem-editor">問題作成</NavLink>
+        <NavLink to="/licenses">データ出典</NavLink>
       </nav>
       <div className="app-body">
         <Routes>
@@ -34,6 +36,7 @@ export default function App() {
           <Route path="/problem-editor" element={<ProblemEditorPage />} />
           <Route path="/problem-editor/:id" element={<ProblemEditorPage />} />
           <Route path="/editor" element={<ProblemEditorPage />} />
+          <Route path="/licenses" element={<LicensesPage />} />
         </Routes>
       </div>
     </BrowserRouter>

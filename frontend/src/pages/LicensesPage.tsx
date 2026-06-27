@@ -1,0 +1,48 @@
+import { useEffect, useState } from "react";
+import { fetchLicenses, type LicenseResponse } from "../api/client";
+
+export default function LicensesPage() {
+  const [data, setData] = useState<LicenseResponse | null>(null);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    fetchLicenses().then(setData).catch((err: Error) => setError(err.message));
+  }, []);
+
+  return (
+    <section className="licenses-page" data-testid="licenses-page">
+      <h1>データ出典・ライセンス</h1>
+      <p className="muted">
+        外部定跡データを取り込んだ場合は、出典、ファイルハッシュ、ライセンス本文をここに表示します。
+      </p>
+      {error && <p className="error">{error}</p>}
+      {!data && !error && <p>読み込み中...</p>}
+      {data?.book_sources.length === 0 && <p>登録済みの外部定跡データはありません。</p>}
+      <div className="license-source-list">
+        {data?.book_sources.map((source) => (
+          <article className="license-source-card" key={source.id}>
+            <h2>{source.name}</h2>
+            <dl>
+              <dt>バージョン</dt>
+              <dd>{source.version || "-"}</dd>
+              <dt>ライセンス</dt>
+              <dd>{source.license_name || "-"}</dd>
+              <dt>局面数 / 候補手数</dt>
+              <dd>{source.position_count.toLocaleString()} / {source.move_count.toLocaleString()}</dd>
+              <dt>ファイル</dt>
+              <dd>{source.file_name || "-"}</dd>
+              <dt>SHA-256</dt>
+              <dd className="hash-text">{source.file_sha256 || "-"}</dd>
+              <dt>URL</dt>
+              <dd>{source.source_url ? <a href={source.source_url}>{source.source_url}</a> : "-"}</dd>
+            </dl>
+            {source.copyright_notice && <p>{source.copyright_notice}</p>}
+            {source.note && <p className="muted">{source.note}</p>}
+            <h3>ライセンス表示</h3>
+            <pre className="license-text">{source.license_text || source.license_name || "ライセンス本文は未登録です。"}</pre>
+          </article>
+        ))}
+      </div>
+    </section>
+  );
+}

@@ -10,7 +10,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from .database import init_db
-from .routers import openings, stats, time_attack, tsume
+from .routers import book, openings, stats, time_attack, tsume
 from .seed import seed_if_empty
 
 
@@ -38,6 +38,7 @@ app.include_router(tsume.router)
 app.include_router(time_attack.router)
 app.include_router(stats.router)
 app.include_router(openings.router)
+app.include_router(book.router)
 
 
 @app.get("/api/health")

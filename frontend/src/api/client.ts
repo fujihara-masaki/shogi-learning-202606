@@ -281,3 +281,31 @@ export function fetchOpenings(tag?: string): Promise<OpeningSummary[]> {
 export function fetchOpening(id: number): Promise<ImportedOpeningDetail> {
   return request<ImportedOpeningDetail>(`/api/openings/${id}`);
 }
+
+export interface BookSource {
+  id: number;
+  name: string;
+  version: string;
+  source_url: string;
+  license_name: string;
+  license_text?: string;
+  copyright_notice: string;
+  file_name: string;
+  file_sha256: string;
+  imported_at: string;
+  position_count: number;
+  move_count: number;
+  note: string;
+}
+
+export interface LicenseResponse {
+  book_sources: BookSource[];
+}
+
+export function fetchBookSources(): Promise<BookSource[]> {
+  return request<BookSource[]>("/api/book/sources");
+}
+
+export function fetchLicenses(): Promise<LicenseResponse> {
+  return request<LicenseResponse>("/api/licenses");
+}

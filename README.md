@@ -246,3 +246,41 @@ SQLite に以下のテーブルを作成します(`backend/app/database.py`)。
 4. 棋譜(KIF/CSA)の読み込み・再生
 5. 間隔反復(SRS)による出題スケジューリング
 6. 駒画像への差し替え(`ShogiBoard.tsx` の `PieceFace` を変更)
+
+## 外部定跡データの出典管理と取り込み準備
+
+新ペタショック定跡 233万局面などの大規模な外部定跡データは、容量とライセンス確認の都合によりリポジトリへ含めません。今回の実装では、将来の本取り込みに備えて、出典管理、ライセンス表示、dry-run、少量サンプル取り込みのみを扱います。大量取り込み、局面検索 API、候補手 UI、分岐ツリー、次の一手問題化は次 PR 以降に分けます。
+
+### dry-run の例
+
+```bash
+cd backend
+PYTHONPATH=. python -m app.importers.yaneuraou_book \
+  tests/fixtures/yaneuraou_book_sample.db \
+  --name "Sample YaneuraOu Book" \
+  --license-name "MIT License" \
+  --license-text "MIT License" \
+  --dry-run
+```
+
+`--dry-run` は SHA-256、読み込み局面数、候補手数、不正行数、重複局面数を表示しますが、SQLite には書き込みません。
+
+### サンプル取り込みの例
+
+```bash
+cd backend
+PYTHONPATH=. python -m app.importers.yaneuraou_book \
+  tests/fixtures/yaneuraou_book_sample.db \
+  --name "Sample YaneuraOu Book" \
+  --version fixture \
+  --source-url "https://example.test/book" \
+  --license-name "MIT License" \
+  --license-text "MIT License" \
+  --limit 2
+```
+
+`--limit` は取り込む局面数を制限します。pytest 用 fixture は数局面の小さなファイルだけを置き、大規模な `book.db` 本体はコミットしない方針です。
+
+### ライセンス表示方針
+
+取り込み時に `book_sources` へ出典 URL、ライセンス名、ライセンス本文、著作権表示、ファイル名、SHA-256、局面数、候補手数を保存します。フロントエンドの「データ出典」ページと `/api/licenses` は、この情報を表示して外部定跡データの出典・ライセンスを確認できるようにします。
