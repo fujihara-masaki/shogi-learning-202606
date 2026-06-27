@@ -167,7 +167,6 @@ export function fetchStats(): Promise<StatsResponse> {
   return request<StatsResponse>("/api/stats");
 }
 
-
 export interface OpeningCategory {
   id: number;
   name_ja: string;
@@ -296,6 +295,33 @@ export interface BookSource {
   position_count: number;
   move_count: number;
   note: string;
+}
+
+export interface BookCandidate {
+  move_usi: string;
+  rank: number | null;
+  score: number | null;
+  depth: number | null;
+  pv: string | null;
+  raw: string | null;
+  source_id: number;
+  source_name: string;
+  source_version: string | null;
+  license: string | null;
+  license_name: string | null;
+  source_url: string | null;
+  copyright_notice: string | null;
+}
+
+export interface BookCandidatesResponse {
+  sfen: string;
+  found: boolean;
+  candidates: BookCandidate[];
+}
+
+export function fetchBookCandidates(sfen: string): Promise<BookCandidatesResponse> {
+  const params = new URLSearchParams({ sfen });
+  return request<BookCandidatesResponse>(`/api/book/candidates?${params.toString()}`);
 }
 
 export interface LicenseResponse {

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, Navigate, useParams } from "react-router-dom";
 import { type Move, type Square } from "tsshogi";
-import { fetchOpening } from "../api/client";
+import { fetchBookCandidates, fetchOpening, type BookCandidatesResponse } from "../api/client";
 import MoveHistory from "../components/MoveHistory";
 import ShogiBoard from "../components/ShogiBoard";
 import {
@@ -45,6 +45,7 @@ function OpeningStudyContent({ id }: { id: string | undefined }) {
   const opening = staticOpening ?? importedOpening;
   const state = useMemo(() => (opening ? applyOpeningPath(opening, path) : null), [opening, path]);
   const expected = useMemo(() => (opening ? expectedOpeningMove(opening, path) : null), [opening, path]);
+  const currentSfen = state?.position.sfen ?? null;
 
   if (loadError) {
     return (
@@ -170,9 +171,114 @@ function OpeningStudyContent({ id }: { id: string | undefined }) {
               <p>すべての手順を学習しました。</p>
             )}
           </section>
+          {currentSfen && <BookCandidatesLoader key={currentSfen} sfen={currentSfen} />}
           <MoveHistory moves={state.moves} />
         </div>
       </div>
     </div>
+  );
+}
+
+interface BookCandidatesState {
+  response: BookCandidatesResponse | null;
+  loading: boolean;
+  error: string | null;
+}
+
+function BookCandidatesLoader({ sfen }: { sfen: string }) {
+  const [state, setState] = useState<BookCandidatesState>({ response: null, loading: true, error: null });
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchBookCandidates(sfen)
+      .then((response) => {
+        if (!cancelled) setState({ response, loading: false, error: null });
+      })
+      .catch((e) => {
+        if (!cancelled) {
+          setState({ response: null, loading: false, error: `定跡候補の取得に失敗しました: ${e}` });
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [sfen]);
+
+  return <BookCandidatesPanel response={state.response} loading={state.loading} error={state.error} sfen={sfen} />;
+}
+
+interface BookCandidatesPanelProps {
+  response: BookCandidatesResponse | null;
+  loading: boolean;
+  error: string | null;
+  sfen: string;
+}
+
+function BookCandidatesPanel({ response, loading, error, sfen }: BookCandidatesPanelProps) {
+  return (
+    <section className="opening-current book-candidates" data-testid="book-candidates">
+      <h2>この局面の定跡候補</h2>
+      {sfen && <p className="muted book-candidates-sfen">SFEN: <code>{sfen}</code></p>}
+      {loading && <p className="muted">定跡候補を読み込み中...</p>}
+      {error && <div className="banner banner-error">{error}</div>}
+      {!loading && !error && response && response.candidates.length === 0 && (
+        <p>この局面の定跡候補はありません。</p>
+      )}
+      {!loading && !error && response && response.candidates.length > 0 && (
+        <ol className="book-candidate-list">
+          {response.candidates.map((candidate, index) => (
+            <li key={`${candidate.source_id}-${candidate.move_usi}-${index}`} className="book-candidate-item">
+              <div className="book-candidate-main">
+                <strong>{candidate.move_usi}</strong>
+                {candidate.rank !== null && <span className="opening-category">#{candidate.rank}</span>}
+              </div>
+              <dl className="book-candidate-meta">
+                {candidate.score !== null && (
+                  <>
+                    <dt>評価値</dt>
+                    <dd>{candidate.score}</dd>
+                  </>
+                )}
+                {candidate.depth !== null && (
+                  <>
+                    <dt>深さ</dt>
+                    <dd>{candidate.depth}</dd>
+                  </>
+                )}
+                {candidate.pv && (
+                  <>
+                    <dt>PV</dt>
+                    <dd>{candidate.pv}</dd>
+                  </>
+                )}
+                {candidate.raw && (
+                  <>
+                    <dt>コメント</dt>
+                    <dd>{candidate.raw}</dd>
+                  </>
+                )}
+                <dt>出典</dt>
+                <dd>
+                  {candidate.source_url ? (
+                    <a href={candidate.source_url} target="_blank" rel="noreferrer">
+                      {candidate.source_name}
+                    </a>
+                  ) : (
+                    candidate.source_name
+                  )}
+                  {candidate.source_version && <span> ({candidate.source_version})</span>}
+                </dd>
+                {candidate.license_name && (
+                  <>
+                    <dt>ライセンス</dt>
+                    <dd>{candidate.license_name}</dd>
+                  </>
+                )}
+              </dl>
+            </li>
+          ))}
+        </ol>
+      )}
+    </section>
   );
 }

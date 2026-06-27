@@ -191,6 +191,48 @@ test("opening list navigates to a seeded opening study page", async ({ page }) =
   await expect(page.getByTestId("opening-current-move")).toContainText("7g7f");
 });
 
+test("opening study shows book candidates for the current SFEN", async ({ page }) => {
+  const requestedSfens: string[] = [];
+  await page.route("**/api/book/candidates**", async (route) => {
+    const url = new URL(route.request().url());
+    const sfen = url.searchParams.get("sfen") ?? "";
+    requestedSfens.push(sfen);
+    await route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        sfen,
+        found: true,
+        candidates: [{
+          move_usi: sfen.includes("2P6") ? "3c3d" : "7g7f",
+          rank: 1,
+          score: 30,
+          depth: 1,
+          pv: "7g7f 3c3d",
+          raw: "sample candidate",
+          source_id: 1,
+          source_name: "Sample YaneuraOu Book",
+          source_version: "fixture",
+          license: "MIT License",
+          license_name: "MIT License",
+          source_url: "https://example.test/book",
+          copyright_notice: "Copyright sample",
+        }],
+      }),
+    });
+  });
+
+  await page.goto("/openings/static-rook-rapid-attack");
+  await expect(page.getByTestId("book-candidates")).toContainText("7g7f");
+  await expect(page.getByTestId("book-candidates")).toContainText("Sample YaneuraOu Book");
+  await expect(page.getByTestId("book-candidates")).toContainText("MIT License");
+
+  const board = page.getByTestId("shogi-board");
+  await board.locator('[data-square="77"]').click();
+  await board.locator('[data-square="76"]').click();
+  await expect(page.getByTestId("book-candidates")).toContainText("3c3d");
+  expect(requestedSfens.length).toBeGreaterThanOrEqual(2);
+});
+
 test("opening study accepts correct moves and supports wrong feedback, undo, and reset", async ({ page }) => {
   await page.goto("/openings/static-rook-rapid-attack");
   const board = page.getByTestId("shogi-board");
