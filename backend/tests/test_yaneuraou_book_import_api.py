@@ -113,3 +113,55 @@ def test_book_candidates_api_rejects_blank_sfen(client):
     response = client.get("/api/book/candidates", params={"sfen": "   "})
 
     assert response.status_code == 422
+
+
+def test_book_candidates_api_allows_null_sort_order(client):
+    sfen = "lnsgkgsnl/1r5b1/ppppppppp/9/9/9/PPPPPPPPP/1B5R1/LNSGKGSNL b - 1"
+    conn = get_connection()
+    try:
+        conn.execute("DROP TABLE book_moves")
+        conn.execute(
+            """
+            CREATE TABLE book_moves (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                position_id INTEGER NOT NULL REFERENCES book_positions(id) ON DELETE CASCADE,
+                usi TEXT NOT NULL,
+                score INTEGER,
+                depth INTEGER,
+                pv TEXT NOT NULL DEFAULT '',
+                raw TEXT NOT NULL DEFAULT '',
+                sort_order INTEGER,
+                UNIQUE(position_id, usi, sort_order)
+            )
+            """
+        )
+        source_id = conn.execute(
+            """
+            INSERT INTO book_sources(name, source_url, license_name)
+            VALUES (?, ?, ?)
+            """,
+            ("Legacy Nullable Sort Book", "https://example.test/legacy", "CC0"),
+        ).lastrowid
+        position_id = conn.execute(
+            "INSERT INTO book_positions(source_id, sfen) VALUES (?, ?)",
+            (source_id, sfen),
+        ).lastrowid
+        conn.execute(
+            "INSERT INTO book_moves(position_id, usi, score, depth, sort_order) VALUES (?, ?, ?, ?, ?)",
+            (position_id, "7g7f", 30, 1, 0),
+        )
+        conn.execute(
+            "INSERT INTO book_moves(position_id, usi, score, depth, sort_order) VALUES (?, ?, ?, ?, ?)",
+            (position_id, "2g2f", 10, 1, None),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+    response = client.get("/api/book/candidates", params={"sfen": sfen})
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["found"] is True
+    assert [candidate["move_usi"] for candidate in body["candidates"]] == ["7g7f", "2g2f"]
+    assert [candidate["rank"] for candidate in body["candidates"]] == [1, None]

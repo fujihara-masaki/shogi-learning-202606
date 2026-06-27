@@ -60,6 +60,7 @@ def get_book_candidates(sfen: str = Query(..., min_length=1)) -> dict[str, Any]:
             JOIN book_sources bs ON bs.id = bp.source_id
             WHERE bp.sfen = ?
             ORDER BY
+                CASE WHEN bm.sort_order IS NULL THEN 1 ELSE 0 END ASC,
                 bm.sort_order ASC,
                 CASE WHEN bm.score IS NULL THEN 1 ELSE 0 END ASC,
                 bm.score DESC,
@@ -74,7 +75,7 @@ def get_book_candidates(sfen: str = Query(..., min_length=1)) -> dict[str, Any]:
         candidates = [
             {
                 "move_usi": row["move_usi"],
-                "rank": row["sort_order"] + 1,
+                "rank": row["sort_order"] + 1 if row["sort_order"] is not None else None,
                 "score": row["score"],
                 "depth": row["depth"],
                 "pv": row["pv"],
