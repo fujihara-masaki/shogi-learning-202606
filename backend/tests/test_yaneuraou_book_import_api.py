@@ -69,3 +69,47 @@ def test_lowercase_white_hand_sfen_imports(tmp_path):
     finally:
         conn.close()
     assert row is not None
+
+
+def test_book_candidates_api_returns_moves_with_source_info(client):
+    sfen = "lnsgkgsnl/1r5b1/ppppppppp/9/9/9/PPPPPPPPP/1B5R1/LNSGKGSNL b - 1"
+    import_book(
+        FIXTURE,
+        name="Sample YaneuraOu Book",
+        version="fixture",
+        source_url="https://example.test/book",
+        license_name="MIT License",
+        license_text=MIT,
+        limit=1,
+    )
+
+    response = client.get("/api/book/candidates", params={"sfen": sfen})
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["sfen"] == sfen
+    assert body["found"] is True
+    assert [candidate["move_usi"] for candidate in body["candidates"]] == ["7g7f", "2g2f"]
+    assert body["candidates"][0]["rank"] == 1
+    assert body["candidates"][0]["score"] == 30
+    assert body["candidates"][0]["depth"] == 1
+    assert body["candidates"][0]["source_name"] == "Sample YaneuraOu Book"
+    assert body["candidates"][0]["license"] == "MIT License"
+    assert body["candidates"][0]["license_name"] == "MIT License"
+    assert body["candidates"][0]["source_url"] == "https://example.test/book"
+
+
+def test_book_candidates_api_returns_not_found_for_unknown_sfen(client):
+    import_book(FIXTURE, name="sample", license_name="MIT License", license_text=MIT, limit=1)
+    sfen = "9/9/9/9/9/9/9/9/9 b - 1"
+
+    response = client.get("/api/book/candidates", params={"sfen": sfen})
+
+    assert response.status_code == 200
+    assert response.json() == {"sfen": sfen, "found": False, "candidates": []}
+
+
+def test_book_candidates_api_rejects_blank_sfen(client):
+    response = client.get("/api/book/candidates", params={"sfen": "   "})
+
+    assert response.status_code == 422
