@@ -1,0 +1,14 @@
+# Tiny YaneuraOu-style book sample for tests.
+sfen lnsgkgsnl/1r5b1/ppppppppp/9/9/9/PPPPPPPPP/1B5R1/LNSGKGSNL b - 1
+7g7f 30 1 sample
+2g2f 10 1 sample
+sfen lnsgkgsnl/1r5b1/ppppppppp/9/9/2P6/PP1PPPPPP/1B5R1/LNSGKGSNL w - 2
+3c3d 28 1 sample
+8c8d 12 1 sample
+sfen lnsgkgsnl/1r5b1/ppppppppp/9/9/2P6/PP1PPPPPP/1B5R1/LNSGKGSNL w - 2
+3c3d 99 1 duplicate ignored
+invalid line
+sfen lnsgkgsnl/1r5b1/pppppp1pp/6p2/9/2P6/PP1PPPPPP/1B5R1/LNSGKGSNL b - 3
+2g2f 20 1 sample
+sfen lnsgkgsnl/1r5b1/pppppp1pp/6p2/9/2P6/PP1PPPPPP/1B5R1/LNSGKGSNL w rb2p 4
+8c8d 15 1 lowercase-hand sample

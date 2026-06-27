@@ -53,7 +53,7 @@ test.afterEach(async ({ request }) => {
 test("home shows the main feature links", async ({ page }) => {
   await page.goto("/");
   await expect(page.getByRole("heading", { name: "将棋学習アプリ" })).toBeVisible();
-  for (const name of ["詰め将棋", "タイムアタック", "復習", "履歴", "定跡学習", "問題作成"]) {
+  for (const name of ["詰め将棋", "タイムアタック", "復習", "履歴", "定跡学習", "問題作成", "データ出典"]) {
     await expect(page.getByRole("link", { name }).first()).toBeVisible();
   }
 });
@@ -241,4 +241,33 @@ test("seeded opening replay controls move forward, backward, reset, and finish",
   await expect(page.getByText("まだ指し手はありません")).toBeVisible();
   await page.getByRole("button", { name: "最後まで進む" }).click();
   await expect(page.getByTestId("opening-feedback")).toContainText("この定跡手順を完了しました");
+});
+
+
+test("licenses page renders data source and MIT License from API", async ({ page }) => {
+  await page.route("**/api/licenses", async (route) => {
+    await route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        book_sources: [{
+          id: 1,
+          name: "Sample YaneuraOu Book",
+          version: "fixture",
+          source_url: "https://example.test/book",
+          license_name: "MIT License",
+          license_text: "MIT License\n\nPermission is hereby granted",
+          copyright_notice: "Copyright sample",
+          file_name: "yaneuraou_book_sample.db",
+          file_sha256: "abc123",
+          imported_at: "2026-01-01T00:00:00",
+          position_count: 1,
+          move_count: 2,
+          note: "sample",
+        }],
+      }),
+    });
+  });
+  await page.goto("/licenses");
+  await expect(page.getByTestId("licenses-page")).toContainText("Sample YaneuraOu Book");
+  await expect(page.getByTestId("licenses-page")).toContainText("MIT License");
 });

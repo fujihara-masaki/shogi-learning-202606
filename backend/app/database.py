@@ -145,6 +145,48 @@ CREATE INDEX IF NOT EXISTS idx_opening_positions_line
     ON opening_positions(line_id, ply);
 CREATE INDEX IF NOT EXISTS idx_opening_line_moves_line
     ON opening_line_moves(line_id, ply);
+
+CREATE TABLE IF NOT EXISTS book_sources (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    version TEXT NOT NULL DEFAULT '',
+    source_url TEXT NOT NULL DEFAULT '',
+    license_name TEXT NOT NULL DEFAULT '',
+    license_text TEXT NOT NULL DEFAULT '',
+    copyright_notice TEXT NOT NULL DEFAULT '',
+    file_name TEXT NOT NULL DEFAULT '',
+    file_sha256 TEXT NOT NULL DEFAULT '',
+    imported_at TEXT NOT NULL DEFAULT (datetime('now')),
+    position_count INTEGER NOT NULL DEFAULT 0,
+    move_count INTEGER NOT NULL DEFAULT 0,
+    note TEXT NOT NULL DEFAULT '',
+    UNIQUE(name, version, file_sha256)
+);
+
+CREATE TABLE IF NOT EXISTS book_positions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    source_id INTEGER NOT NULL REFERENCES book_sources(id) ON DELETE CASCADE,
+    sfen TEXT NOT NULL,
+    line_no INTEGER NOT NULL DEFAULT 0,
+    UNIQUE(source_id, sfen)
+);
+
+CREATE TABLE IF NOT EXISTS book_moves (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    position_id INTEGER NOT NULL REFERENCES book_positions(id) ON DELETE CASCADE,
+    usi TEXT NOT NULL,
+    score INTEGER,
+    depth INTEGER,
+    pv TEXT NOT NULL DEFAULT '',
+    raw TEXT NOT NULL DEFAULT '',
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    UNIQUE(position_id, usi, sort_order)
+);
+
+CREATE INDEX IF NOT EXISTS idx_book_sources_imported_at ON book_sources(imported_at);
+CREATE INDEX IF NOT EXISTS idx_book_positions_source ON book_positions(source_id);
+CREATE INDEX IF NOT EXISTS idx_book_positions_sfen ON book_positions(sfen);
+CREATE INDEX IF NOT EXISTS idx_book_moves_position ON book_moves(position_id, sort_order);
 """
 
 
