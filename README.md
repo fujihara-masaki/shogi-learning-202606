@@ -292,3 +292,36 @@ PYTHONPATH=. python -m app.importers.yaneuraou_book \
 ### ライセンス表示方針
 
 取り込み時に `book_sources` へ出典 URL、ライセンス名、ライセンス本文、著作権表示、ファイル名、SHA-256、局面数、候補手数を保存します。フロントエンドの「データ出典」ページと `/api/licenses` は、この情報を表示して外部定跡データの出典・ライセンスを確認できるようにします。
+
+## やねうら王定跡からの学習用サンプル抽出
+
+大量のやねうら王定跡をそのまま学習 UI に出すと、特定戦型や類似局面に偏りやすくなります。そこで、取り込み済みの `book_sources` / `book_positions` / `book_moves` を元に、戦型別に上限を設けた学習用サンプルを `learning_samples` に抽出できます。まずは 233万局面の全件運用ではなく、1万局面・10万局面程度のサンプル作成から始める想定です。
+
+事前にやねうら王定跡を取り込んだ後、対象の `book_source_id` を指定して実行します。
+
+```bash
+cd backend
+python -m app.scripts.extract_learning_samples \
+  --source-id <book_source_id> \
+  --limit 10000 \
+  --per-opening-limit 500 \
+  --seed 1 \
+  --dry-run
+```
+
+主なオプション:
+
+- `--limit`: 抽出する学習用サンプルの全体上限です。10,000 や 100,000 など、小さめの単位から検証できます。
+- `--per-opening-limit`: 1 戦型あたりの抽出上限です。棒銀・中飛車・四間飛車・向かい飛車・矢倉・角換わり・相掛かり・横歩取りなど、同じ戦型に偏りすぎないために使います。
+- `--seed`: 同じ入力データと条件で再現性のある抽出順にするための乱数 seed です。
+- `--dry-run`: DB に保存せず、戦型別の候補件数・抽出予定件数・未分類件数だけを表示します。
+
+戦型分類は、YaneuraOu book の候補手と SFEN から判断できる範囲の簡易ルールです。履歴がない局面や代表的な手掛かりがない局面は `unclassified` / `未分類` として扱い、抽出処理自体は失敗させません。保存時は同じ `book_source_id` の既存サンプルを置き換えるため、条件を変えた再抽出ができます。
+
+抽出済みサンプル数は API から確認できます。
+
+```bash
+curl http://localhost:8000/api/book/sources/<book_source_id>/learning-samples/summary
+```
+
+レスポンスには戦型別件数、未分類件数、対象 book source の出典情報が含まれます。出典・ライセンス表示は既存の book source 表示に従い、学習 UI で利用する場合も `book_sources` の `source_url` / `license_name` / `copyright_notice` を併記してください。UI への本格表示は今後、定跡候補表示や戦型別学習画面から `learning_samples` を参照する形で拡張できます。
