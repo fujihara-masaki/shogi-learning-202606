@@ -789,3 +789,50 @@ select {
   max-height: 320px;
   overflow: auto;
 }
+
+.book-candidates-sfen {
+  overflow-wrap: anywhere;
+}
+
+.book-candidate-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0;
+  padding-left: 1.25rem;
+}
+
+.book-candidate-item {
+  padding: 10px 0;
+  border-top: 1px solid #eee5d5;
+}
+
+.book-candidate-item:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.book-candidate-main {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.book-candidate-meta {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 4px 10px;
+  margin: 0;
+  font-size: 0.9rem;
+}
+
+.book-candidate-meta dt {
+  color: #6d6557;
+  font-weight: 700;
+}
+
+.book-candidate-meta dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
