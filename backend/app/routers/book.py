@@ -121,7 +121,7 @@ def get_book_source(source_id: int) -> dict[str, Any]:
 def get_learning_sample_summary(source_id: int) -> dict[str, Any]:
     conn = get_connection()
     try:
-        source = conn.execute("SELECT id, name, version, license_name, source_url FROM book_sources WHERE id = ?", (source_id,)).fetchone()
+        source = conn.execute("SELECT id, name, version, license_name, source_url, copyright_notice FROM book_sources WHERE id = ?", (source_id,)).fetchone()
         if not source:
             raise HTTPException(status_code=404, detail="book source not found")
         rows = conn.execute(

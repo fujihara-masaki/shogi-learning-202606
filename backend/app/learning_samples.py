@@ -82,7 +82,15 @@ def _candidate_rows(conn, source_id: int) -> list[dict[str, Any]]:
     return [dict(row) for row in rows]
 
 
+def validate_sample_limits(*, limit: int, per_opening_limit: int) -> None:
+    if limit < 1:
+        raise ValueError("limit must be 1 or greater")
+    if per_opening_limit < 1:
+        raise ValueError("per_opening_limit must be 1 or greater")
+
+
 def build_learning_sample_plan(source_id: int, *, limit: int, per_opening_limit: int, seed: int, dry_run: bool) -> LearningSamplePlan:
+    validate_sample_limits(limit=limit, per_opening_limit=per_opening_limit)
     init_db()
     rng = random.Random(seed)
     conn = get_connection()

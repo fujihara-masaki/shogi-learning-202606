@@ -5,11 +5,18 @@ import argparse
 from .learning_samples import build_learning_sample_plan
 
 
+def positive_int(value: str) -> int:
+    parsed = int(value)
+    if parsed < 1:
+        raise argparse.ArgumentTypeError("must be 1 or greater")
+    return parsed
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Extract balanced learning samples from imported YaneuraOu book data")
     parser.add_argument("--source-id", type=int, required=True)
-    parser.add_argument("--limit", type=int, default=10000)
-    parser.add_argument("--per-opening-limit", type=int, default=500)
+    parser.add_argument("--limit", type=positive_int, default=10000)
+    parser.add_argument("--per-opening-limit", type=positive_int, default=500)
     parser.add_argument("--seed", type=int, default=1)
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()
