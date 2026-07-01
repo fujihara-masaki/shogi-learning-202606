@@ -255,3 +255,38 @@ export function openingFromImportedLine(imported: ImportedOpeningLike): OpeningL
     moves: build(0),
   };
 }
+
+
+export interface LearningSampleLike {
+  id: number;
+  opening_name: string;
+  sfen: string;
+  sample_reason: string;
+  candidates: Array<{ move_usi: string; score: number | null; depth: number | null }>;
+  source?: { name: string; license_name: string };
+}
+
+export function openingFromLearningSample(sample: LearningSampleLike): OpeningLine {
+  const move = sample.candidates[0];
+  return {
+    id: `sample-${sample.id}`,
+    name: `${sample.opening_name} サンプル #${sample.id}`,
+    category: sample.opening_name,
+    description: sample.sample_reason || "定跡DBから抽出した学習サンプル",
+    initialSfen: sample.sfen,
+    moves: move
+      ? [
+          {
+            id: `sample-${sample.id}-1`,
+            usi: move.move_usi,
+            notation: move.move_usi,
+            explanation: "定跡DBの候補手を使った1手学習です。右側に同局面の候補一覧も表示します。",
+            aim: sample.source?.license_name
+              ? `出典: ${sample.source.name} / ライセンス: ${sample.source.license_name}`
+              : `出典: ${sample.source?.name || "定跡DB"}`,
+            hint: `USI ${move.move_usi} の候補手を指します。`,
+          },
+        ]
+      : [],
+  };
+}

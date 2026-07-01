@@ -324,6 +324,51 @@ export function fetchBookCandidates(sfen: string): Promise<BookCandidatesRespons
   return request<BookCandidatesResponse>(`/api/book/candidates?${params.toString()}`);
 }
 
+
+export interface LearningSampleOpeningSummary {
+  opening_key: string;
+  opening_name: string;
+  sample_count: number;
+  first_rank: number;
+}
+
+export interface LearningSampleSource {
+  id: number;
+  name: string;
+  version: string;
+  license_name: string;
+  source_url: string;
+  copyright_notice: string;
+}
+
+export interface LearningSample {
+  id: number;
+  book_source_id: number;
+  book_position_id: number;
+  opening_key: string;
+  opening_name: string;
+  sfen: string;
+  sample_rank: number;
+  sample_reason: string;
+  created_at: string;
+  source: LearningSampleSource;
+  candidates: BookCandidate[];
+}
+
+export function fetchLearningSampleOpenings(): Promise<LearningSampleOpeningSummary[]> {
+  return request<LearningSampleOpeningSummary[]>("/api/learning-samples/openings");
+}
+
+export function fetchLearningSamples(openingKey?: string, limit = 20): Promise<LearningSample[]> {
+  const params = new URLSearchParams({ limit: String(limit) });
+  if (openingKey) params.set("opening_key", openingKey);
+  return request<LearningSample[]>(`/api/learning-samples?${params.toString()}`);
+}
+
+export function fetchLearningSample(id: number): Promise<LearningSample> {
+  return request<LearningSample>(`/api/learning-samples/${id}`);
+}
+
 export interface LicenseResponse {
   book_sources: BookSource[];
 }
