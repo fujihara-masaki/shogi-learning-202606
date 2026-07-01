@@ -13,18 +13,37 @@ def positive_int(value: str) -> int:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Extract balanced learning samples from imported YaneuraOu book data")
+    parser = argparse.ArgumentParser(
+        description="Extract balanced learning samples from imported YaneuraOu book data"
+    )
     parser.add_argument("--source-id", type=int, required=True)
     parser.add_argument("--limit", type=positive_int, default=10000)
     parser.add_argument("--per-opening-limit", type=positive_int, default=500)
     parser.add_argument("--seed", type=int, default=1)
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()
-    plan = build_learning_sample_plan(args.source_id, limit=args.limit, per_opening_limit=args.per_opening_limit, seed=args.seed, dry_run=args.dry_run)
+    plan = build_learning_sample_plan(
+        args.source_id,
+        limit=args.limit,
+        per_opening_limit=args.per_opening_limit,
+        seed=args.seed,
+        dry_run=args.dry_run,
+    )
     print(f"source_id={plan.source_id} dry_run={plan.dry_run}")
-    print(f"candidates={plan.total_candidates} selected={plan.selected_count} unclassified={plan.unclassified_count}")
+    print(
+        f"candidates={plan.total_candidates} selected={plan.selected_count} "
+        f"unclassified={plan.unclassified_count}"
+    )
     for key, summary in sorted(plan.by_opening.items()):
-        print(f"{key}\t{summary['opening_name']}\tcandidates={summary['candidate_count']}\tselected={summary['selected_count']}")
+        reasons = summary.get("reason_counts") or {}
+        top_reason = next(iter(reasons), "")
+        examples = ",".join(str(x) for x in summary.get("example_position_ids", []))
+        detail = f"\ttop_reason={top_reason}" if top_reason else ""
+        example_detail = f"\texamples={examples}" if examples else ""
+        print(
+            f"{key}\t{summary['opening_name']}\tcandidates={summary['candidate_count']}"
+            f"\tselected={summary['selected_count']}{detail}{example_detail}"
+        )
 
 
 if __name__ == "__main__":

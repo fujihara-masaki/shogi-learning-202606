@@ -88,3 +88,28 @@ def test_learning_sample_summary_api(client, tmp_path):
     assert response.json()["total_samples"] == 2
     assert response.json()["source"]["name"] == "Sample YaneuraOu Book"
     assert response.json()["source"]["copyright_notice"] == "fixture copyright"
+
+
+def test_classifies_aigakari_from_mutual_rook_pawn_shape():
+    from app.learning_samples import classify_book_position
+
+    sfen = "lnsgkgsnl/1r5b1/p1ppppppp/1p7/7P1/9/PPPPPPP1P/1B5R1/LNSGKGSNL b - 1"
+
+    assert classify_book_position(sfen, ["2e2d", "8e8f"])[0] == "aigakari"
+
+
+def test_classifies_bogin_from_silver_advance_shape():
+    from app.learning_samples import classify_book_position
+
+    sfen = "lnsgkgsnl/1r5b1/ppppppppp/9/9/6SP1/PPPPPPP1P/1B5R1/LNSGKG1NL b - 1"
+
+    assert classify_book_position(sfen, ["2f2e"])[0] == "bogin"
+
+
+def test_learning_sample_plan_includes_diagnostics(tmp_path):
+    source_id = imported_source(tmp_path)
+    plan = build_learning_sample_plan(source_id, limit=10, per_opening_limit=10, seed=1, dry_run=True)
+
+    unclassified = plan.by_opening["unclassified"]
+    assert unclassified["reason_counts"]
+    assert unclassified["example_position_ids"]
