@@ -20,6 +20,7 @@ export default function OpeningStudyPage() {
 }
 
 function OpeningStudyContent({ id }: { id: string | undefined }) {
+  const isSampleRoute = id?.startsWith("sample-") ?? false;
   const staticOpening = id ? findOpening(id) : undefined;
   const [importedOpening, setImportedOpening] = useState<OpeningLine | null>(null);
   const [sampleOpening, setSampleOpening] = useState<OpeningLine | null>(null);
@@ -30,7 +31,7 @@ function OpeningStudyContent({ id }: { id: string | undefined }) {
   const [lastMoveTo, setLastMoveTo] = useState<Square | null>(null);
 
   useEffect(() => {
-    if (!id || !id.startsWith("sample-")) return;
+    if (!id || !isSampleRoute) return;
     const sampleId = Number(id.replace("sample-", ""));
     if (!Number.isFinite(sampleId)) return;
     let cancelled = false;
@@ -44,10 +45,10 @@ function OpeningStudyContent({ id }: { id: string | undefined }) {
     return () => {
       cancelled = true;
     };
-  }, [id]);
+  }, [id, isSampleRoute]);
 
   useEffect(() => {
-    if (!id || id.startsWith("sample-") || staticOpening || !/^\d+$/.test(id)) return;
+    if (!id || isSampleRoute || staticOpening || !/^\d+$/.test(id)) return;
     let cancelled = false;
     fetchOpening(Number(id))
       .then((opening) => {
@@ -59,9 +60,9 @@ function OpeningStudyContent({ id }: { id: string | undefined }) {
     return () => {
       cancelled = true;
     };
-  }, [id, staticOpening]);
+  }, [id, isSampleRoute, staticOpening]);
 
-  const opening = staticOpening ?? sampleOpening ?? importedOpening;
+  const opening = staticOpening ?? (isSampleRoute ? sampleOpening : importedOpening);
   const state = useMemo(() => (opening ? applyOpeningPath(opening, path) : null), [opening, path]);
   const expected = useMemo(() => (opening ? expectedOpeningMove(opening, path) : null), [opening, path]);
   const currentSfen = state?.position.sfen ?? null;
