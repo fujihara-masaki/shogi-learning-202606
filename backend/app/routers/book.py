@@ -30,6 +30,81 @@ def _source(row: Any, include_license_text: bool = False) -> dict[str, Any]:
     return data
 
 
+def _candidate_rows_for_position(conn, position_id: int) -> list[dict[str, Any]]:
+    rows = conn.execute(
+        """
+        SELECT
+            bm.usi AS move_usi,
+            bm.score,
+            bm.depth,
+            bm.pv,
+            bm.raw,
+            bm.sort_order,
+            bs.id AS source_id,
+            bs.name AS source_name,
+            bs.version AS source_version,
+            bs.source_url,
+            bs.license_name,
+            bs.copyright_notice
+        FROM book_moves bm
+        JOIN book_positions bp ON bp.id = bm.position_id
+        JOIN book_sources bs ON bs.id = bp.source_id
+        WHERE bm.position_id = ?
+        ORDER BY
+            CASE WHEN bm.sort_order IS NULL THEN 1 ELSE 0 END ASC,
+            bm.sort_order ASC,
+            CASE WHEN bm.score IS NULL THEN 1 ELSE 0 END ASC,
+            bm.score DESC,
+            CASE WHEN bm.depth IS NULL THEN 1 ELSE 0 END ASC,
+            bm.depth DESC,
+            bm.id ASC
+        """,
+        (position_id,),
+    ).fetchall()
+    return [_candidate(row) for row in rows]
+
+
+def _candidate(row: Any) -> dict[str, Any]:
+    return {
+        "move_usi": row["move_usi"],
+        "rank": row["sort_order"] + 1 if row["sort_order"] is not None else None,
+        "score": row["score"],
+        "depth": row["depth"],
+        "pv": row["pv"],
+        "raw": row["raw"],
+        "source_id": row["source_id"],
+        "source_name": row["source_name"],
+        "source_version": row["source_version"],
+        "license": row["license_name"],
+        "license_name": row["license_name"],
+        "source_url": row["source_url"],
+        "copyright_notice": row["copyright_notice"],
+    }
+
+
+def _learning_sample(row: Any, candidates: list[dict[str, Any]]) -> dict[str, Any]:
+    return {
+        "id": row["id"],
+        "book_source_id": row["book_source_id"],
+        "book_position_id": row["book_position_id"],
+        "opening_key": row["opening_key"],
+        "opening_name": row["opening_name"],
+        "sfen": row["sfen"],
+        "sample_rank": row["sample_rank"],
+        "sample_reason": row["sample_reason"],
+        "created_at": row["created_at"],
+        "source": {
+            "id": row["source_id"],
+            "name": row["source_name"],
+            "version": row["source_version"],
+            "license_name": row["license_name"],
+            "source_url": row["source_url"],
+            "copyright_notice": row["copyright_notice"],
+        },
+        "candidates": candidates,
+    }
+
+
 @router.get("/api/book/candidates")
 def get_book_candidates(sfen: str = Query(..., min_length=1)) -> dict[str, Any]:
     normalized_sfen = sfen.strip()
@@ -72,24 +147,7 @@ def get_book_candidates(sfen: str = Query(..., min_length=1)) -> dict[str, Any]:
             """,
             (normalized_sfen,),
         ).fetchall()
-        candidates = [
-            {
-                "move_usi": row["move_usi"],
-                "rank": row["sort_order"] + 1 if row["sort_order"] is not None else None,
-                "score": row["score"],
-                "depth": row["depth"],
-                "pv": row["pv"],
-                "raw": row["raw"],
-                "source_id": row["source_id"],
-                "source_name": row["source_name"],
-                "source_version": row["source_version"],
-                "license": row["license_name"],
-                "license_name": row["license_name"],
-                "source_url": row["source_url"],
-                "copyright_notice": row["copyright_notice"],
-            }
-            for row in rows
-        ]
+        candidates = [_candidate(row) for row in rows]
         return {"sfen": normalized_sfen, "found": bool(candidates), "candidates": candidates}
     finally:
         conn.close()
@@ -140,6 +198,71 @@ def get_learning_sample_summary(source_id: int) -> dict[str, Any]:
             "unclassified_samples": sum(row["sample_count"] for row in rows if row["opening_key"] == "unclassified"),
             "openings": [dict(row) for row in rows],
         }
+    finally:
+        conn.close()
+
+
+@router.get("/api/learning-samples/openings")
+def list_learning_sample_openings() -> list[dict[str, Any]]:
+    conn = get_connection()
+    try:
+        rows = conn.execute(
+            """
+            SELECT opening_key, opening_name, COUNT(*) AS sample_count, MIN(sample_rank) AS first_rank
+            FROM learning_samples
+            GROUP BY opening_key, opening_name
+            ORDER BY sample_count DESC, first_rank ASC, opening_key ASC
+            """
+        ).fetchall()
+        return [dict(row) for row in rows]
+    finally:
+        conn.close()
+
+
+@router.get("/api/learning-samples")
+def list_learning_samples(opening_key: str | None = Query(default=None), limit: int = Query(default=20, ge=1, le=100)) -> list[dict[str, Any]]:
+    conn = get_connection()
+    try:
+        params: list[Any] = []
+        where = ""
+        if opening_key:
+            where = "WHERE ls.opening_key = ?"
+            params.append(opening_key)
+        params.append(limit)
+        rows = conn.execute(
+            f"""
+            SELECT ls.*, bs.id AS source_id, bs.name AS source_name, bs.version AS source_version,
+                   bs.license_name, bs.source_url, bs.copyright_notice
+            FROM learning_samples ls
+            JOIN book_sources bs ON bs.id = ls.book_source_id
+            {where}
+            ORDER BY ls.opening_key ASC, ls.sample_rank ASC, ls.id ASC
+            LIMIT ?
+            """,
+            params,
+        ).fetchall()
+        return [_learning_sample(row, _candidate_rows_for_position(conn, row["book_position_id"])) for row in rows]
+    finally:
+        conn.close()
+
+
+@router.get("/api/learning-samples/{sample_id}")
+def get_learning_sample(sample_id: int) -> dict[str, Any]:
+    conn = get_connection()
+    try:
+        row = conn.execute(
+            """
+            SELECT ls.*, bs.id AS source_id, bs.name AS source_name, bs.version AS source_version,
+                   bs.license_name, bs.source_url, bs.copyright_notice
+            FROM learning_samples ls
+            JOIN book_sources bs ON bs.id = ls.book_source_id
+            WHERE ls.id = ?
+            """,
+            (sample_id,),
+        ).fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="learning sample not found")
+        return _learning_sample(row, _candidate_rows_for_position(conn, row["book_position_id"]))
     finally:
         conn.close()
 

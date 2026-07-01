@@ -113,3 +113,29 @@ def test_learning_sample_plan_includes_diagnostics(tmp_path):
     unclassified = plan.by_opening["unclassified"]
     assert unclassified["reason_counts"]
     assert unclassified["example_position_ids"]
+
+
+def test_learning_samples_can_be_listed_by_opening_with_candidates(client, tmp_path):
+    os.environ["SHOGI_DB_PATH"] = str(tmp_path / "samples_api.db")
+    init_db()
+    result = import_book(FIXTURE, name="Sample YaneuraOu Book", version="fixture", license_name="MIT")
+    build_learning_sample_plan(result.source_id, limit=4, per_opening_limit=10, seed=1, dry_run=False)
+
+    openings_response = client.get("/api/learning-samples/openings")
+    assert openings_response.status_code == 200
+    openings = openings_response.json()
+    assert openings
+
+    opening_key = openings[0]["opening_key"]
+    samples_response = client.get(f"/api/learning-samples?opening_key={opening_key}")
+    assert samples_response.status_code == 200
+    samples = samples_response.json()
+    assert samples
+    assert all(sample["opening_key"] == opening_key for sample in samples)
+    assert samples[0]["sfen"]
+    assert samples[0]["candidates"]
+    assert samples[0]["candidates"][0]["move_usi"]
+
+    detail_response = client.get(f"/api/learning-samples/{samples[0]['id']}")
+    assert detail_response.status_code == 200
+    assert detail_response.json()["id"] == samples[0]["id"]

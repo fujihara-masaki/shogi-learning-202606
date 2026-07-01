@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, Navigate, useParams } from "react-router-dom";
 import { type Move, type Square } from "tsshogi";
-import { fetchBookCandidates, fetchOpening, type BookCandidatesResponse } from "../api/client";
+import { fetchBookCandidates, fetchLearningSample, fetchOpening, type BookCandidatesResponse } from "../api/client";
 import MoveHistory from "../components/MoveHistory";
 import ShogiBoard from "../components/ShogiBoard";
 import {
@@ -10,6 +10,7 @@ import {
   findOpening,
   isExpectedOpeningMove,
   openingFromImportedLine,
+  openingFromLearningSample,
   type OpeningLine,
 } from "../shogi/openings";
 
@@ -19,8 +20,10 @@ export default function OpeningStudyPage() {
 }
 
 function OpeningStudyContent({ id }: { id: string | undefined }) {
+  const isSampleRoute = id?.startsWith("sample-") ?? false;
   const staticOpening = id ? findOpening(id) : undefined;
   const [importedOpening, setImportedOpening] = useState<OpeningLine | null>(null);
+  const [sampleOpening, setSampleOpening] = useState<OpeningLine | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [path, setPath] = useState<number[]>([]);
   const [feedback, setFeedback] = useState<string | null>(null);
@@ -28,7 +31,24 @@ function OpeningStudyContent({ id }: { id: string | undefined }) {
   const [lastMoveTo, setLastMoveTo] = useState<Square | null>(null);
 
   useEffect(() => {
-    if (!id || staticOpening || !/^\d+$/.test(id)) return;
+    if (!id || !isSampleRoute) return;
+    const sampleId = Number(id.replace("sample-", ""));
+    if (!Number.isFinite(sampleId)) return;
+    let cancelled = false;
+    fetchLearningSample(sampleId)
+      .then((sample) => {
+        if (!cancelled) setSampleOpening(openingFromLearningSample(sample));
+      })
+      .catch((e) => {
+        if (!cancelled) setLoadError(`学習サンプルの取得に失敗しました: ${e}`);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [id, isSampleRoute]);
+
+  useEffect(() => {
+    if (!id || isSampleRoute || staticOpening || !/^\d+$/.test(id)) return;
     let cancelled = false;
     fetchOpening(Number(id))
       .then((opening) => {
@@ -40,9 +60,9 @@ function OpeningStudyContent({ id }: { id: string | undefined }) {
     return () => {
       cancelled = true;
     };
-  }, [id, staticOpening]);
+  }, [id, isSampleRoute, staticOpening]);
 
-  const opening = staticOpening ?? importedOpening;
+  const opening = staticOpening ?? (isSampleRoute ? sampleOpening : importedOpening);
   const state = useMemo(() => (opening ? applyOpeningPath(opening, path) : null), [opening, path]);
   const expected = useMemo(() => (opening ? expectedOpeningMove(opening, path) : null), [opening, path]);
   const currentSfen = state?.position.sfen ?? null;

@@ -6,10 +6,14 @@ import {
   fetchOpeningTypeLines,
   fetchOpeningTypes,
   fetchOpenings,
+  fetchLearningSampleOpenings,
+  fetchLearningSamples,
   type OpeningCategory,
   type OpeningSummary,
   type OpeningTagSummary,
   type OpeningType,
+  type LearningSample,
+  type LearningSampleOpeningSummary,
 } from "../api/client";
 import { OPENING_LINES, countMainLineMoves } from "../shogi/openings";
 
@@ -22,6 +26,9 @@ export default function OpeningsPage() {
   const [imported, setImported] = useState<OpeningSummary[]>([]);
   const [selectedType, setSelectedType] = useState<OpeningType | null>(null);
   const [typeLines, setTypeLines] = useState<OpeningSummary[]>([]);
+  const [sampleOpenings, setSampleOpenings] = useState<LearningSampleOpeningSummary[]>([]);
+  const [selectedSampleOpening, setSelectedSampleOpening] = useState("");
+  const [learningSamples, setLearningSamples] = useState<LearningSample[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -31,13 +38,17 @@ export default function OpeningsPage() {
       fetchOpenings(selectedTag || undefined),
       fetchOpeningCategories(),
       fetchOpeningTypes(selectedCategoryId ?? undefined),
+      fetchLearningSampleOpenings(),
     ])
-      .then(([tagList, openingList, categoryList, typeList]) => {
+      .then(([tagList, openingList, categoryList, typeList, sampleOpeningList]) => {
         if (cancelled) return;
         setTags(tagList);
         setImported(openingList);
         setCategories(categoryList);
         setOpeningTypes(typeList);
+        setSampleOpenings(sampleOpeningList);
+        const nextSampleOpening = selectedSampleOpening || sampleOpeningList[0]?.opening_key || "";
+        setSelectedSampleOpening(nextSampleOpening);
         setError(null);
       })
       .catch((e) => {
@@ -46,7 +57,7 @@ export default function OpeningsPage() {
     return () => {
       cancelled = true;
     };
-  }, [selectedTag, selectedCategoryId]);
+  }, [selectedTag, selectedCategoryId, selectedSampleOpening]);
 
   useEffect(() => {
     if (!selectedType || selectedType.opening_line_count === 0) return;
@@ -62,6 +73,21 @@ export default function OpeningsPage() {
       cancelled = true;
     };
   }, [selectedType]);
+
+  useEffect(() => {
+    if (!selectedSampleOpening) return;
+    let cancelled = false;
+    fetchLearningSamples(selectedSampleOpening, 12)
+      .then((samples) => {
+        if (!cancelled) setLearningSamples(samples);
+      })
+      .catch((e) => {
+        if (!cancelled) setError(`学習サンプルの取得に失敗しました: ${e}`);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedSampleOpening]);
 
   function resetSelectedTypeLines() {
     setSelectedType(null);
@@ -163,6 +189,34 @@ export default function OpeningsPage() {
           </div>
         </section>
       )}
+
+      <section>
+        <h2>定跡DB 学習サンプル</h2>
+        <p className="muted">PR #16〜#17で抽出した learning_samples を戦型別に選び、SFEN局面と候補手で1手学習できます。</p>
+        <div className="filter-bar">
+          <select value={selectedSampleOpening} onChange={(e) => setSelectedSampleOpening(e.target.value)} aria-label="学習サンプル戦型">
+            {sampleOpenings.length === 0 && <option value="">学習サンプルなし</option>}
+            {sampleOpenings.map((opening) => (
+              <option key={opening.opening_key} value={opening.opening_key}>{opening.opening_name} ({opening.sample_count})</option>
+            ))}
+          </select>
+        </div>
+        <div className="opening-list" data-testid="learning-sample-list">
+          {learningSamples.map((sample) => (
+            <article key={sample.id} className="opening-card" data-testid="learning-sample-card">
+              <div>
+                <p className="opening-category">{sample.opening_name} / #{sample.sample_rank}</p>
+                <h2>サンプル局面 {sample.id}</h2>
+                <p>{sample.sample_reason}</p>
+                <p className="muted">候補手: {sample.candidates.map((candidate) => candidate.move_usi).join("、") || "なし"}</p>
+                <p className="muted">出典: {sample.source.name}{sample.source.license_name && ` / ${sample.source.license_name}`}</p>
+              </div>
+              <Link className="primary-link" to={`/openings/sample-${sample.id}`}>この局面で学習する</Link>
+            </article>
+          ))}
+          {selectedSampleOpening && learningSamples.length === 0 && <p className="muted">この戦型の学習サンプルはありません。</p>}
+        </div>
+      </section>
 
       <section>
         <h2>学習できる定跡ライン</h2>
