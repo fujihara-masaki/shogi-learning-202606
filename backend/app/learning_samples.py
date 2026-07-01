@@ -22,32 +22,120 @@ OPENING_LABELS = {
 }
 
 
-def classify_book_position(sfen: str, moves: list[str]) -> tuple[str, str]:
-    """Classify a book position using lightweight SFEN/candidate-move rules.
+RANKS = "abcdefghi"
 
-    Imported YaneuraOu positions do not keep the move history, so these rules are
-    intentionally conservative and return ``unclassified`` when no representative
-    clue is present.
+
+def _parse_sfen_board(sfen: str) -> tuple[dict[tuple[int, str], str], str, str]:
+    parts = sfen.split()
+    placement = parts[0] if parts else ""
+    side = parts[1] if len(parts) > 1 else "b"
+    hand = parts[2] if len(parts) > 2 else "-"
+    board: dict[tuple[int, str], str] = {}
+    for rank_index, row in enumerate(placement.split("/")):
+        if rank_index >= len(RANKS):
+            break
+        rank = RANKS[rank_index]
+        file_no = 9
+        i = 0
+        while i < len(row) and file_no >= 1:
+            ch = row[i]
+            if ch.isdigit():
+                file_no -= int(ch)
+            elif ch == "+" and i + 1 < len(row):
+                board[(file_no, rank)] = row[i : i + 2]
+                file_no -= 1
+                i += 1
+            else:
+                board[(file_no, rank)] = ch
+                file_no -= 1
+            i += 1
+    return board, side, hand
+
+
+def _piece_at(board: dict[tuple[int, str], str], square: str) -> str | None:
+    if len(square) != 2 or not square[0].isdigit():
+        return None
+    return board.get((int(square[0]), square[1]))
+
+
+def _has_piece(board: dict[tuple[int, str], str], piece: str, squares: set[str]) -> bool:
+    return any(_piece_at(board, sq) == piece for sq in squares)
+
+
+def _hand_contains(hand: str, piece: str) -> bool:
+    return hand != "-" and piece in hand
+
+
+def classify_book_position(sfen: str, moves: list[str]) -> tuple[str, str]:
+    """Classify a book position using SFEN piece placement and candidate moves.
+
+    YaneuraOu book rows do not include move history, so the classifier combines
+    stable board-shape clues (piece locations, hands, advanced pawns) with the
+    current candidate moves.  Rules are ordered from most distinctive to more
+    generic so common candidate moves do not over-classify early positions.
     """
-    s = sfen.split()[0]
+    board, _side, hand = _parse_sfen_board(sfen)
     move_set = set(moves)
-    if "8h2b" in move_set or "2b8h" in move_set or "+B" in s or "+b" in s:
-        return "kakugawari", "candidate move/piece placement suggests bishop exchange"
-    if {"2g2f", "2f2e"} & move_set and {"8c8d", "8d8e"} & move_set:
-        return "aigakari", "both rook pawns are candidate plans"
-    if "3d3c" in move_set or "3c3d" in move_set:
-        return "yagura", "silver development around 3c/3d suggests Yagura"
-    if "2e2d" in move_set or "8e8f" in move_set:
-        return "yokofudori", "rook-pawn capture candidate suggests Yokofudori"
-    if "5g5f" in move_set or "5c5d" in move_set or "/4R4/" in s or "/4r4/" in s:
-        return "nakabisha", "central-file pawn/rook clue suggests Nakabisha"
-    if "6h7h" in move_set or "3b4b" in move_set or "/5R3/" in s or "/5r3/" in s:
-        return "shikenbisha", "fourth-file rook/silver clue suggests Shikenbisha"
-    if "2h8h" in move_set or "8b2b" in move_set or "/1R7/" in s or "/1r7/" in s:
-        return "mukaibisha", "opposing-rook clue suggests Mukaibisha"
-    if "2g2f" in move_set and ("3i3h" in move_set or "3h2g" in move_set):
-        return "bogin", "rook-pawn and silver advance candidates suggest Bogin"
-    return UNKNOWN_OPENING, "no simple opening rule matched"
+    black_bishop_on_board = any(piece == "B" for piece in board.values())
+    white_bishop_on_board = any(piece == "b" for piece in board.values())
+    bishop_in_hand = _hand_contains(hand, "B") or _hand_contains(hand, "b")
+    black_rook = next((sq for sq, piece in board.items() if piece == "R"), None)
+    white_rook = next((sq for sq, piece in board.items() if piece == "r"), None)
+
+    # Ranging-rook families: use rook placement before static-rook pawn-shape rules.
+    if (black_rook and black_rook[0] == 5) or (white_rook and white_rook[0] == 5):
+        return "nakabisha", "rook is placed on the central file"
+    if (black_rook and black_rook[0] == 6) or (white_rook and white_rook[0] == 4):
+        return "shikenbisha", "rook is placed on the fourth-file ranging-rook file"
+    if (black_rook and black_rook[0] == 8) or (white_rook and white_rook[0] == 2):
+        return "mukaibisha", "rook is placed on the opposing-rook file"
+    if {"2h5h", "8b5b", "5g5f", "5c5d"} & move_set:
+        return "nakabisha", "central-file rook/pawn candidate suggests Nakabisha"
+    if {"2h6h", "8b4b", "6g6f", "4c4d"} & move_set:
+        return "shikenbisha", "fourth-file rook/pawn candidate suggests Shikenbisha"
+    if {"2h8h", "8b2b", "8g8f", "2c2d"} & move_set:
+        return "mukaibisha", "opposing-rook candidate suggests Mukaibisha"
+
+    promoted_bishop_on_board = any(piece in {"+B", "+b"} for piece in board.values())
+    bishop_drop_candidate = any(m.startswith(("B*", "b*")) for m in move_set)
+
+    # Bishop-exchange: require an actual bishop in hand / missing bishop, not merely a capture candidate.
+    has_missing_bishop = not (black_bishop_on_board and white_bishop_on_board)
+    if bishop_in_hand or promoted_bishop_on_board or has_missing_bishop:
+        if (
+            {"8h2b", "2b8h"} & move_set
+            or bishop_drop_candidate
+            or bishop_in_hand
+            or promoted_bishop_on_board
+        ):
+            return "kakugawari", "bishop in hand or absent from board suggests bishop exchange"
+
+    black_2_pawn = _has_piece(board, "P", {"2f", "2e", "2d"})
+    white_8_pawn = _has_piece(board, "p", {"8d", "8e", "8f"})
+    black_7_pawn = _has_piece(board, "P", {"7f", "7e"})
+    white_3_pawn = _has_piece(board, "p", {"3d", "3e"})
+    bishops_home_or_open = black_bishop_on_board and white_bishop_on_board
+
+    if black_2_pawn and white_8_pawn and bishops_home_or_open:
+        return "aigakari", "both rook pawns are advanced while bishops remain on board"
+    if {"2e2d", "8e8f", "2f2e", "8d8e"} & move_set and black_2_pawn and white_8_pawn:
+        return "aigakari", "mutual rook-pawn candidate/shape suggests Aigakari"
+    if {"2e2d", "8e8f", "3d3c"} & move_set and has_missing_bishop:
+        return "yokofudori", "rook-pawn capture after bishop opening suggests Yokofudori"
+
+    has_yagura_shape = (
+        _has_piece(board, "S", {"7g", "6g", "7h"})
+        and _has_piece(board, "s", {"3c", "4c", "3b"})
+        and black_7_pawn
+        and white_3_pawn
+    )
+    if has_yagura_shape or {"7i6h", "3a4b", "6h7g", "4b3c"} & move_set:
+        return "yagura", "Yagura silver-and-pawn structure detected"
+    has_bogin_shape = _has_piece(board, "S", {"2g", "3f", "2f"}) and black_2_pawn
+    if has_bogin_shape or {"3i3h", "3h2g", "2g3f", "7a7b", "7b8c", "8c7d"} & move_set:
+        return "bogin", "silver advance near rook pawn suggests Bogin"
+
+    return UNKNOWN_OPENING, "no board-shape or candidate-move rule matched"
 
 
 @dataclass(frozen=True)
@@ -118,9 +206,29 @@ def build_learning_sample_plan(source_id: int, *, limit: int, per_opening_limit:
         by_opening: dict[str, dict[str, Any]] = {}
         for key in sorted(grouped):
             items = grouped[key]
-            items.sort(key=lambda x: (-int(x["move_count"] or 0), -int(x["max_depth"] or 0), int(x["max_abs_score"] or 0), x["tie_breaker"], x["book_position_id"]))
+            items.sort(
+                key=lambda x: (
+                    -int(x["move_count"] or 0),
+                    -int(x["max_depth"] or 0),
+                    int(x["max_abs_score"] or 0),
+                    x["tie_breaker"],
+                    x["book_position_id"],
+                )
+            )
             picks = items[:per_opening_limit]
-            by_opening[key] = {"opening_name": OPENING_LABELS.get(key, key), "candidate_count": len(items), "selected_count": len(picks)}
+            reason_counts: dict[str, int] = {}
+            for item in items:
+                reason = str(item["sample_reason"])
+                reason_counts[reason] = reason_counts.get(reason, 0) + 1
+            by_opening[key] = {
+                "opening_name": OPENING_LABELS.get(key, key),
+                "candidate_count": len(items),
+                "selected_count": len(picks),
+                "reason_counts": dict(
+                    sorted(reason_counts.items(), key=lambda x: (-x[1], x[0]))[:5]
+                ),
+                "example_position_ids": [item["book_position_id"] for item in items[:3]],
+            }
             selected.extend(picks)
         selected.sort(key=lambda x: (x["tie_breaker"], x["opening_key"], x["book_position_id"]))
         selected = selected[:limit]
@@ -139,9 +247,28 @@ def build_learning_sample_plan(source_id: int, *, limit: int, per_opening_limit:
                 INSERT INTO learning_samples(book_source_id, book_position_id, opening_key, opening_name, sfen, sample_rank, sample_reason)
                 VALUES (?, ?, ?, ?, ?, ?, ?)
                 """,
-                [(x["book_source_id"], x["book_position_id"], x["opening_key"], x["opening_name"], x["sfen"], x["sample_rank"], x["sample_reason"]) for x in selected],
+                [
+                    (
+                        x["book_source_id"],
+                        x["book_position_id"],
+                        x["opening_key"],
+                        x["opening_name"],
+                        x["sfen"],
+                        x["sample_rank"],
+                        x["sample_reason"],
+                    )
+                    for x in selected
+                ],
             )
             conn.commit()
-        return LearningSamplePlan(source_id, sum(len(v) for v in grouped.values()), len(selected), len(grouped.get(UNKNOWN_OPENING, [])), by_opening, selected, dry_run)
+        return LearningSamplePlan(
+            source_id,
+            sum(len(v) for v in grouped.values()),
+            len(selected),
+            len(grouped.get(UNKNOWN_OPENING, [])),
+            by_opening,
+            selected,
+            dry_run,
+        )
     finally:
         conn.close()
