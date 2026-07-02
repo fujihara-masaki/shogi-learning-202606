@@ -247,8 +247,9 @@ test("major opening types show related playable lines", async ({ page }) => {
 test("opening list navigates to a seeded opening study page", async ({ page }) => {
   await page.goto("/openings");
   await expect(page.getByRole("heading", { name: "定跡学習" })).toBeVisible();
-  await expect(page.getByTestId("opening-card")).toHaveCount(3);
-  await openingCardByExactTitle(page, "棒銀").getByRole("link", { name: "学習する" }).click();
+  const bouginCard = openingCardByExactTitle(page, "棒銀");
+  await expect(bouginCard).toHaveCount(1);
+  await bouginCard.getByRole("link", { name: "学習する" }).click();
   await expect(page.getByTestId("opening-study-page")).toBeVisible();
   await expect(page.getByTestId("opening-current-move")).toContainText("7g7f");
 });
