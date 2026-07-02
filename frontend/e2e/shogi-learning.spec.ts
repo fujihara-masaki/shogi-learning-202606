@@ -24,6 +24,28 @@ const majorPlayableOpenings = [
   "対振り飛車急戦",
 ];
 
+const additionalPlayableOpenings = [
+  "三間飛車",
+  "角交換振り飛車",
+  "相振り飛車",
+  "嬉野流",
+  "鬼殺し",
+  "早石田",
+  "筋違い角",
+  "雁木",
+  "矢倉棒銀",
+  "角換わり棒銀",
+  "角換わり早繰り銀",
+  "角換わり腰掛け銀",
+  "原始棒銀",
+  "美濃囲い",
+  "穴熊",
+  "舟囲い",
+  "左美濃",
+];
+
+const allPlayableOpenings = [...majorPlayableOpenings, ...additionalPlayableOpenings];
+
 function openingCardByExactTitle(page: Page, title: string) {
   return page.getByTestId("opening-card").filter({
     has: page.getByTestId("opening-card-title").getByText(title, { exact: true }),
@@ -207,14 +229,14 @@ test("opening page shows opening categories and representative types", async ({ 
 
   await page.getByTestId("opening-category-card").filter({ hasText: "奇襲・B級戦法" }).click();
   await expect(page.getByTestId("opening-type-list")).toContainText("嬉野流");
-  await expect(page.getByTestId("opening-type-list")).toContainText("定跡手順は準備中");
+  await expect(openingTypeCardByExactTitle(page, "嬉野流").getByRole("button", { name: /関連定跡ラインを見る/ })).toBeVisible();
 });
 
 
 test("major opening types show related playable lines", async ({ page }) => {
   await page.goto("/openings");
 
-  for (const openingName of majorPlayableOpenings) {
+  for (const openingName of allPlayableOpenings) {
     const card = openingTypeCardByExactTitle(page, openingName);
     await expect(card).toHaveCount(1);
     await expect(card.getByRole("button", { name: /関連定跡ラインを見る/ })).toBeVisible();
