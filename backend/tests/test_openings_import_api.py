@@ -110,13 +110,14 @@ def test_seed_openings_backfills_missing_lines_in_existing_database(tmp_path):
                 for row in conn.execute("SELECT id, name_ja FROM opening_types").fetchall()
             }
             legacy_names = {"棒銀", "中飛車", "向かい飛車"}
+            legacy_opening_types = {"棒銀": "居飛車", "中飛車": "振り飛車", "向かい飛車": "振り飛車"}
             for name in legacy_names:
                 conn.execute(
                     """
-                    INSERT INTO opening_lines(opening_type_id, name, opening_type, initial_sfen)
-                    VALUES (?, ?, 'legacy seed', 'startpos')
+                    INSERT INTO opening_lines(name, opening_type, initial_sfen)
+                    VALUES (?, ?, 'startpos')
                     """,
-                    (type_ids[name], name),
+                    (name, legacy_opening_types[name]),
                 )
             imported_source_id = conn.execute(
                 """
@@ -153,12 +154,142 @@ def test_seed_openings_backfills_missing_lines_in_existing_database(tmp_path):
             for name in legacy_names:
                 assert sum(1 for row in rows if row["name"] == name) == 1
 
+            linked_rows = conn.execute(
+                """
+                SELECT ol.name, ot.name_ja AS linked_type_name
+                FROM opening_lines ol
+                JOIN opening_types ot ON ot.id = ol.opening_type_id
+                WHERE ol.source_id IS NULL AND ol.name IN ({})
+                """.format(",".join("?" for _ in MAJOR_PLAYABLE_OPENINGS)),
+                tuple(MAJOR_PLAYABLE_OPENINGS),
+            ).fetchall()
+            assert {row["name"]: row["linked_type_name"] for row in linked_rows} == {
+                name: name for name in MAJOR_PLAYABLE_OPENINGS
+            }
+
             imported_line = conn.execute(
                 "SELECT source_id, name FROM opening_lines WHERE id = ?",
                 (imported_line_id,),
             ).fetchone()
             assert imported_line["source_id"] == imported_source_id
             assert imported_line["name"] == "ユーザー中飛車"
+        finally:
+            conn.close()
+    finally:
+        os.environ.pop("SHOGI_DB_PATH", None)
+
+
+def test_seed_openings_supports_legacy_related_tables_without_unique_constraints(tmp_path):
+    db_path = tmp_path / "legacy-no-unique.db"
+    os.environ["SHOGI_DB_PATH"] = str(db_path)
+    try:
+        import sqlite3
+
+        conn = sqlite3.connect(db_path)
+        try:
+            conn.executescript(
+                """
+                CREATE TABLE opening_categories (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    name_ja TEXT NOT NULL UNIQUE,
+                    sort_order INTEGER NOT NULL DEFAULT 0,
+                    description TEXT NOT NULL DEFAULT '',
+                    source_url TEXT NOT NULL DEFAULT '',
+                    license TEXT NOT NULL DEFAULT ''
+                );
+                CREATE TABLE opening_types (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    category_id INTEGER NOT NULL,
+                    parent_id INTEGER,
+                    name_ja TEXT NOT NULL,
+                    name_kana TEXT NOT NULL DEFAULT '',
+                    name_en TEXT NOT NULL DEFAULT '',
+                    aliases TEXT NOT NULL DEFAULT '[]',
+                    description_short TEXT NOT NULL DEFAULT '',
+                    source_name TEXT NOT NULL DEFAULT '',
+                    source_url TEXT NOT NULL DEFAULT '',
+                    license TEXT NOT NULL DEFAULT '',
+                    sort_order INTEGER NOT NULL DEFAULT 0,
+                    is_active INTEGER NOT NULL DEFAULT 1
+                );
+                CREATE TABLE opening_lines (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    source_id INTEGER,
+                    opening_type_id INTEGER,
+                    name TEXT NOT NULL,
+                    opening_type TEXT NOT NULL,
+                    initial_sfen TEXT NOT NULL,
+                    moves TEXT NOT NULL DEFAULT '[]',
+                    comments TEXT NOT NULL DEFAULT '[]',
+                    tags TEXT NOT NULL DEFAULT '[]',
+                    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+                );
+                CREATE TABLE opening_positions (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    line_id INTEGER NOT NULL,
+                    ply INTEGER NOT NULL,
+                    sfen TEXT NOT NULL
+                );
+                CREATE TABLE opening_line_moves (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    line_id INTEGER NOT NULL,
+                    ply INTEGER NOT NULL,
+                    usi TEXT NOT NULL,
+                    from_sfen TEXT NOT NULL,
+                    to_sfen TEXT NOT NULL,
+                    comment TEXT NOT NULL DEFAULT '',
+                    variation_group TEXT NOT NULL DEFAULT 'main',
+                    parent_move_id INTEGER,
+                    sort_order INTEGER NOT NULL DEFAULT 0
+                );
+                CREATE TABLE opening_tags (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    line_id INTEGER NOT NULL,
+                    tag TEXT NOT NULL,
+                    score REAL NOT NULL DEFAULT 1.0,
+                    reason TEXT NOT NULL DEFAULT ''
+                );
+                """
+            )
+            conn.commit()
+        finally:
+            conn.close()
+
+        init_db()
+
+        from app.database import get_connection
+        from app.seed import seed_opening_catalog_if_empty, seed_openings_if_empty
+
+        conn = get_connection()
+        try:
+            seed_opening_catalog_if_empty(conn)
+            seed_openings_if_empty(conn)
+            seed_openings_if_empty(conn)
+            conn.commit()
+
+            bougin = conn.execute(
+                """
+                SELECT ol.id, ot.name_ja AS linked_type_name, COUNT(olm.id) AS move_count
+                FROM opening_lines ol
+                JOIN opening_types ot ON ot.id = ol.opening_type_id
+                LEFT JOIN opening_line_moves olm ON olm.line_id = ol.id
+                WHERE ol.name = '棒銀' AND ol.source_id IS NULL
+                GROUP BY ol.id, ot.name_ja
+                """
+            ).fetchone()
+            assert bougin["linked_type_name"] == "棒銀"
+            assert bougin["move_count"] > 0
+
+            duplicate_moves = conn.execute(
+                """
+                SELECT COUNT(*) AS c
+                FROM opening_line_moves
+                WHERE line_id = ? AND ply = 1 AND variation_group = 'main' AND sort_order = 0
+                """,
+                (bougin["id"],),
+            ).fetchone()["c"]
+            assert duplicate_moves == 1
         finally:
             conn.close()
     finally:

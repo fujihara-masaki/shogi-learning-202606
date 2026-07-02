@@ -432,35 +432,64 @@ def seed_openings_if_empty(conn) -> None:
                 ),
             )
             line_id = int(cur.lastrowid)
-        conn.executemany(
-            """
-            INSERT INTO opening_positions(line_id, ply, sfen) VALUES (?, ?, ?)
-            ON CONFLICT(line_id, ply) DO UPDATE SET sfen = excluded.sfen
-            """,
-            [(line_id, ply, sfen) for ply, sfen in enumerate(positions)],
-        )
-        conn.executemany(
-            """
-            INSERT INTO opening_line_moves(line_id, ply, usi, from_sfen, to_sfen, comment)
-            VALUES (?, ?, ?, ?, ?, ?)
-            ON CONFLICT(line_id, ply, variation_group, sort_order) DO UPDATE SET
-                usi = excluded.usi,
-                from_sfen = excluded.from_sfen,
-                to_sfen = excluded.to_sfen,
-                comment = excluded.comment
-            """,
-            [
-                (line_id, ply, usi, before, after, opening["comments"][ply - 1])
-                for ply, usi, before, after in move_rows
-            ],
-        )
-        conn.execute(
-            """
-            INSERT INTO opening_tags(line_id, tag, score, reason) VALUES (?, ?, ?, ?)
-            ON CONFLICT(line_id, tag) DO UPDATE SET score = excluded.score, reason = excluded.reason
-            """,
-            (line_id, opening["tag"], 1.0, opening["description"]),
-        )
+        for ply, sfen in enumerate(positions):
+            position_row = conn.execute(
+                "SELECT id FROM opening_positions WHERE line_id = ? AND ply = ?",
+                (line_id, ply),
+            ).fetchone()
+            if position_row:
+                conn.execute(
+                    "UPDATE opening_positions SET sfen = ? WHERE id = ?",
+                    (sfen, position_row["id"]),
+                )
+            else:
+                conn.execute(
+                    "INSERT INTO opening_positions(line_id, ply, sfen) VALUES (?, ?, ?)",
+                    (line_id, ply, sfen),
+                )
+
+        for ply, usi, before, after in move_rows:
+            comment = opening["comments"][ply - 1]
+            move_row = conn.execute(
+                """
+                SELECT id
+                FROM opening_line_moves
+                WHERE line_id = ? AND ply = ? AND variation_group = 'main' AND sort_order = 0
+                """,
+                (line_id, ply),
+            ).fetchone()
+            if move_row:
+                conn.execute(
+                    """
+                    UPDATE opening_line_moves
+                    SET usi = ?, from_sfen = ?, to_sfen = ?, comment = ?
+                    WHERE id = ?
+                    """,
+                    (usi, before, after, comment, move_row["id"]),
+                )
+            else:
+                conn.execute(
+                    """
+                    INSERT INTO opening_line_moves(line_id, ply, usi, from_sfen, to_sfen, comment, variation_group, sort_order)
+                    VALUES (?, ?, ?, ?, ?, ?, 'main', 0)
+                    """,
+                    (line_id, ply, usi, before, after, comment),
+                )
+
+        tag_row = conn.execute(
+            "SELECT id FROM opening_tags WHERE line_id = ? AND tag = ?",
+            (line_id, opening["tag"]),
+        ).fetchone()
+        if tag_row:
+            conn.execute(
+                "UPDATE opening_tags SET score = ?, reason = ? WHERE id = ?",
+                (1.0, opening["description"], tag_row["id"]),
+            )
+        else:
+            conn.execute(
+                "INSERT INTO opening_tags(line_id, tag, score, reason) VALUES (?, ?, ?, ?)",
+                (line_id, opening["tag"], 1.0, opening["description"]),
+            )
 
 
 def seed_if_empty() -> None:
