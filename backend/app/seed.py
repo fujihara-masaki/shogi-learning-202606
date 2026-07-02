@@ -380,43 +380,85 @@ def seed_opening_catalog_if_empty(conn) -> None:
 def seed_openings_if_empty(conn) -> None:
     import shogi
 
-    row = conn.execute("SELECT COUNT(*) AS c FROM opening_lines").fetchone()
-    if row["c"] > 0:
-        return
     for opening in SAMPLE_OPENING_LINES:
         positions, move_rows = _opening_snapshots(shogi.STARTING_SFEN, opening["moves"])
         type_row = conn.execute(
             "SELECT id FROM opening_types WHERE name_ja = ?", (opening["name"],)
         ).fetchone()
-        cur = conn.execute(
+        type_id = type_row["id"] if type_row else None
+        line_row = conn.execute(
             """
-            INSERT INTO opening_lines(opening_type_id, name, opening_type, initial_sfen, moves, comments, tags)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+            SELECT id
+            FROM opening_lines
+            WHERE source_id IS NULL AND name = ?
+            ORDER BY id
+            LIMIT 1
             """,
-            (
-                type_row["id"] if type_row else None,
-                opening["name"],
-                opening["opening_type"],
-                shogi.STARTING_SFEN,
-                json.dumps(opening["moves"], ensure_ascii=False),
-                json.dumps(opening["comments"], ensure_ascii=False),
-                json.dumps([opening["tag"]], ensure_ascii=False),
-            ),
-        )
-        line_id = int(cur.lastrowid)
+            (opening["name"],),
+        ).fetchone()
+        if line_row:
+            line_id = int(line_row["id"])
+            conn.execute(
+                """
+                UPDATE opening_lines
+                SET opening_type_id = ?, opening_type = ?, initial_sfen = ?, moves = ?, comments = ?, tags = ?,
+                    updated_at = datetime('now')
+                WHERE id = ?
+                """,
+                (
+                    type_id,
+                    opening["opening_type"],
+                    shogi.STARTING_SFEN,
+                    json.dumps(opening["moves"], ensure_ascii=False),
+                    json.dumps(opening["comments"], ensure_ascii=False),
+                    json.dumps([opening["tag"]], ensure_ascii=False),
+                    line_id,
+                ),
+            )
+        else:
+            cur = conn.execute(
+                """
+                INSERT INTO opening_lines(opening_type_id, name, opening_type, initial_sfen, moves, comments, tags)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    type_id,
+                    opening["name"],
+                    opening["opening_type"],
+                    shogi.STARTING_SFEN,
+                    json.dumps(opening["moves"], ensure_ascii=False),
+                    json.dumps(opening["comments"], ensure_ascii=False),
+                    json.dumps([opening["tag"]], ensure_ascii=False),
+                ),
+            )
+            line_id = int(cur.lastrowid)
         conn.executemany(
-            "INSERT INTO opening_positions(line_id, ply, sfen) VALUES (?, ?, ?)",
+            """
+            INSERT INTO opening_positions(line_id, ply, sfen) VALUES (?, ?, ?)
+            ON CONFLICT(line_id, ply) DO UPDATE SET sfen = excluded.sfen
+            """,
             [(line_id, ply, sfen) for ply, sfen in enumerate(positions)],
         )
         conn.executemany(
-            "INSERT INTO opening_line_moves(line_id, ply, usi, from_sfen, to_sfen, comment) VALUES (?, ?, ?, ?, ?, ?)",
+            """
+            INSERT INTO opening_line_moves(line_id, ply, usi, from_sfen, to_sfen, comment)
+            VALUES (?, ?, ?, ?, ?, ?)
+            ON CONFLICT(line_id, ply, variation_group, sort_order) DO UPDATE SET
+                usi = excluded.usi,
+                from_sfen = excluded.from_sfen,
+                to_sfen = excluded.to_sfen,
+                comment = excluded.comment
+            """,
             [
                 (line_id, ply, usi, before, after, opening["comments"][ply - 1])
                 for ply, usi, before, after in move_rows
             ],
         )
         conn.execute(
-            "INSERT INTO opening_tags(line_id, tag, score, reason) VALUES (?, ?, ?, ?)",
+            """
+            INSERT INTO opening_tags(line_id, tag, score, reason) VALUES (?, ?, ?, ?)
+            ON CONFLICT(line_id, tag) DO UPDATE SET score = excluded.score, reason = excluded.reason
+            """,
             (line_id, opening["tag"], 1.0, opening["description"]),
         )
 
