@@ -37,7 +37,24 @@ def test_seed_opening_mvp_apis(client):
     lines = client.get("/openings")
     assert lines.status_code == 200
     names = {line["name"] for line in lines.json()}
-    assert {"棒銀", "中飛車", "向かい飛車"}.issubset(names)
+    major_openings = {
+        "棒銀",
+        "中飛車",
+        "向かい飛車",
+        "四間飛車",
+        "矢倉",
+        "角換わり",
+        "相掛かり",
+        "横歩取り",
+        "石田流",
+        "ゴキゲン中飛車",
+        "角交換四間飛車",
+        "右四間飛車",
+        "居飛車穴熊",
+        "対振り飛車急戦",
+    }
+    assert major_openings.issubset(names)
+    assert all(next(line for line in lines.json() if line["name"] == name)["move_count"] > 0 for name in major_openings)
 
     bougin = next(line for line in lines.json() if line["name"] == "棒銀")
     detail = client.get(f"/opening-lines/{bougin['id']}")
@@ -47,6 +64,46 @@ def test_seed_opening_mvp_apis(client):
     moves = client.get(f"/opening-lines/{bougin['id']}/moves")
     assert moves.status_code == 200
     assert len(moves.json()) == bougin["move_count"]
+
+
+def test_major_opening_types_have_playable_seed_lines(client):
+    required_names = {
+        "四間飛車",
+        "矢倉",
+        "角換わり",
+        "相掛かり",
+        "横歩取り",
+        "石田流",
+        "ゴキゲン中飛車",
+        "角交換四間飛車",
+        "右四間飛車",
+        "居飛車穴熊",
+        "対振り飛車急戦",
+    }
+
+    types = client.get("/api/opening-types")
+    assert types.status_code == 200
+    types_by_name = {opening_type["name_ja"]: opening_type for opening_type in types.json()}
+
+    for name in required_names:
+        opening_type = types_by_name[name]
+        assert opening_type["opening_line_count"] >= 1
+
+        lines = client.get(f"/api/opening-types/{opening_type['id']}/lines")
+        assert lines.status_code == 200
+        playable_lines = [line for line in lines.json() if line["move_count"] > 0]
+        assert playable_lines
+
+        detail = client.get(f"/api/openings/{playable_lines[0]['id']}")
+        assert detail.status_code == 200
+        body = detail.json()
+        assert body["opening_type_id"] == opening_type["id"]
+        assert body["initial_sfen"]
+        assert len(body["moves"]) == playable_lines[0]["move_count"]
+        assert body["moves"][0]["usi"]
+        assert body["moves"][0]["from_sfen"]
+        assert body["moves"][0]["to_sfen"]
+        assert len(body["positions"]) == len(body["moves"]) + 1
 
 
 def test_parse_sfen_line_and_classify_nakabisha():
