@@ -223,6 +223,75 @@ SAMPLE_OPENING_LINES = [
         "moves": ["7g7f", "3c3d", "2g2f", "4c4d", "2f2e", "3a3b", "4i5h", "4a4b", "5g5f", "5a4a", "3i4h", "6a5b", "4h5g"],
         "comments": ["角道を開けます。", "後手も角道を開けます。", "飛車先を伸ばして居飛車を明示します。", "後手は4筋を突いて振り飛車模様にします。", "飛車先の圧力を高めます。", "後手は銀を上がって角頭を守ります。", "金を中央へ寄せて急戦に備えます。", "後手も金を寄せます。", "5筋の歩を突き、右銀の進出路を作ります。", "後手玉は囲いへ向かいます。", "右銀を上がって攻めに使います。", "後手は中央を厚くします。", "銀を5七へ進め、急戦の仕掛けを狙います。"],
     },
+
+    {
+        "name": "三間飛車", "opening_type": "振り飛車", "description": "飛車を7筋へ振って左辺から主導権を狙う基本の振り飛車です。", "tag": "sangenbisha",
+        "moves": ["7g7f", "3c3d", "6g6f", "8c8d", "2h7h", "8d8e", "7i6h", "6a5b"],
+    },
+    {
+        "name": "角交換振り飛車", "opening_type": "振り飛車", "description": "角交換後に飛車を振り、持ち角を活かして戦う構想です。", "tag": "kakukokan_furibisha",
+        "moves": ["7g7f", "3c3d", "8h2b+", "3a2b", "2h6h", "8c8d", "6g6f", "6a5b"],
+    },
+    {
+        "name": "相振り飛車", "opening_type": "相振り飛車", "description": "双方が飛車を振り、玉の囲いと左辺の主導権を争う戦型です。", "tag": "ai_furibisha",
+        "moves": ["7g7f", "3c3d", "6g6f", "5c5d", "2h7h", "8b5b", "7i6h", "5b3b"],
+    },
+    {
+        "name": "嬉野流", "opening_type": "奇襲・B級戦法", "description": "左銀を早く中央へ繰り出し、力戦調の攻めを狙う構想です。", "tag": "ureshino",
+        "moves": ["6i7h", "3c3d", "7i6h", "8c8d", "5g5f", "8d8e", "6h5g", "4a3b"],
+    },
+    {
+        "name": "鬼殺し", "opening_type": "奇襲・B級戦法", "description": "左銀を早く5六へ進め、桂跳ねや角筋を絡めた奇襲を狙います。", "tag": "onigoroshi",
+        "moves": ["7g7f", "3c3d", "7i7h", "8c8d", "6g6f", "8d8e", "7h6g", "6a5b", "6g5f"],
+    },
+    {
+        "name": "早石田", "opening_type": "振り飛車", "description": "早く7筋の位を取り、三間飛車から攻勢を目指す急戦調の石田流です。", "tag": "haya_ishida",
+        "moves": ["7g7f", "3c3d", "7f7e", "8c8d", "2h7h", "8d8e", "7h7f"],
+    },
+    {
+        "name": "筋違い角", "opening_type": "奇襲・B級戦法", "description": "角交換後に4五角と打ち、相手陣の隙を狙う力戦戦法です。", "tag": "sujichigai_kaku",
+        "moves": ["7g7f", "3c3d", "8h2b+", "3a2b", "B*4e", "6a5b"],
+    },
+    {
+        "name": "雁木", "opening_type": "相居飛車", "description": "金銀を中央へ盛り上げ、厚みで受け止める相居飛車の構想です。", "tag": "gangi",
+        "moves": ["7g7f", "8c8d", "6g6f", "3c3d", "7i6h", "7a6b", "6h6g", "5c5d", "5g5f"],
+    },
+    {
+        "name": "矢倉棒銀", "opening_type": "相居飛車", "description": "矢倉模様から右銀を繰り出し、2筋突破を狙う急戦です。", "tag": "yagura_bougin",
+        "moves": ["7g7f", "8c8d", "6i7h", "3c3d", "6g6f", "7a6b", "2g2f", "5c5d", "3i3h", "5a4b", "3h2g"],
+    },
+    {
+        "name": "角換わり棒銀", "opening_type": "相居飛車", "description": "角交換後に右銀を2筋へ繰り出し、飛車先突破を目指します。", "tag": "kakugawari_bougin",
+        "moves": ["7g7f", "8c8d", "2g2f", "3c3d", "8h2b+", "3a2b", "3i3h", "7a7b", "3h2g"],
+    },
+    {
+        "name": "角換わり早繰り銀", "opening_type": "相居飛車", "description": "角交換後に銀を4六へ急ぎ、主導権を取りに行く戦型です。", "tag": "kakugawari_hayakuri_gin",
+        "moves": ["7g7f", "8c8d", "2g2f", "3c3d", "8h2b+", "3a2b", "3i4h", "7a7b", "3g3f", "6a5b", "4h3g"],
+    },
+    {
+        "name": "角換わり腰掛け銀", "opening_type": "相居飛車", "description": "角交換後に銀を5六へ据え、厚みを作って仕掛けを待つ戦型です。", "tag": "kakugawari_koshikake_gin",
+        "moves": ["7g7f", "8c8d", "2g2f", "3c3d", "8h2b+", "3a2b", "7i8h", "7a7b", "5g5f", "6a5b", "3i4h", "5c5d", "4h5g"],
+    },
+    {
+        "name": "原始棒銀", "opening_type": "相居飛車", "description": "飛車先と右銀を一直線に進める、棒銀の最も基本的な形です。", "tag": "primitive_bougin",
+        "moves": ["2g2f", "8c8d", "2f2e", "8d8e", "3i3h", "7a6b", "3h2g", "4a3b", "2g2f"],
+    },
+    {
+        "name": "美濃囲い", "opening_type": "囲い・構想", "description": "振り飛車側の玉を右辺へ囲い、金銀で横からの攻めに強い形を作ります。", "tag": "mino_gakoi",
+        "moves": ["7g7f", "3c3d", "6g6f", "8c8d", "2h6h", "8d8e", "5i4h", "6a5b", "4h3h", "5b4b", "3h2h", "7a6b", "3i3h"],
+    },
+    {
+        "name": "穴熊", "opening_type": "囲い・構想", "description": "玉を端深く潜らせ、香の下で堅く囲う代表的な持久戦の囲いです。", "tag": "anaguma",
+        "moves": ["7g7f", "3c3d", "2g2f", "4c4d", "8h7g", "3a3b", "5i6h", "5a4b", "6h7h", "6a5b", "7h8h"],
+    },
+    {
+        "name": "舟囲い", "opening_type": "囲い・構想", "description": "居飛車対振り飛車で素早く玉を左へ寄せる急戦向けの基本囲いです。", "tag": "funagakoi",
+        "moves": ["7g7f", "3c3d", "2g2f", "4c4d", "4i5h", "3a3b", "5i6h", "4a4b", "6h7h"],
+    },
+    {
+        "name": "左美濃", "opening_type": "囲い・構想", "description": "居飛車側が左辺で美濃囲いに組み、対振り飛車で堅さを確保します。", "tag": "hidari_mino",
+        "moves": ["7g7f", "3c3d", "2g2f", "8c8d", "7i6h", "7a6b", "6h7g", "4a3b", "5i6h", "6a5b", "4i5h"],
+    },
     {
         "name": "向かい飛車",
         "opening_type": "振り飛車",
@@ -381,6 +450,7 @@ def seed_openings_if_empty(conn) -> None:
     import shogi
 
     for opening in SAMPLE_OPENING_LINES:
+        opening.setdefault("comments", [f"{opening['name']}の代表手順 {i}手目です。" for i in range(1, len(opening["moves"]) + 1)])
         positions, move_rows = _opening_snapshots(shogi.STARTING_SFEN, opening["moves"])
         type_row = conn.execute(
             "SELECT id FROM opening_types WHERE name_ja = ?", (opening["name"],)

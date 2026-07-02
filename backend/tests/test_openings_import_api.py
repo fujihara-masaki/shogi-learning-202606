@@ -21,6 +21,28 @@ MAJOR_PLAYABLE_OPENINGS = {
     "対振り飛車急戦",
 }
 
+ADDITIONAL_PLAYABLE_OPENINGS = {
+    "三間飛車",
+    "角交換振り飛車",
+    "相振り飛車",
+    "嬉野流",
+    "鬼殺し",
+    "早石田",
+    "筋違い角",
+    "雁木",
+    "矢倉棒銀",
+    "角換わり棒銀",
+    "角換わり早繰り銀",
+    "角換わり腰掛け銀",
+    "原始棒銀",
+    "美濃囲い",
+    "穴熊",
+    "舟囲い",
+    "左美濃",
+}
+
+ALL_PLAYABLE_OPENINGS = MAJOR_PLAYABLE_OPENINGS | ADDITIONAL_PLAYABLE_OPENINGS
+
 
 def test_import_opening_file_and_query_api(client, tmp_path):
     path = tmp_path / "licensed.sfen"
@@ -54,8 +76,8 @@ def test_seed_opening_mvp_apis(client):
     lines = client.get("/openings")
     assert lines.status_code == 200
     names = {line["name"] for line in lines.json()}
-    assert MAJOR_PLAYABLE_OPENINGS.issubset(names)
-    assert all(next(line for line in lines.json() if line["name"] == name)["move_count"] > 0 for name in MAJOR_PLAYABLE_OPENINGS)
+    assert ALL_PLAYABLE_OPENINGS.issubset(names)
+    assert all(next(line for line in lines.json() if line["name"] == name)["move_count"] > 0 for name in ALL_PLAYABLE_OPENINGS)
 
     bougin = next(line for line in lines.json() if line["name"] == "棒銀")
     detail = client.get(f"/opening-lines/{bougin['id']}")
@@ -72,7 +94,7 @@ def test_major_opening_types_have_playable_seed_lines(client):
     assert types.status_code == 200
     types_by_name = {opening_type["name_ja"]: opening_type for opening_type in types.json()}
 
-    for name in MAJOR_PLAYABLE_OPENINGS:
+    for name in ALL_PLAYABLE_OPENINGS:
         opening_type = types_by_name[name]
         assert opening_type["opening_line_count"] >= 1
 
@@ -144,12 +166,12 @@ def test_seed_openings_backfills_missing_lines_in_existing_database(tmp_path):
                 LEFT JOIN opening_line_moves olm ON olm.line_id = ol.id
                 WHERE ol.source_id IS NULL AND ol.name IN ({})
                 GROUP BY ol.id, ol.name
-                """.format(",".join("?" for _ in MAJOR_PLAYABLE_OPENINGS)),
-                tuple(MAJOR_PLAYABLE_OPENINGS),
+                """.format(",".join("?" for _ in ALL_PLAYABLE_OPENINGS)),
+                tuple(ALL_PLAYABLE_OPENINGS),
             ).fetchall()
             counts_by_name = {row["name"]: row["move_count"] for row in rows}
-            assert MAJOR_PLAYABLE_OPENINGS.issubset(counts_by_name)
-            assert all(counts_by_name[name] > 0 for name in MAJOR_PLAYABLE_OPENINGS)
+            assert ALL_PLAYABLE_OPENINGS.issubset(counts_by_name)
+            assert all(counts_by_name[name] > 0 for name in ALL_PLAYABLE_OPENINGS)
 
             for name in legacy_names:
                 assert sum(1 for row in rows if row["name"] == name) == 1
@@ -160,11 +182,11 @@ def test_seed_openings_backfills_missing_lines_in_existing_database(tmp_path):
                 FROM opening_lines ol
                 JOIN opening_types ot ON ot.id = ol.opening_type_id
                 WHERE ol.source_id IS NULL AND ol.name IN ({})
-                """.format(",".join("?" for _ in MAJOR_PLAYABLE_OPENINGS)),
-                tuple(MAJOR_PLAYABLE_OPENINGS),
+                """.format(",".join("?" for _ in ALL_PLAYABLE_OPENINGS)),
+                tuple(ALL_PLAYABLE_OPENINGS),
             ).fetchall()
             assert {row["name"]: row["linked_type_name"] for row in linked_rows} == {
-                name: name for name in MAJOR_PLAYABLE_OPENINGS
+                name: name for name in ALL_PLAYABLE_OPENINGS
             }
 
             imported_line = conn.execute(
