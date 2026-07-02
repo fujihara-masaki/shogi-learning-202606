@@ -7,6 +7,35 @@ const ONE_MOVE_SOLUTION = "G*5b";
 
 type Problem = { id: number; title: string; solution_moves: string[] };
 
+const majorPlayableOpenings = [
+  "棒銀",
+  "中飛車",
+  "向かい飛車",
+  "四間飛車",
+  "矢倉",
+  "角換わり",
+  "相掛かり",
+  "横歩取り",
+  "石田流",
+  "ゴキゲン中飛車",
+  "角交換四間飛車",
+  "右四間飛車",
+  "居飛車穴熊",
+  "対振り飛車急戦",
+];
+
+function openingCardByExactTitle(page: Page, title: string) {
+  return page.getByTestId("opening-card").filter({
+    has: page.getByTestId("opening-card-title").getByText(title, { exact: true }),
+  });
+}
+
+function openingTypeCardByExactTitle(page: Page, title: string) {
+  return page.getByTestId("opening-type-card").filter({
+    has: page.getByTestId("opening-type-card-title").getByText(title, { exact: true }),
+  });
+}
+
 async function cleanupE2eProblems(request: APIRequestContext) {
   const res = await request.get(`${API_BASE}/api/tsume-problems`);
   expect(res.ok()).toBeTruthy();
@@ -182,11 +211,22 @@ test("opening page shows opening categories and representative types", async ({ 
 });
 
 
+test("major opening types show related playable lines", async ({ page }) => {
+  await page.goto("/openings");
+
+  for (const openingName of majorPlayableOpenings) {
+    const card = openingTypeCardByExactTitle(page, openingName);
+    await expect(card).toHaveCount(1);
+    await expect(card.getByRole("button", { name: /関連定跡ラインを見る/ })).toBeVisible();
+  }
+});
+
+
 test("opening list navigates to a seeded opening study page", async ({ page }) => {
   await page.goto("/openings");
   await expect(page.getByRole("heading", { name: "定跡学習" })).toBeVisible();
   await expect(page.getByTestId("opening-card")).toHaveCount(3);
-  await page.getByTestId("opening-card").filter({ hasText: "棒銀" }).getByRole("link", { name: "学習する" }).click();
+  await openingCardByExactTitle(page, "棒銀").getByRole("link", { name: "学習する" }).click();
   await expect(page.getByTestId("opening-study-page")).toBeVisible();
   await expect(page.getByTestId("opening-current-move")).toContainText("7g7f");
 });
@@ -271,7 +311,7 @@ test("time attack setup starts and displays a problem", async ({ page }) => {
 
 test("seeded opening replay controls move forward, backward, reset, and finish", async ({ page }) => {
   await page.goto("/openings");
-  await page.getByTestId("opening-card").filter({ hasText: "中飛車" }).getByRole("link", { name: "学習する" }).click();
+  await openingCardByExactTitle(page, "中飛車").getByRole("link", { name: "学習する" }).click();
   await expect(page.getByTestId("opening-current-move")).toContainText("7g7f");
 
   await page.getByRole("button", { name: "1手進む" }).click();

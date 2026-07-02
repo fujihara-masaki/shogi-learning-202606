@@ -4,6 +4,23 @@ from pathlib import Path
 from app.database import init_db
 from scripts.import_openings import import_directory, import_file, parse_usi_line, classify_opening, board_snapshots, infer_opening_type
 
+MAJOR_PLAYABLE_OPENINGS = {
+    "棒銀",
+    "中飛車",
+    "向かい飛車",
+    "四間飛車",
+    "矢倉",
+    "角換わり",
+    "相掛かり",
+    "横歩取り",
+    "石田流",
+    "ゴキゲン中飛車",
+    "角交換四間飛車",
+    "右四間飛車",
+    "居飛車穴熊",
+    "対振り飛車急戦",
+}
+
 
 def test_import_opening_file_and_query_api(client, tmp_path):
     path = tmp_path / "licensed.sfen"
@@ -37,7 +54,8 @@ def test_seed_opening_mvp_apis(client):
     lines = client.get("/openings")
     assert lines.status_code == 200
     names = {line["name"] for line in lines.json()}
-    assert {"棒銀", "中飛車", "向かい飛車"}.issubset(names)
+    assert MAJOR_PLAYABLE_OPENINGS.issubset(names)
+    assert all(next(line for line in lines.json() if line["name"] == name)["move_count"] > 0 for name in MAJOR_PLAYABLE_OPENINGS)
 
     bougin = next(line for line in lines.json() if line["name"] == "棒銀")
     detail = client.get(f"/opening-lines/{bougin['id']}")
@@ -47,6 +65,290 @@ def test_seed_opening_mvp_apis(client):
     moves = client.get(f"/opening-lines/{bougin['id']}/moves")
     assert moves.status_code == 200
     assert len(moves.json()) == bougin["move_count"]
+
+
+def test_major_opening_types_have_playable_seed_lines(client):
+    types = client.get("/api/opening-types")
+    assert types.status_code == 200
+    types_by_name = {opening_type["name_ja"]: opening_type for opening_type in types.json()}
+
+    for name in MAJOR_PLAYABLE_OPENINGS:
+        opening_type = types_by_name[name]
+        assert opening_type["opening_line_count"] >= 1
+
+        lines = client.get(f"/api/opening-types/{opening_type['id']}/lines")
+        assert lines.status_code == 200
+        playable_lines = [line for line in lines.json() if line["move_count"] > 0]
+        assert playable_lines
+
+        detail = client.get(f"/api/openings/{playable_lines[0]['id']}")
+        assert detail.status_code == 200
+        body = detail.json()
+        assert body["opening_type_id"] == opening_type["id"]
+        assert body["initial_sfen"]
+        assert len(body["moves"]) == playable_lines[0]["move_count"]
+        assert body["moves"][0]["usi"]
+        assert body["moves"][0]["from_sfen"]
+        assert body["moves"][0]["to_sfen"]
+        assert len(body["positions"]) == len(body["moves"]) + 1
+
+
+def test_seed_openings_backfills_missing_lines_in_existing_database(tmp_path):
+    db_path = tmp_path / "existing-openings.db"
+    os.environ["SHOGI_DB_PATH"] = str(db_path)
+    try:
+        init_db()
+
+        from app.database import get_connection
+        from app.seed import seed_opening_catalog_if_empty, seed_openings_if_empty
+
+        conn = get_connection()
+        try:
+            seed_opening_catalog_if_empty(conn)
+            type_ids = {
+                row["name_ja"]: row["id"]
+                for row in conn.execute("SELECT id, name_ja FROM opening_types").fetchall()
+            }
+            legacy_names = {"棒銀", "中飛車", "向かい飛車"}
+            legacy_opening_types = {"棒銀": "居飛車", "中飛車": "振り飛車", "向かい飛車": "振り飛車"}
+            for name in legacy_names:
+                conn.execute(
+                    """
+                    INSERT INTO opening_lines(name, opening_type, initial_sfen)
+                    VALUES (?, ?, 'startpos')
+                    """,
+                    (name, legacy_opening_types[name]),
+                )
+            imported_source_id = conn.execute(
+                """
+                INSERT INTO opening_sources(name, file_path, license_name)
+                VALUES ('user import', '/tmp/user.sfen', 'CC0')
+                """
+            ).lastrowid
+            imported_line_id = conn.execute(
+                """
+                INSERT INTO opening_lines(source_id, opening_type_id, name, opening_type, initial_sfen, moves)
+                VALUES (?, ?, 'ユーザー中飛車', '中飛車', 'startpos', '["7g7f"]')
+                """,
+                (imported_source_id, type_ids["中飛車"]),
+            ).lastrowid
+            conn.commit()
+
+            seed_openings_if_empty(conn)
+            conn.commit()
+
+            rows = conn.execute(
+                """
+                SELECT ol.id, ol.name, COUNT(olm.id) AS move_count
+                FROM opening_lines ol
+                LEFT JOIN opening_line_moves olm ON olm.line_id = ol.id
+                WHERE ol.source_id IS NULL AND ol.name IN ({})
+                GROUP BY ol.id, ol.name
+                """.format(",".join("?" for _ in MAJOR_PLAYABLE_OPENINGS)),
+                tuple(MAJOR_PLAYABLE_OPENINGS),
+            ).fetchall()
+            counts_by_name = {row["name"]: row["move_count"] for row in rows}
+            assert MAJOR_PLAYABLE_OPENINGS.issubset(counts_by_name)
+            assert all(counts_by_name[name] > 0 for name in MAJOR_PLAYABLE_OPENINGS)
+
+            for name in legacy_names:
+                assert sum(1 for row in rows if row["name"] == name) == 1
+
+            linked_rows = conn.execute(
+                """
+                SELECT ol.name, ot.name_ja AS linked_type_name
+                FROM opening_lines ol
+                JOIN opening_types ot ON ot.id = ol.opening_type_id
+                WHERE ol.source_id IS NULL AND ol.name IN ({})
+                """.format(",".join("?" for _ in MAJOR_PLAYABLE_OPENINGS)),
+                tuple(MAJOR_PLAYABLE_OPENINGS),
+            ).fetchall()
+            assert {row["name"]: row["linked_type_name"] for row in linked_rows} == {
+                name: name for name in MAJOR_PLAYABLE_OPENINGS
+            }
+
+            imported_line = conn.execute(
+                "SELECT source_id, name FROM opening_lines WHERE id = ?",
+                (imported_line_id,),
+            ).fetchone()
+            assert imported_line["source_id"] == imported_source_id
+            assert imported_line["name"] == "ユーザー中飛車"
+        finally:
+            conn.close()
+    finally:
+        os.environ.pop("SHOGI_DB_PATH", None)
+
+
+def test_seed_openings_supports_legacy_related_tables_without_unique_constraints(tmp_path):
+    db_path = tmp_path / "legacy-no-unique.db"
+    os.environ["SHOGI_DB_PATH"] = str(db_path)
+    try:
+        import sqlite3
+
+        conn = sqlite3.connect(db_path)
+        try:
+            conn.executescript(
+                """
+                CREATE TABLE opening_categories (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    name_ja TEXT NOT NULL UNIQUE,
+                    sort_order INTEGER NOT NULL DEFAULT 0,
+                    description TEXT NOT NULL DEFAULT '',
+                    source_url TEXT NOT NULL DEFAULT '',
+                    license TEXT NOT NULL DEFAULT ''
+                );
+                CREATE TABLE opening_types (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    category_id INTEGER NOT NULL,
+                    parent_id INTEGER,
+                    name_ja TEXT NOT NULL,
+                    name_kana TEXT NOT NULL DEFAULT '',
+                    name_en TEXT NOT NULL DEFAULT '',
+                    aliases TEXT NOT NULL DEFAULT '[]',
+                    description_short TEXT NOT NULL DEFAULT '',
+                    source_name TEXT NOT NULL DEFAULT '',
+                    source_url TEXT NOT NULL DEFAULT '',
+                    license TEXT NOT NULL DEFAULT '',
+                    sort_order INTEGER NOT NULL DEFAULT 0,
+                    is_active INTEGER NOT NULL DEFAULT 1
+                );
+                CREATE TABLE opening_lines (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    source_id INTEGER,
+                    opening_type_id INTEGER,
+                    name TEXT NOT NULL,
+                    opening_type TEXT NOT NULL,
+                    initial_sfen TEXT NOT NULL,
+                    moves TEXT NOT NULL DEFAULT '[]',
+                    comments TEXT NOT NULL DEFAULT '[]',
+                    tags TEXT NOT NULL DEFAULT '[]',
+                    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+                );
+                CREATE TABLE opening_positions (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    line_id INTEGER NOT NULL,
+                    ply INTEGER NOT NULL,
+                    sfen TEXT NOT NULL
+                );
+                CREATE TABLE opening_line_moves (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    line_id INTEGER NOT NULL,
+                    ply INTEGER NOT NULL,
+                    usi TEXT NOT NULL,
+                    from_sfen TEXT NOT NULL,
+                    to_sfen TEXT NOT NULL,
+                    comment TEXT NOT NULL DEFAULT '',
+                    variation_group TEXT NOT NULL DEFAULT 'main',
+                    parent_move_id INTEGER,
+                    sort_order INTEGER NOT NULL DEFAULT 0
+                );
+                CREATE TABLE opening_tags (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    line_id INTEGER NOT NULL,
+                    tag TEXT NOT NULL,
+                    score REAL NOT NULL DEFAULT 1.0,
+                    reason TEXT NOT NULL DEFAULT ''
+                );
+                """
+            )
+            conn.commit()
+        finally:
+            conn.close()
+
+        init_db()
+
+        from app.database import get_connection
+        from app.seed import seed_opening_catalog_if_empty, seed_openings_if_empty
+
+        conn = get_connection()
+        try:
+            seed_opening_catalog_if_empty(conn)
+            seed_openings_if_empty(conn)
+            seed_openings_if_empty(conn)
+            conn.commit()
+
+            bougin = conn.execute(
+                """
+                SELECT ol.id, ot.name_ja AS linked_type_name, COUNT(olm.id) AS move_count
+                FROM opening_lines ol
+                JOIN opening_types ot ON ot.id = ol.opening_type_id
+                LEFT JOIN opening_line_moves olm ON olm.line_id = ol.id
+                WHERE ol.name = '棒銀' AND ol.source_id IS NULL
+                GROUP BY ol.id, ot.name_ja
+                """
+            ).fetchone()
+            assert bougin["linked_type_name"] == "棒銀"
+            assert bougin["move_count"] > 0
+
+            duplicate_moves = conn.execute(
+                """
+                SELECT COUNT(*) AS c
+                FROM opening_line_moves
+                WHERE line_id = ? AND ply = 1 AND variation_group = 'main' AND sort_order = 0
+                """,
+                (bougin["id"],),
+            ).fetchone()["c"]
+            assert duplicate_moves == 1
+        finally:
+            conn.close()
+    finally:
+        os.environ.pop("SHOGI_DB_PATH", None)
+
+
+def test_seed_openings_repairs_existing_seed_line_details(tmp_path):
+    db_path = tmp_path / "broken-seed-lines.db"
+    os.environ["SHOGI_DB_PATH"] = str(db_path)
+    try:
+        init_db()
+
+        from app.database import get_connection
+        from app.seed import seed_opening_catalog_if_empty, seed_openings_if_empty
+
+        conn = get_connection()
+        try:
+            seed_opening_catalog_if_empty(conn)
+            bougin_type = conn.execute("SELECT id FROM opening_types WHERE name_ja = '棒銀'").fetchone()
+            line_id = conn.execute(
+                """
+                INSERT INTO opening_lines(opening_type_id, name, opening_type, initial_sfen, moves, comments, tags)
+                VALUES (?, '棒銀', 'legacy seed', 'startpos', '[]', '[]', '[]')
+                """,
+                (bougin_type["id"],),
+            ).lastrowid
+            conn.commit()
+
+            seed_openings_if_empty(conn)
+            conn.commit()
+
+            repaired = conn.execute(
+                """
+                SELECT ol.initial_sfen, ol.moves, COUNT(olm.id) AS move_count
+                FROM opening_lines ol
+                LEFT JOIN opening_line_moves olm ON olm.line_id = ol.id
+                WHERE ol.id = ?
+                GROUP BY ol.id
+                """,
+                (line_id,),
+            ).fetchone()
+            position_count = conn.execute(
+                "SELECT COUNT(*) AS c FROM opening_positions WHERE line_id = ?",
+                (line_id,),
+            ).fetchone()["c"]
+            tag_count = conn.execute(
+                "SELECT COUNT(*) AS c FROM opening_tags WHERE line_id = ? AND tag = 'bougin'",
+                (line_id,),
+            ).fetchone()["c"]
+
+            assert repaired["initial_sfen"] != "startpos"
+            assert repaired["moves"] != "[]"
+            assert repaired["move_count"] > 0
+            assert position_count == repaired["move_count"] + 1
+            assert tag_count == 1
+        finally:
+            conn.close()
+    finally:
+        os.environ.pop("SHOGI_DB_PATH", None)
 
 
 def test_parse_sfen_line_and_classify_nakabisha():
