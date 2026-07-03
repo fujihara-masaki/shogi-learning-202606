@@ -22,7 +22,14 @@ CREATE TABLE IF NOT EXISTS tsume_problems (
     explanation TEXT NOT NULL DEFAULT '',
     is_favorite INTEGER NOT NULL DEFAULT 0,
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
-    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+    source_name TEXT NOT NULL DEFAULT '',
+    source_url TEXT NOT NULL DEFAULT '',
+    source_license TEXT NOT NULL DEFAULT '',
+    source_copyright TEXT NOT NULL DEFAULT '',
+    external_id TEXT NOT NULL DEFAULT '',
+    source_hash TEXT NOT NULL DEFAULT '',
+    source_metadata TEXT NOT NULL DEFAULT '{}'
 );
 
 CREATE TABLE IF NOT EXISTS problem_results (
@@ -375,11 +382,31 @@ def _backfill_opening_line_type_ids(conn: sqlite3.Connection) -> None:
     )
 
 
+
+def _ensure_tsume_source_columns(conn: sqlite3.Connection) -> None:
+    columns = {row["name"] for row in conn.execute("PRAGMA table_info(tsume_problems)").fetchall()}
+    for column in ("source_name", "source_url", "source_license", "source_copyright", "external_id", "source_hash"):
+        if column not in columns:
+            conn.execute(f"ALTER TABLE tsume_problems ADD COLUMN {column} TEXT NOT NULL DEFAULT ''")
+    if "source_metadata" not in columns:
+        conn.execute("ALTER TABLE tsume_problems ADD COLUMN source_metadata TEXT NOT NULL DEFAULT '{}'")
+    conn.execute("""
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_tsume_source_external
+        ON tsume_problems(source_name, mate_length, external_id)
+        WHERE source_name <> '' AND external_id <> ''
+    """)
+    conn.execute("""
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_tsume_source_hash
+        ON tsume_problems(source_name, source_hash)
+        WHERE source_name <> '' AND source_hash <> ''
+    """)
+
 def init_db() -> None:
     conn = get_connection()
     try:
         _migrate_opening_moves(conn)
         conn.executescript(SCHEMA)
+        _ensure_tsume_source_columns(conn)
         _ensure_opening_line_moves_schema(conn)
         _ensure_opening_line_columns(conn)
         _ensure_opening_line_indexes(conn)

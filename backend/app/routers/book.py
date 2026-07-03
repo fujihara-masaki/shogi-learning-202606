@@ -272,6 +272,27 @@ def list_licenses() -> dict[str, Any]:
     conn = get_connection()
     try:
         rows = conn.execute("SELECT * FROM book_sources ORDER BY imported_at DESC, id DESC").fetchall()
-        return {"book_sources": [_source(row, include_license_text=True) for row in rows]}
+        tsume_rows = conn.execute(
+            """
+            SELECT source_name, source_url, source_license, source_copyright, COUNT(*) AS problem_count
+            FROM tsume_problems
+            WHERE source_name <> ''
+            GROUP BY source_name, source_url, source_license, source_copyright
+            ORDER BY source_name
+            """
+        ).fetchall()
+        return {
+            "book_sources": [_source(row, include_license_text=True) for row in rows],
+            "tsume_sources": [
+                {
+                    "name": row["source_name"],
+                    "source_url": row["source_url"],
+                    "license_name": row["source_license"],
+                    "copyright_notice": row["source_copyright"],
+                    "problem_count": row["problem_count"],
+                }
+                for row in tsume_rows
+            ],
+        }
     finally:
         conn.close()

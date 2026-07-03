@@ -336,3 +336,12 @@ curl http://localhost:8000/api/book/sources/<book_source_id>/learning-samples/su
 ```
 
 レスポンスには戦型別件数、未分類件数、対象 book source の出典情報が含まれます。出典・ライセンス表示は既存の book source 表示に従い、学習 UI で利用する場合も `book_sources` の `source_url` / `license_name` / `copyright_notice` を併記してください。UI への本格表示は今後、定跡候補表示や戦型別学習画面から `learning_samples` を参照する形で拡張できます。
+
+## Third-party data and licenses
+
+This application can import tsume-shogi puzzle data from [`tokuhirom/tanuki-tsume-shogi`](https://github.com/tokuhirom/tanuki-tsume-shogi).
+
+- Target files: `puzzles/1.json`, `puzzles/3.json`, `puzzles/5.json`
+- Copyright (c) 2026 tokuhirom
+- Licensed under the MIT License
+- See [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md) for the full license text.
