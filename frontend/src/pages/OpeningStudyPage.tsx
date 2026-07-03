@@ -168,7 +168,7 @@ function OpeningStudyContent({ id }: { id: string | undefined }) {
             className={`banner ${feedback?.startsWith("不正解") ? "banner-error" : completed ? "banner-success" : "banner-info"}`}
             data-testid="opening-feedback"
           >
-            {completed ? "Wikipediaで確認できる手順はここまでです" : feedback ?? "盤面上で推奨手を指してください"}
+            {completed ? "この定跡手順を完了しました。Wikipediaで確認できる手順はここまでです。" : feedback ?? "盤面上で推奨手を指してください"}
             {hasBranches && <span className="branch-badge" data-testid="branch-badge">分岐あり</span>}
           </div>
           <ShogiBoard

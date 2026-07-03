@@ -352,7 +352,7 @@ test("seeded opening replay controls move forward, backward, reset, and finish",
   await page.getByRole("button", { name: "最初に戻る" }).click();
   await expect(page.getByText("まだ指し手はありません")).toBeVisible();
   await page.getByRole("button", { name: "最後まで進む" }).click();
-  await expect(page.getByTestId("opening-feedback")).toContainText("この定跡手順を完了しました");
+  await expect(page.getByTestId("opening-feedback")).toContainText("この定跡手順を完了しました。Wikipediaで確認できる手順はここまでです。");
   await expect(page.getByRole("button", { name: "一手進む" })).toBeDisabled();
   await expect(page.getByRole("button", { name: "最後まで進む" })).toBeDisabled();
 });
