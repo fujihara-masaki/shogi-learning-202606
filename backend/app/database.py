@@ -151,12 +151,6 @@ CREATE INDEX IF NOT EXISTS idx_problem_results_problem
     ON problem_results(problem_id);
 CREATE INDEX IF NOT EXISTS idx_tsume_problems_mate_length
     ON tsume_problems(mate_length);
-CREATE UNIQUE INDEX IF NOT EXISTS idx_tsume_source_external
-    ON tsume_problems(source_name, mate_length, external_id)
-    WHERE source_name <> '' AND external_id <> '';
-CREATE UNIQUE INDEX IF NOT EXISTS idx_tsume_source_hash
-    ON tsume_problems(source_name, source_hash)
-    WHERE source_name <> '' AND source_hash <> '';
 CREATE INDEX IF NOT EXISTS idx_opening_tags_tag
     ON opening_tags(tag);
 CREATE INDEX IF NOT EXISTS idx_opening_types_category
