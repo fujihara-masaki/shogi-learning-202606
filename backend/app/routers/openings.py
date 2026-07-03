@@ -43,6 +43,10 @@ def _line_row_to_summary(row: Any) -> dict[str, Any]:
             "license": row["license"] or row["license_name"] or "",
             "source_note": row["source_note"] or "",
             "coverage_status": row["coverage_status"] or "",
+            "source_type": row["source_type"] or "",
+            "source_section": row["source_section"] or "",
+            "source_license": row["source_license"] or "",
+            "source_retrieved_at": row["source_retrieved_at"] or "",
         },
     }
 
@@ -97,7 +101,11 @@ def list_openings(tag: str | None = Query(default=None)) -> list[dict[str, Any]]
                 ol.license,
                 ol.source_note,
                 ol.coverage_status,
-                (SELECT COUNT(*) FROM opening_line_moves om WHERE om.line_id = ol.id) AS move_count,
+                ol.source_type,
+                ol.source_section,
+                ol.source_license,
+                ol.source_retrieved_at,
+                (SELECT COUNT(*) FROM opening_line_moves om WHERE om.line_id = ol.id AND om.variation_group = 'main') AS move_count,
                 os.name AS source_name,
                 os.license_name,
                 os.license_url
@@ -136,6 +144,10 @@ def get_opening(line_id: int) -> dict[str, Any]:
                 ol.license,
                 ol.source_note,
                 ol.coverage_status,
+                ol.source_type,
+                ol.source_section,
+                ol.source_license,
+                ol.source_retrieved_at,
                 os.name AS source_name,
                 os.license_name,
                 os.license_url
@@ -193,6 +205,10 @@ def get_opening(line_id: int) -> dict[str, Any]:
                 "license": row["license"] or row["license_name"] or "",
                 "source_note": row["source_note"] or "",
                 "coverage_status": row["coverage_status"] or "",
+                "source_type": row["source_type"] or "",
+                "source_section": row["source_section"] or "",
+                "source_license": row["source_license"] or "",
+                "source_retrieved_at": row["source_retrieved_at"] or "",
             },
         }
     finally:
@@ -256,7 +272,11 @@ def list_opening_type_lines(opening_type_id: int) -> list[dict[str, Any]]:
                 ol.license,
                 ol.source_note,
                 ol.coverage_status,
-                (SELECT COUNT(*) FROM opening_line_moves om WHERE om.line_id = ol.id) AS move_count,
+                ol.source_type,
+                ol.source_section,
+                ol.source_license,
+                ol.source_retrieved_at,
+                (SELECT COUNT(*) FROM opening_line_moves om WHERE om.line_id = ol.id AND om.variation_group = 'main') AS move_count,
                 os.name AS source_name,
                 os.license_name,
                 os.license_url

@@ -14,6 +14,9 @@ export interface OpeningMoveNode {
   license?: string;
   sourceNote?: string;
   coverageStatus?: string;
+  sourceSection?: string;
+  sourceLicense?: string;
+  sourceRetrievedAt?: string;
   next?: OpeningMoveNode[];
 }
 
@@ -240,6 +243,10 @@ export interface ImportedOpeningLike {
     license?: string;
     source_note?: string;
     coverage_status?: string;
+    source_type?: string;
+    source_section?: string;
+    source_license?: string;
+    source_retrieved_at?: string;
   };
 }
 
@@ -259,6 +266,9 @@ export function openingFromImportedLine(imported: ImportedOpeningLike): OpeningL
     license: licenseLabel,
     sourceNote: imported.source?.source_note,
     coverageStatus: imported.source?.coverage_status,
+    sourceSection: imported.source?.source_section,
+    sourceLicense: imported.source?.source_license,
+    sourceRetrievedAt: imported.source?.source_retrieved_at,
   });
 
   const movesByFrom = new Map<string, Array<{ move: ImportedOpeningLike["moves"][number]; index: number }>>();
