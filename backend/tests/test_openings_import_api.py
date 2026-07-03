@@ -605,3 +605,39 @@ def test_init_db_migrates_existing_opening_lines_type_id_column_and_index(tmp_pa
             conn.close()
     finally:
         os.environ.pop("SHOGI_DB_PATH", None)
+
+
+def test_seed_openings_expose_wikipedia_source_metadata_and_legal_moves(client):
+    import shogi
+
+    types = client.get("/api/opening-types")
+    assert types.status_code == 200
+    target_names = {
+        "棒銀", "原始棒銀", "矢倉棒銀", "角換わり棒銀", "角換わり早繰り銀", "角換わり腰掛け銀",
+        "矢倉", "角換わり", "相掛かり", "横歩取り", "雁木", "右四間飛車", "対振り飛車急戦",
+        "四間飛車", "三間飛車", "中飛車", "向かい飛車", "石田流", "ゴキゲン中飛車",
+        "角交換四間飛車", "居飛車穴熊",
+    }
+    type_ids = {row["name_ja"]: row["id"] for row in types.json() if row["name_ja"] in target_names}
+    assert set(type_ids) == target_names
+
+    for name, type_id in type_ids.items():
+        lines_response = client.get(f"/api/opening-types/{type_id}/lines")
+        assert lines_response.status_code == 200
+        lines = lines_response.json()
+        assert lines, name
+        detail_response = client.get(f"/api/openings/{lines[0]['id']}")
+        assert detail_response.status_code == 200
+        detail = detail_response.json()
+        source = detail["source"]
+        assert source["source_url"].startswith("https://ja.wikipedia.org/wiki/")
+        assert source["license"] == "CC BY-SA"
+        assert source["source_note"]
+        assert source["coverage_status"]
+
+        board = shogi.Board(detail["initial_sfen"])
+        main_moves = [move for move in detail["moves"] if move["variation_group"] == "main"]
+        for move_row in sorted(main_moves, key=lambda row: row["ply"]):
+            move = shogi.Move.from_usi(move_row["usi"])
+            assert move in board.legal_moves, (name, move_row["usi"], board.sfen())
+            board.push(move)

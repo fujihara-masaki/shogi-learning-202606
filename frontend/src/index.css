@@ -844,3 +844,49 @@ select {
   margin: 0;
   overflow-wrap: anywhere;
 }
+
+.branch-badge {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 0.75rem;
+  padding: 0.15rem 0.55rem;
+  border-radius: 999px;
+  background: #f59e0b;
+  color: #111827;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.opening-branches {
+  margin-top: 1rem;
+  padding: 1rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.85rem;
+  background: #fffdf7;
+}
+
+.branch-choice-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.branch-choice-list.compact {
+  margin-top: 0.5rem;
+}
+
+.branch-choice {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  align-items: flex-start;
+}
+
+.branch-choice.primary {
+  border-color: #2563eb;
+}
+
+.branch-choice span {
+  font-size: 0.8rem;
+  color: #4b5563;
+}

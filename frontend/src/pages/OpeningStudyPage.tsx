@@ -65,6 +65,10 @@ function OpeningStudyContent({ id }: { id: string | undefined }) {
   const opening = staticOpening ?? (isSampleRoute ? sampleOpening : importedOpening);
   const state = useMemo(() => (opening ? applyOpeningPath(opening, path) : null), [opening, path]);
   const expected = useMemo(() => (opening ? expectedOpeningMove(opening, path) : null), [opening, path]);
+  const currentChoices = state?.steps.length ? state.steps[state.steps.length - 1].node.next ?? [] : opening?.moves ?? [];
+  const hasBranches = currentChoices.length > 1;
+  const selectedBranchPath = state?.steps.map((step) => step.node.branchLabel).filter(Boolean).join(" → ") || "本線";
+  const sourceNode = state?.steps.at(-1)?.node ?? expected;
   const currentSfen = state?.position.sfen ?? null;
 
   if (loadError) {
@@ -109,6 +113,22 @@ function OpeningStudyContent({ id }: { id: string | undefined }) {
     setLastMoveTo(null);
   }
 
+  function chooseBranch(index: number) {
+    const node = currentChoices[index];
+    if (!node) return;
+    setPath((prev) => [...prev, index]);
+    setFeedback(`分岐を選択: ${node.branchLabel || node.notation}`);
+    setHintVisible(false);
+    setLastMoveTo(null);
+  }
+
+  function switchBranch(stepIndex: number, branchIndex: number) {
+    setPath((prev) => [...prev.slice(0, stepIndex), branchIndex]);
+    setFeedback("分岐点まで戻して別分岐を選択しました");
+    setHintVisible(false);
+    setLastMoveTo(null);
+  }
+
   function undo() {
     setPath((prev) => prev.slice(0, -1));
     setFeedback(null);
@@ -148,7 +168,8 @@ function OpeningStudyContent({ id }: { id: string | undefined }) {
             className={`banner ${feedback?.startsWith("不正解") ? "banner-error" : completed ? "banner-success" : "banner-info"}`}
             data-testid="opening-feedback"
           >
-            {completed ? "この定跡手順を完了しました" : feedback ?? "盤面上で推奨手を指してください"}
+            {completed ? "この定跡手順を完了しました。Wikipediaで確認できる手順はここまでです。" : feedback ?? "盤面上で推奨手を指してください"}
+            {hasBranches && <span className="branch-badge" data-testid="branch-badge">分岐あり</span>}
           </div>
           <ShogiBoard
             position={state.position}
@@ -175,6 +196,45 @@ function OpeningStudyContent({ id }: { id: string | undefined }) {
             </button>
           </div>
           {hintVisible && expected && <div className="hint-box">ヒント: {expected.hint}</div>}
+          <section className="opening-branches" data-testid="opening-branches">
+            <h2>分岐選択</h2>
+            <p className="muted">現在の分岐パス: <strong>{selectedBranchPath}</strong></p>
+            {hasBranches ? (
+              <div className="branch-choice-list">
+                {currentChoices.map((choice, index) => (
+                  <button key={choice.id} type="button" onClick={() => chooseBranch(index)} className={index === 0 ? "branch-choice primary" : "branch-choice"}>
+                    {choice.branchLabel || (index === 0 ? "本線" : `分岐${index + 1}`)}
+                    <span>{choice.notation} ({choice.usi})</span>
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <p className="muted">この局面の分岐候補はありません。</p>
+            )}
+            {state.steps.some((step) => step.choices.length > 1) && (
+              <div className="branch-history">
+                <h3>通過した分岐</h3>
+                {state.steps.map((step, stepIndex) => step.choices.length > 1 && (
+                  <div key={`${step.node.id}-branches`} className="branch-choice-list compact">
+                    {step.choices.map((choice, branchIndex) => (
+                      <button key={choice.id} type="button" onClick={() => switchBranch(stepIndex, branchIndex)} disabled={path[stepIndex] === branchIndex}>
+                        {choice.branchLabel || (branchIndex === 0 ? "本線" : `分岐${branchIndex + 1}`)}
+                      </button>
+                    ))}
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
+          {sourceNode && (
+            <section className="opening-source-note" aria-label="データ出典" data-testid="opening-source">
+              <h2>データ出典</h2>
+              <p>{sourceNode.sourceTitle || "出典未設定"}{sourceNode.sourceUrl && <>: <a href={sourceNode.sourceUrl} target="_blank" rel="noreferrer">{sourceNode.sourceUrl}</a></>}</p>
+              {sourceNode.license && <p>ライセンス: {sourceNode.license}</p>}
+              {sourceNode.coverageStatus && <p>カバレッジ: {sourceNode.coverageStatus}</p>}
+              {sourceNode.sourceNote && <p className="muted">{sourceNode.sourceNote}</p>}
+            </section>
+          )}
         </div>
         <div className="player-side">
           <section className="opening-current" data-testid="opening-current-move">

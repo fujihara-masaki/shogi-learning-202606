@@ -8,6 +8,12 @@ export interface OpeningMoveNode {
   explanation: string;
   aim: string;
   hint: string;
+  branchLabel?: string;
+  sourceUrl?: string;
+  sourceTitle?: string;
+  license?: string;
+  sourceNote?: string;
+  coverageStatus?: string;
   next?: OpeningMoveNode[];
 }
 
@@ -223,36 +229,80 @@ export interface ImportedOpeningLike {
   name: string;
   opening_type: string;
   initial_sfen: string;
-  moves: Array<{ usi: string; comment?: string }>;
+  moves: Array<{ usi: string; comment?: string; from_sfen?: string; to_sfen?: string; variation_group?: string; sort_order?: number }>;
   tags?: Array<{ label?: string; tag: string }>;
-  source?: { name: string; license_name: string; license_url: string };
+  source?: {
+    name: string;
+    license_name: string;
+    license_url: string;
+    source_url?: string;
+    source_title?: string;
+    license?: string;
+    source_note?: string;
+    coverage_status?: string;
+  };
 }
 
 export function openingFromImportedLine(imported: ImportedOpeningLike): OpeningLine {
-  const build = (index: number): OpeningMoveNode[] => {
+  const sourceLabel = imported.source?.source_title || imported.source?.name || "インポートデータ";
+  const licenseLabel = imported.source?.license || imported.source?.license_name || "";
+  const decorate = (move: { usi: string; comment?: string; variation_group?: string }, index: number, branchLabel?: string): OpeningMoveNode => ({
+    id: `imported-${imported.id}-${move.variation_group ?? "main"}-${index + 1}-${move.usi}`,
+    usi: move.usi,
+    notation: move.usi,
+    branchLabel,
+    explanation: move.comment || "Wikipediaで確認できる範囲の定跡手です。",
+    aim: licenseLabel ? `出典: ${sourceLabel} / ライセンス: ${licenseLabel}` : `出典: ${sourceLabel}`,
+    hint: `USI ${move.usi} の手を指します。`,
+    sourceUrl: imported.source?.source_url,
+    sourceTitle: imported.source?.source_title || imported.source?.name,
+    license: licenseLabel,
+    sourceNote: imported.source?.source_note,
+    coverageStatus: imported.source?.coverage_status,
+  });
+
+  const movesByFrom = new Map<string, Array<{ move: ImportedOpeningLike["moves"][number]; index: number }>>();
+  for (const [index, move] of imported.moves.entries()) {
+    const key = "from_sfen" in move && move.from_sfen ? move.from_sfen : `linear-${index}`;
+    const bucket = movesByFrom.get(key) ?? [];
+    bucket.push({ move, index });
+    movesByFrom.set(key, bucket);
+  }
+
+  const buildFromSfen = (sfen: string, seen: Set<string>): OpeningMoveNode[] => {
+    const choices = movesByFrom.get(sfen) ?? [];
+    return choices
+      .sort((a, b) => (a.move.sort_order ?? 0) - (b.move.sort_order ?? 0) || a.index - b.index)
+      .map(({ move, index }) => {
+        const branchLabel = choices.length > 1 ? (move.variation_group === "main" ? "本線" : move.variation_group) : undefined;
+        const node = decorate(move, index, branchLabel);
+        const nextSfen = "to_sfen" in move ? move.to_sfen : "";
+        if (nextSfen && !seen.has(nextSfen)) {
+          node.next = buildFromSfen(nextSfen, new Set([...seen, nextSfen]));
+        }
+        return node;
+      });
+  };
+
+  const tree = imported.moves.some((move) => "from_sfen" in move && move.from_sfen)
+    ? buildFromSfen(imported.initial_sfen, new Set([imported.initial_sfen]))
+    : [];
+
+  const buildLinear = (index: number): OpeningMoveNode[] => {
     const move = imported.moves[index];
     if (!move) return [];
-    return [
-      {
-        id: `imported-${imported.id}-${index + 1}`,
-        usi: move.usi,
-        notation: move.usi,
-        explanation: move.comment || "インポートした定跡手です。",
-        aim: imported.source?.license_name
-          ? `出典: ${imported.source.name} / ライセンス: ${imported.source.license_name}`
-          : `出典: ${imported.source?.name || "インポートデータ"}`,
-        hint: `USI ${move.usi} の手を指します。`,
-        next: build(index + 1),
-      },
-    ];
+    const node = decorate(move, index);
+    node.next = buildLinear(index + 1);
+    return [node];
   };
+
   return {
     id: String(imported.id),
     name: imported.name,
     category: imported.opening_type,
     description: imported.tags?.map((tag) => tag.label || tag.tag).join("、") || "インポートした定跡ライン",
     initialSfen: imported.initial_sfen,
-    moves: build(0),
+    moves: tree.length > 0 ? tree : buildLinear(0),
   };
 }
 

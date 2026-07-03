@@ -91,6 +91,11 @@ CREATE TABLE IF NOT EXISTS opening_lines (
     moves TEXT NOT NULL DEFAULT '[]',     -- USI 配列 (JSON)
     comments TEXT NOT NULL DEFAULT '[]',  -- 指し手ごとのコメント (JSON 配列)
     tags TEXT NOT NULL DEFAULT '[]',
+    source_url TEXT NOT NULL DEFAULT '',
+    source_title TEXT NOT NULL DEFAULT '',
+    license TEXT NOT NULL DEFAULT '',
+    source_note TEXT NOT NULL DEFAULT '',
+    coverage_status TEXT NOT NULL DEFAULT '',
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
     updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
@@ -227,6 +232,9 @@ def _ensure_opening_line_columns(conn: sqlite3.Connection) -> None:
         conn.execute("ALTER TABLE opening_lines ADD COLUMN source_id INTEGER REFERENCES opening_sources(id) ON DELETE SET NULL")
     if "opening_type_id" not in columns:
         conn.execute("ALTER TABLE opening_lines ADD COLUMN opening_type_id INTEGER REFERENCES opening_types(id) ON DELETE SET NULL")
+    for column in ("source_url", "source_title", "license", "source_note", "coverage_status"):
+        if column not in columns:
+            conn.execute(f"ALTER TABLE opening_lines ADD COLUMN {column} TEXT NOT NULL DEFAULT ''")
 
 
 def _ensure_opening_line_indexes(conn: sqlite3.Connection) -> None:

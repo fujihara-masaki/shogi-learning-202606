@@ -68,3 +68,27 @@ describe("openingFromImportedLine", () => {
     expect(flattenMainLine(opening).map((move) => move.usi)).toEqual(["7g7f", "3c3d", "2h5h"]);
   });
 });
+
+it("builds branch choices from imported moves and can switch back to the branch point", () => {
+  const start = "lnsgkgsnl/1r5b1/ppppppppp/9/9/9/PPPPPPPPP/1B5R1/LNSGKGSNL b - 1";
+  const after76 = "lnsgkgsnl/1r5b1/ppppppppp/9/9/2P6/PP1PPPPPP/1B5R1/LNSGKGSNL w - 2";
+  const opening = openingFromImportedLine({
+    id: 99,
+    name: "branch sample",
+    opening_type: "角換わり",
+    initial_sfen: start,
+    moves: [
+      { usi: "7g7f", from_sfen: start, to_sfen: after76, variation_group: "main", sort_order: 0 },
+      { usi: "3c3d", from_sfen: after76, to_sfen: "lnsgkgsnl/1r5b1/pppppp1pp/6p2/9/2P6/PP1PPPPPP/1B5R1/LNSGKGSNL b - 3", variation_group: "main", sort_order: 0 },
+      { usi: "8c8d", from_sfen: after76, to_sfen: "lnsgkgsnl/1r5b1/ppppppppp/9/1p7/2P6/PP1PPPPPP/1B5R1/LNSGKGSNL b - 3", variation_group: "△8四歩型", sort_order: 1 },
+    ],
+    source: { name: "Wikipedia", license_name: "CC BY-SA", license_url: "", source_url: "https://ja.wikipedia.org/wiki/角換わり" },
+  });
+
+  const branchPoint = applyOpeningPath(opening, [0]);
+  expect(branchPoint.steps.at(-1)?.node.next).toHaveLength(2);
+  expect(branchPoint.steps.at(-1)?.node.next?.map((node) => node.branchLabel)).toEqual(["本線", "△8四歩型"]);
+  expect(applyOpeningPath(opening, [0, 0]).moves.map((move) => move.usi)).toEqual(["7g7f", "3c3d"]);
+  expect(applyOpeningPath(opening, [0, 1]).moves.map((move) => move.usi)).toEqual(["7g7f", "8c8d"]);
+  expect(applyOpeningPath(opening, [0]).position.sfen).toBe(branchPoint.position.sfen);
+});
