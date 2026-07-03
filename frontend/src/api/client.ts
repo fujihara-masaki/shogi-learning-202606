@@ -211,6 +211,10 @@ export interface OpeningSourceSummary {
   license?: string;
   source_note?: string;
   coverage_status?: string;
+  source_type?: string;
+  source_section?: string;
+  source_license?: string;
+  source_retrieved_at?: string;
 }
 
 export interface OpeningSummary {

@@ -230,7 +230,9 @@ function OpeningStudyContent({ id }: { id: string | undefined }) {
             <section className="opening-source-note" aria-label="データ出典" data-testid="opening-source">
               <h2>データ出典</h2>
               <p>{sourceNode.sourceTitle || "出典未設定"}{sourceNode.sourceUrl && <>: <a href={sourceNode.sourceUrl} target="_blank" rel="noreferrer">{sourceNode.sourceUrl}</a></>}</p>
-              {sourceNode.license && <p>ライセンス: {sourceNode.license}</p>}
+              {sourceNode.sourceSection && <p>セクション: {sourceNode.sourceSection}</p>}
+              {sourceNode.license && <p>ライセンス: {sourceNode.sourceLicense || sourceNode.license}</p>}
+              {sourceNode.sourceRetrievedAt && <p>取得日: {sourceNode.sourceRetrievedAt}</p>}
               {sourceNode.coverageStatus && <p>カバレッジ: {sourceNode.coverageStatus}</p>}
               {sourceNode.sourceNote && <p className="muted">{sourceNode.sourceNote}</p>}
             </section>

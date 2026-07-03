@@ -108,11 +108,12 @@ def test_major_opening_types_have_playable_seed_lines(client):
         body = detail.json()
         assert body["opening_type_id"] == opening_type["id"]
         assert body["initial_sfen"]
-        assert len(body["moves"]) == playable_lines[0]["move_count"]
+        main_body_moves = [move for move in body["moves"] if move["variation_group"] == "main"]
+        assert len(main_body_moves) == playable_lines[0]["move_count"]
         assert body["moves"][0]["usi"]
         assert body["moves"][0]["from_sfen"]
         assert body["moves"][0]["to_sfen"]
-        assert len(body["positions"]) == len(body["moves"]) + 1
+        assert len(body["positions"]) == len(main_body_moves) + 1
 
 
 def test_seed_openings_backfills_missing_lines_in_existing_database(tmp_path):
@@ -631,7 +632,7 @@ def test_seed_openings_expose_wikipedia_source_metadata_and_legal_moves(client):
         detail = detail_response.json()
         source = detail["source"]
         assert source["source_url"].startswith("https://ja.wikipedia.org/wiki/")
-        assert source["license"] == "CC BY-SA"
+        assert source["license"] in {"CC BY-SA", "CC BY-SA 4.0"}
         assert source["source_note"]
         assert source["coverage_status"]
 
@@ -641,3 +642,62 @@ def test_seed_openings_expose_wikipedia_source_metadata_and_legal_moves(client):
             move = shogi.Move.from_usi(move_row["usi"])
             assert move in board.legal_moves, (name, move_row["usi"], board.sfen())
             board.push(move)
+
+
+def test_wikipedia_long_seed_branches_are_idempotent_and_replayable(client):
+    import shogi
+
+    names = {
+        "原始鬼殺し（Wikipedia明示手順）": ("原始鬼殺し", 19),
+        "新・早石田（鈴木流急戦・Wikipedia明示手順）": ("新・早石田", 7),
+        "升田式石田流（Wikipedia明示手順）": ("升田式石田流", 7),
+    }
+    lines = client.get("/api/openings").json()
+    ids = {line["name"]: line["id"] for line in lines if line["name"] in names}
+    assert set(ids) == set(names)
+
+    from app.database import get_connection
+    from app.seed import seed_openings_if_empty
+
+    conn = get_connection()
+    try:
+        before = conn.execute("SELECT COUNT(*) AS c FROM opening_lines").fetchone()["c"]
+        seed_openings_if_empty(conn)
+        conn.commit()
+        after = conn.execute("SELECT COUNT(*) AS c FROM opening_lines").fetchone()["c"]
+        assert after == before
+    finally:
+        conn.close()
+
+    for name, (section, min_main_moves) in names.items():
+        detail = client.get(f"/api/openings/{ids[name]}").json()
+        assert detail["source"]["source_type"] == "wikipedia"
+        assert detail["source"]["source_section"] == section
+        assert detail["source"]["source_license"] == "CC BY-SA 4.0"
+        assert detail["source"]["source_retrieved_at"] == "2026-07-03"
+
+        main_moves = sorted([m for m in detail["moves"] if m["variation_group"] == "main"], key=lambda m: m["ply"])
+        assert len(main_moves) >= min_main_moves
+        board = shogi.Board(detail["initial_sfen"])
+        for expected_ply, move_row in enumerate(main_moves, start=1):
+            assert move_row["ply"] == expected_ply
+            assert move_row["from_sfen"] == board.sfen()
+            move = shogi.Move.from_usi(move_row["usi"])
+            assert move in board.legal_moves, (name, move_row)
+            board.push(move)
+            assert move_row["to_sfen"] == board.sfen()
+
+    onigoroshi = client.get(f"/api/openings/{ids['原始鬼殺し（Wikipedia明示手順）']}").json()
+    branches = [m for m in onigoroshi["moves"] if m["variation_group"] != "main"]
+    assert {m["variation_group"] for m in branches} == {"△6二銀の対応", "△6二金の有効な受け"}
+    main_sfen = {pos["ply"]: pos["sfen"] for pos in onigoroshi["positions"]}
+    for group in {m["variation_group"] for m in branches}:
+        branch_moves = sorted([m for m in branches if m["variation_group"] == group], key=lambda m: m["ply"])
+        start_ply = branch_moves[0]["ply"] - 1
+        board = shogi.Board(main_sfen[start_ply])
+        for move_row in branch_moves:
+            assert move_row["from_sfen"] == board.sfen()
+            move = shogi.Move.from_usi(move_row["usi"])
+            assert move in board.legal_moves, (group, move_row)
+            board.push(move)
+            assert move_row["to_sfen"] == board.sfen()

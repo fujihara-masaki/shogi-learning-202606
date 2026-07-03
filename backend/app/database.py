@@ -96,6 +96,10 @@ CREATE TABLE IF NOT EXISTS opening_lines (
     license TEXT NOT NULL DEFAULT '',
     source_note TEXT NOT NULL DEFAULT '',
     coverage_status TEXT NOT NULL DEFAULT '',
+    source_type TEXT NOT NULL DEFAULT '',
+    source_section TEXT NOT NULL DEFAULT '',
+    source_license TEXT NOT NULL DEFAULT '',
+    source_retrieved_at TEXT NOT NULL DEFAULT '',
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
     updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
@@ -232,7 +236,7 @@ def _ensure_opening_line_columns(conn: sqlite3.Connection) -> None:
         conn.execute("ALTER TABLE opening_lines ADD COLUMN source_id INTEGER REFERENCES opening_sources(id) ON DELETE SET NULL")
     if "opening_type_id" not in columns:
         conn.execute("ALTER TABLE opening_lines ADD COLUMN opening_type_id INTEGER REFERENCES opening_types(id) ON DELETE SET NULL")
-    for column in ("source_url", "source_title", "license", "source_note", "coverage_status"):
+    for column in ("source_url", "source_title", "license", "source_note", "coverage_status", "source_type", "source_section", "source_license", "source_retrieved_at"):
         if column not in columns:
             conn.execute(f"ALTER TABLE opening_lines ADD COLUMN {column} TEXT NOT NULL DEFAULT ''")
 

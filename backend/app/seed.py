@@ -245,6 +245,55 @@ SAMPLE_OPENING_LINES = [
         "moves": ["7g7f", "3c3d", "7i7h", "8c8d", "6g6f", "8d8e", "7h6g", "6a5b", "6g5f"],
     },
     {
+        "name": "原始鬼殺し（Wikipedia明示手順）",
+        "opening_type": "奇襲・B級戦法",
+        "description": "Wikipedia本文の原始鬼殺し節に明示された初手からの進行です。",
+        "tag": "onigoroshi",
+        "opening_type_name": "鬼殺し",
+        "source_url": "https://ja.wikipedia.org/wiki/鬼殺し_(将棋)",
+        "source_title": "Wikipedia 鬼殺し (将棋)",
+        "source_section": "原始鬼殺し",
+        "coverage_status": "Wikipedia本文明示の長手順・対策分岐",
+        "source_note": "原始鬼殺し節の▲7六歩△3四歩▲7七桂から▲7三歩成までの本文記述と、△6二金/△6二銀の対応を短く手順化。",
+        "moves": ["7g7f", "3c3d", "8i7g", "8c8d", "7g6e", "7a6b", "7f7e", "6c6d", "8h2b+", "3a2b", "B*5e", "2b3c", "5e6d", "6a5b", "7e7d", "6b6c", "2h7h", "6c6d", "7d7c+"],
+        "comments": [
+            "▲7六歩。原始鬼殺しの初手です。", "△3四歩。", "▲7七桂。Wikipedia図1-1の局面です。", "△8四歩。本文で示された応手です。",
+            "▲6五桂。", "△6二銀。", "▲7五歩。Wikipedia図1-2の局面です。", "△6四歩。両取り筋への対応です。",
+            "▲2二角成。", "△同銀。", "▲5五角。Wikipedia図1-3の局面です。", "△3三銀。",
+            "▲6四角。", "△5二金右。", "▲7四歩。", "△6三金。", "▲7八飛。", "△6四金。", "▲7三歩成。Wikipedia図1-4までの本文手順です。"
+        ],
+        "branches": [
+            {"from_ply": 3, "name": "△6二銀の対応", "moves": ["7a6b"], "note": "3手目▲7七桂に対する4手目△6二銀。"},
+            {"from_ply": 3, "name": "△6二金の有効な受け", "moves": ["6a6b", "7g6e", "6c6d"], "note": "△6二金、▲6五桂に△6四歩〜△6三金とする受け。"}
+        ],
+    },
+    {
+        "name": "新・早石田（鈴木流急戦・Wikipedia明示手順）",
+        "opening_type": "振り飛車",
+        "description": "Wikipedia本文の新・早石田節に明示された初手からの進行です。",
+        "tag": "haya_ishida",
+        "opening_type_name": "早石田",
+        "source_url": "https://ja.wikipedia.org/wiki/石田流",
+        "source_title": "Wikipedia 石田流",
+        "source_section": "新・早石田",
+        "coverage_status": "Wikipedia本文明示の初手からの手順",
+        "source_note": "新・早石田節の第7手▲7四歩までの本文・図示手順を対象化。以降は本文にある範囲のみ。",
+        "moves": ["7g7f", "3c3d", "7f7e", "8c8d", "2h7h", "8d8e", "7e7d"],
+    },
+    {
+        "name": "升田式石田流（Wikipedia明示手順）",
+        "opening_type": "振り飛車",
+        "description": "Wikipedia本文の升田式石田流節に明示された初手からの進行です。",
+        "tag": "ishida",
+        "opening_type_name": "石田流",
+        "source_url": "https://ja.wikipedia.org/wiki/石田流",
+        "source_title": "Wikipedia 石田流",
+        "source_section": "升田式石田流",
+        "coverage_status": "Wikipedia本文明示の初手からの手順",
+        "source_note": "升田式石田流節の▲7六歩△3四歩▲7五歩△8四歩▲7八飛△8五歩▲4八玉、および実戦以下▲7六飛を手順化。",
+        "moves": ["7g7f", "3c3d", "7f7e", "8c8d", "2h7h", "8d8e", "5i4h"],
+    },
+    {
         "name": "早石田", "opening_type": "振り飛車", "description": "早く7筋の位を取り、三間飛車から攻勢を目指す急戦調の石田流です。", "tag": "haya_ishida",
         "moves": ["7g7f", "3c3d", "7f7e", "8c8d", "2h7h", "8d8e", "7h7f"],
     },
@@ -314,7 +363,11 @@ SAMPLE_OPENING_LINES = [
 WIKIPEDIA_OPENING_SOURCE_DEFAULTS = {
     "source_url": "https://ja.wikipedia.org/wiki/将棋の戦法",
     "source_title": "Wikipedia 将棋の戦法",
-    "license": "CC BY-SA",
+    "license": "CC BY-SA 4.0",
+    "source_type": "wikipedia",
+    "source_section": "",
+    "source_license": "CC BY-SA 4.0",
+    "source_retrieved_at": "2026-07-03",
     "source_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
     "coverage_status": "短い手順のみ",
 }
@@ -335,7 +388,7 @@ WIKIPEDIA_OPENING_SOURCE_BY_NAME = {
 def _opening_source_metadata(opening: dict) -> dict:
     metadata = dict(WIKIPEDIA_OPENING_SOURCE_DEFAULTS)
     metadata.update(WIKIPEDIA_OPENING_SOURCE_BY_NAME.get(opening["name"], {}))
-    metadata.update({key: opening[key] for key in ("source_url", "source_title", "license", "source_note", "coverage_status") if key in opening})
+    metadata.update({key: opening[key] for key in ("source_url", "source_title", "license", "source_type", "source_section", "source_license", "source_retrieved_at", "source_note", "coverage_status") if key in opening})
     return metadata
 
 OPENING_CATEGORY_SEEDS = [
@@ -481,7 +534,7 @@ def seed_openings_if_empty(conn) -> None:
         metadata = _opening_source_metadata(opening)
         positions, move_rows = _opening_snapshots(shogi.STARTING_SFEN, opening["moves"])
         type_row = conn.execute(
-            "SELECT id FROM opening_types WHERE name_ja = ?", (opening["name"],)
+            "SELECT id FROM opening_types WHERE name_ja = ?", (opening.get("opening_type_name", opening["name"]),)
         ).fetchone()
         type_id = type_row["id"] if type_row else None
         line_row = conn.execute(
@@ -501,6 +554,7 @@ def seed_openings_if_empty(conn) -> None:
                 UPDATE opening_lines
                 SET opening_type_id = ?, opening_type = ?, initial_sfen = ?, moves = ?, comments = ?, tags = ?,
                     source_url = ?, source_title = ?, license = ?, source_note = ?, coverage_status = ?,
+                    source_type = ?, source_section = ?, source_license = ?, source_retrieved_at = ?,
                     updated_at = datetime('now')
                 WHERE id = ?
                 """,
@@ -516,6 +570,10 @@ def seed_openings_if_empty(conn) -> None:
                     metadata["license"],
                     metadata["source_note"],
                     metadata["coverage_status"],
+                    metadata["source_type"],
+                    metadata["source_section"],
+                    metadata["source_license"],
+                    metadata["source_retrieved_at"],
                     line_id,
                 ),
             )
@@ -523,8 +581,9 @@ def seed_openings_if_empty(conn) -> None:
             cur = conn.execute(
                 """
                 INSERT INTO opening_lines(opening_type_id, name, opening_type, initial_sfen, moves, comments, tags,
-                                          source_url, source_title, license, source_note, coverage_status)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                                          source_url, source_title, license, source_note, coverage_status,
+                                          source_type, source_section, source_license, source_retrieved_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     type_id,
@@ -539,6 +598,10 @@ def seed_openings_if_empty(conn) -> None:
                     metadata["license"],
                     metadata["source_note"],
                     metadata["coverage_status"],
+                    metadata["source_type"],
+                    metadata["source_section"],
+                    metadata["source_license"],
+                    metadata["source_retrieved_at"],
                 ),
             )
             line_id = int(cur.lastrowid)
@@ -585,6 +648,56 @@ def seed_openings_if_empty(conn) -> None:
                     """,
                     (line_id, ply, usi, before, after, comment),
                 )
+
+        main_sfen_by_ply = {ply: sfen for ply, sfen in enumerate(positions)}
+        main_move_id_by_ply = {
+            row["ply"]: row["id"]
+            for row in conn.execute(
+                """
+                SELECT id, ply FROM opening_line_moves
+                WHERE line_id = ? AND variation_group = 'main'
+                """,
+                (line_id,),
+            ).fetchall()
+        }
+        for branch_index, branch in enumerate(opening.get("branches", []), start=1):
+            branch_name = branch["name"]
+            from_ply = int(branch["from_ply"])
+            board = shogi.Board(main_sfen_by_ply[from_ply])
+            parent_move_id = main_move_id_by_ply.get(from_ply)
+            for offset, usi in enumerate(branch["moves"], start=1):
+                branch_ply = from_ply + offset
+                before = board.sfen()
+                move = shogi.Move.from_usi(usi)
+                if move not in board.legal_moves:
+                    raise ValueError(f"サンプル定跡分岐手が不正です: {opening['name']} {branch_name} {usi}")
+                board.push(move)
+                after = board.sfen()
+                comment = branch.get("note", f"{branch_name} {offset}手目です。") if offset == 1 else f"{branch_name} {offset}手目です。"
+                move_row = conn.execute(
+                    """
+                    SELECT id FROM opening_line_moves
+                    WHERE line_id = ? AND ply = ? AND variation_group = ? AND sort_order = ?
+                    """,
+                    (line_id, branch_ply, branch_name, branch_index),
+                ).fetchone()
+                if move_row:
+                    conn.execute(
+                        """
+                        UPDATE opening_line_moves
+                        SET usi = ?, from_sfen = ?, to_sfen = ?, comment = ?, parent_move_id = ?
+                        WHERE id = ?
+                        """,
+                        (usi, before, after, comment, parent_move_id, move_row["id"]),
+                    )
+                else:
+                    conn.execute(
+                        """
+                        INSERT INTO opening_line_moves(line_id, ply, usi, from_sfen, to_sfen, comment, variation_group, parent_move_id, sort_order)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        """,
+                        (line_id, branch_ply, usi, before, after, comment, branch_name, parent_move_id, branch_index),
+                    )
 
         tag_row = conn.execute(
             "SELECT id FROM opening_tags WHERE line_id = ? AND tag = ?",
