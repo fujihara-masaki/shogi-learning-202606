@@ -275,6 +275,66 @@ def _migrate_opening_moves(conn: sqlite3.Connection) -> None:
         )
 
 
+def _ensure_opening_line_moves_schema(conn: sqlite3.Connection) -> None:
+    table = conn.execute(
+        "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'opening_line_moves'"
+    ).fetchone()
+    if not table or not table["sql"]:
+        return
+
+    table_sql = " ".join(str(table["sql"]).lower().split())
+    has_old_unique = "unique(line_id, ply)" in table_sql
+    has_branch_unique = "unique(line_id, ply, variation_group, sort_order)" in table_sql
+    if not has_old_unique or has_branch_unique:
+        return
+
+    columns = {row["name"] for row in conn.execute("PRAGMA table_info(opening_line_moves)").fetchall()}
+    variation_expr = "variation_group" if "variation_group" in columns else "'main'"
+    parent_expr = "parent_move_id" if "parent_move_id" in columns else "NULL"
+    sort_expr = "sort_order" if "sort_order" in columns else "0"
+
+    conn.execute("DROP VIEW IF EXISTS opening_moves")
+    conn.execute("ALTER TABLE opening_line_moves RENAME TO opening_line_moves_old")
+    conn.execute(
+        """
+        CREATE TABLE opening_line_moves (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            line_id INTEGER NOT NULL REFERENCES opening_lines(id) ON DELETE CASCADE,
+            ply INTEGER NOT NULL,
+            usi TEXT NOT NULL,
+            from_sfen TEXT NOT NULL,
+            to_sfen TEXT NOT NULL,
+            comment TEXT NOT NULL DEFAULT '',
+            variation_group TEXT NOT NULL DEFAULT 'main',
+            parent_move_id INTEGER REFERENCES opening_line_moves(id) ON DELETE CASCADE,
+            sort_order INTEGER NOT NULL DEFAULT 0,
+            UNIQUE(line_id, ply, variation_group, sort_order)
+        )
+        """
+    )
+    conn.execute(
+        f"""
+        INSERT INTO opening_line_moves(
+            id, line_id, ply, usi, from_sfen, to_sfen, comment,
+            variation_group, parent_move_id, sort_order
+        )
+        SELECT
+            id, line_id, ply, usi, from_sfen, to_sfen, comment,
+            {variation_expr}, {parent_expr}, {sort_expr}
+        FROM opening_line_moves_old
+        """
+    )
+    conn.execute("DROP TABLE opening_line_moves_old")
+    conn.execute(
+        """
+        CREATE VIEW opening_moves AS
+            SELECT id, line_id, ply, usi, from_sfen, to_sfen, comment
+            FROM opening_line_moves
+            WHERE variation_group = 'main'
+        """
+    )
+
+
 def _backfill_opening_line_type_ids(conn: sqlite3.Connection) -> None:
     objects = {
         row["name"]
@@ -320,10 +380,12 @@ def init_db() -> None:
     try:
         _migrate_opening_moves(conn)
         conn.executescript(SCHEMA)
+        _ensure_opening_line_moves_schema(conn)
         _ensure_opening_line_columns(conn)
         _ensure_opening_line_indexes(conn)
         _backfill_opening_line_type_ids(conn)
         _migrate_opening_moves(conn)
+        _ensure_opening_line_moves_schema(conn)
         conn.commit()
     finally:
         conn.close()

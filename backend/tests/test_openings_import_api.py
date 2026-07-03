@@ -608,6 +608,77 @@ def test_init_db_migrates_existing_opening_lines_type_id_column_and_index(tmp_pa
         os.environ.pop("SHOGI_DB_PATH", None)
 
 
+def test_startup_migrates_legacy_opening_line_moves_unique_constraint_for_branch_seeds(tmp_path):
+    import sqlite3
+    from fastapi.testclient import TestClient
+
+    db_path = tmp_path / "legacy_branch_seed.db"
+    os.environ["SHOGI_DB_PATH"] = str(db_path)
+    try:
+        conn = sqlite3.connect(db_path)
+        try:
+            conn.executescript(
+                """
+                CREATE TABLE opening_lines (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    name TEXT NOT NULL,
+                    opening_type TEXT NOT NULL,
+                    initial_sfen TEXT NOT NULL,
+                    moves TEXT NOT NULL DEFAULT '[]',
+                    comments TEXT NOT NULL DEFAULT '[]',
+                    tags TEXT NOT NULL DEFAULT '[]',
+                    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+                );
+                CREATE TABLE opening_line_moves (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    line_id INTEGER NOT NULL REFERENCES opening_lines(id) ON DELETE CASCADE,
+                    ply INTEGER NOT NULL,
+                    usi TEXT NOT NULL,
+                    from_sfen TEXT NOT NULL,
+                    to_sfen TEXT NOT NULL,
+                    comment TEXT NOT NULL DEFAULT '',
+                    variation_group TEXT NOT NULL DEFAULT 'main',
+                    parent_move_id INTEGER REFERENCES opening_line_moves(id) ON DELETE CASCADE,
+                    sort_order INTEGER NOT NULL DEFAULT 0,
+                    UNIQUE(line_id, ply)
+                );
+                """
+            )
+            conn.commit()
+        finally:
+            conn.close()
+
+        from app.main import app
+
+        with TestClient(app) as client:
+            lines = client.get("/api/openings").json()
+            onigoroshi = next(line for line in lines if line["name"] == "原始鬼殺し（Wikipedia明示手順）")
+            detail = client.get(f"/api/openings/{onigoroshi['id']}").json()
+            branch_groups = {move["variation_group"] for move in detail["moves"] if move["variation_group"] != "main"}
+            assert branch_groups == {"△6二銀の対応", "△6二金の有効な受け"}
+
+        conn = sqlite3.connect(db_path)
+        conn.row_factory = sqlite3.Row
+        try:
+            indexes = conn.execute("PRAGMA index_list(opening_line_moves)").fetchall()
+            unique_indexes = [index for index in indexes if index["unique"]]
+            assert unique_indexes
+            unique_columns = {
+                tuple(
+                    row["name"]
+                    for row in conn.execute(f"PRAGMA index_info({index['name']})").fetchall()
+                )
+                for index in unique_indexes
+            }
+            assert ("line_id", "ply", "variation_group", "sort_order") in unique_columns
+            assert ("line_id", "ply") not in unique_columns
+        finally:
+            conn.close()
+    finally:
+        os.environ.pop("SHOGI_DB_PATH", None)
+
+
 def test_seed_openings_expose_wikipedia_source_metadata_and_legal_moves(client):
     import shogi
 
