@@ -14,6 +14,13 @@ class TsumeProblemBase(BaseModel):
     tags: list[str] = []
     explanation: str = ""
     is_favorite: bool = False
+    source_name: str = ""
+    source_url: str = ""
+    source_license: str = ""
+    source_copyright: str = ""
+    external_id: str = ""
+    source_hash: str = ""
+    source_metadata: dict = {}
 
 
 class TsumeProblemCreate(TsumeProblemBase):

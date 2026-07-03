@@ -23,10 +23,17 @@ export interface TsumeProblem {
   is_favorite: boolean;
   created_at: string;
   updated_at: string;
+  source_name: string;
+  source_url: string;
+  source_license: string;
+  source_copyright: string;
+  external_id: string;
+  source_hash: string;
+  source_metadata: Record<string, unknown>;
   stats: ProblemStats;
 }
 
-export type TsumeProblemInput = Omit<TsumeProblem, "id" | "created_at" | "updated_at" | "stats">;
+export type TsumeProblemInput = Omit<TsumeProblem, "id" | "created_at" | "updated_at" | "stats" | "source_name" | "source_url" | "source_license" | "source_copyright" | "external_id" | "source_hash" | "source_metadata"> & Partial<Pick<TsumeProblem, "source_name" | "source_url" | "source_license" | "source_copyright" | "external_id" | "source_hash" | "source_metadata">>;
 
 export interface ValidationResponse { valid: boolean; errors: string[] }
 
@@ -381,8 +388,17 @@ export function fetchLearningSample(id: number): Promise<LearningSample> {
   return request<LearningSample>(`/api/learning-samples/${id}`);
 }
 
+export interface TsumeSourceLicense {
+  name: string;
+  source_url: string;
+  license_name: string;
+  copyright_notice: string;
+  problem_count: number;
+}
+
 export interface LicenseResponse {
   book_sources: BookSource[];
+  tsume_sources: TsumeSourceLicense[];
 }
 
 export function fetchBookSources(): Promise<BookSource[]> {

@@ -13,12 +13,29 @@ export default function LicensesPage() {
     <section className="licenses-page" data-testid="licenses-page">
       <h1>データ出典・ライセンス</h1>
       <p className="muted">
-        外部定跡データを取り込んだ場合は、出典、ファイルハッシュ、ライセンス本文をここに表示します。
+        外部定跡・詰将棋データを取り込んだ場合は、出典、ファイルハッシュ、ライセンス本文をここに表示します。
       </p>
       {error && <p className="error">{error}</p>}
       {!data && !error && <p>読み込み中...</p>}
-      {data?.book_sources.length === 0 && <p>登録済みの外部定跡データはありません。</p>}
+      {data?.book_sources.length === 0 && data?.tsume_sources.length === 0 && <p>登録済みの外部データはありません。</p>}
       <div className="license-source-list">
+        {data?.tsume_sources.map((source) => (
+          <article className="license-source-card" key={source.name}>
+            <h2>{source.name}</h2>
+            <dl>
+              <dt>種別</dt>
+              <dd>詰将棋データ</dd>
+              <dt>ライセンス</dt>
+              <dd>{source.license_name || "-"}</dd>
+              <dt>問題数</dt>
+              <dd>{source.problem_count.toLocaleString()}</dd>
+              <dt>URL</dt>
+              <dd>{source.source_url ? <a href={source.source_url}>{source.source_url}</a> : "-"}</dd>
+            </dl>
+            {source.copyright_notice && <p>{source.copyright_notice}</p>}
+            <p className="muted">詰将棋データの一部は tokuhirom/tanuki-tsume-shogi を利用しています。</p>
+          </article>
+        ))}
         {data?.book_sources.map((source) => (
           <article className="license-source-card" key={source.id}>
             <h2>{source.name}</h2>

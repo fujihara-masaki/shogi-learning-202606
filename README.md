@@ -336,3 +336,31 @@ curl http://localhost:8000/api/book/sources/<book_source_id>/learning-samples/su
 ```
 
 レスポンスには戦型別件数、未分類件数、対象 book source の出典情報が含まれます。出典・ライセンス表示は既存の book source 表示に従い、学習 UI で利用する場合も `book_sources` の `source_url` / `license_name` / `copyright_notice` を併記してください。UI への本格表示は今後、定跡候補表示や戦型別学習画面から `learning_samples` を参照する形で拡張できます。
+
+## Third-party data and licenses
+
+This application can import tsume-shogi puzzle data from [`tokuhirom/tanuki-tsume-shogi`](https://github.com/tokuhirom/tanuki-tsume-shogi), specifically `puzzles/1.json`, `puzzles/3.json`, and `puzzles/5.json` (currently 228 one-move, 543 three-move, and 296 five-move puzzles; 1,067 total).
+
+- Portions of the tsume-shogi data use `tokuhirom/tanuki-tsume-shogi`.
+- Copyright (c) 2026 tokuhirom
+- Licensed under the MIT License
+
+### MIT License (`tokuhirom/tanuki-tsume-shogi`)
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.

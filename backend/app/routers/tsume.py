@@ -50,6 +50,13 @@ def row_to_problem(conn: sqlite3.Connection, row: sqlite3.Row) -> TsumeProblem:
         is_favorite=bool(row["is_favorite"]),
         created_at=row["created_at"],
         updated_at=row["updated_at"],
+        source_name=row["source_name"],
+        source_url=row["source_url"],
+        source_license=row["source_license"],
+        source_copyright=row["source_copyright"],
+        external_id=row["external_id"],
+        source_hash=row["source_hash"],
+        source_metadata=json.loads(row["source_metadata"] or "{}"),
         stats=stats,
     )
 
@@ -129,8 +136,9 @@ def create_problem(body: TsumeProblemCreate):
             """
             INSERT INTO tsume_problems
               (title, initial_sfen, mate_length, solution_moves, opponent_moves,
-               difficulty, tags, explanation, is_favorite)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+               difficulty, tags, explanation, is_favorite, source_name, source_url,
+               source_license, source_copyright, external_id, source_hash, source_metadata)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 body.title,
@@ -142,6 +150,8 @@ def create_problem(body: TsumeProblemCreate):
                 json.dumps(body.tags, ensure_ascii=False),
                 body.explanation,
                 1 if body.is_favorite else 0,
+                body.source_name, body.source_url, body.source_license, body.source_copyright,
+                body.external_id, body.source_hash, json.dumps(body.source_metadata, ensure_ascii=False),
             ),
         )
         conn.commit()
@@ -161,7 +171,9 @@ def update_problem(problem_id: int, body: TsumeProblemUpdate):
             UPDATE tsume_problems SET
               title = ?, initial_sfen = ?, mate_length = ?, solution_moves = ?,
               opponent_moves = ?, difficulty = ?, tags = ?, explanation = ?,
-              is_favorite = ?, updated_at = datetime('now')
+              is_favorite = ?, source_name = ?, source_url = ?, source_license = ?,
+              source_copyright = ?, external_id = ?, source_hash = ?, source_metadata = ?,
+              updated_at = datetime('now')
             WHERE id = ?
             """,
             (
@@ -174,6 +186,8 @@ def update_problem(problem_id: int, body: TsumeProblemUpdate):
                 json.dumps(body.tags, ensure_ascii=False),
                 body.explanation,
                 1 if body.is_favorite else 0,
+                body.source_name, body.source_url, body.source_license, body.source_copyright,
+                body.external_id, body.source_hash, json.dumps(body.source_metadata, ensure_ascii=False),
                 problem_id,
             ),
         )
