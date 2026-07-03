@@ -157,21 +157,21 @@ function OpeningStudyContent({ id }: { id: string | undefined }) {
             lastMoveTo={lastMoveTo}
             onUserMove={handleUserMove}
           />
-          <div className="board-controls">
-            <button type="button" onClick={() => setHintVisible((v) => !v)} disabled={completed}>
-              ヒント
-            </button>
-            <button type="button" onClick={stepForward} disabled={completed}>
-              1手進む
-            </button>
-            <button type="button" onClick={undo} disabled={path.length === 0}>
-              1手戻る
-            </button>
+          <div className="board-controls opening-replay-controls">
             <button type="button" onClick={reset} disabled={path.length === 0}>
               最初に戻る
             </button>
+            <button type="button" onClick={undo} disabled={path.length === 0}>
+              一手戻る
+            </button>
+            <button type="button" onClick={stepForward} disabled={completed}>
+              一手進む
+            </button>
             <button type="button" onClick={goToEnd} disabled={completed}>
               最後まで進む
+            </button>
+            <button type="button" onClick={() => setHintVisible((v) => !v)} disabled={completed}>
+              ヒント
             </button>
           </div>
           {hintVisible && expected && <div className="hint-box">ヒント: {expected.hint}</div>}
