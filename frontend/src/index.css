@@ -350,6 +350,14 @@ select {
   flex-wrap: wrap;
 }
 
+.opening-replay-controls {
+  align-items: center;
+}
+
+.opening-replay-controls button {
+  white-space: nowrap;
+}
+
 .banner {
   padding: 8px 14px;
   border-radius: 8px;

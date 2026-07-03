@@ -311,7 +311,7 @@ test("opening study accepts correct moves and supports wrong feedback, undo, and
   await expect(page.getByTestId("opening-current-move")).toContainText("△3四歩");
   await expect(page.getByText("7g7f")).toBeVisible();
 
-  await page.getByRole("button", { name: "1手戻る" }).click();
+  await page.getByRole("button", { name: "一手戻る" }).click();
   await expect(page.getByTestId("opening-current-move")).toContainText("▲7六歩");
   await expect(page.getByText("まだ指し手はありません")).toBeVisible();
 
@@ -337,15 +337,24 @@ test("seeded opening replay controls move forward, backward, reset, and finish",
   await openingCardByExactTitle(page, "中飛車").getByRole("link", { name: "学習する" }).click();
   await expect(page.getByTestId("opening-current-move")).toContainText("7g7f");
 
-  await page.getByRole("button", { name: "1手進む" }).click();
+  const replayButtons = page.locator(".opening-replay-controls button");
+  await expect(replayButtons).toHaveText(["最初に戻る", "一手戻る", "一手進む", "最後まで進む", "ヒント"]);
+  await expect(page.getByRole("button", { name: "最初に戻る" })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "一手戻る" })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "一手進む" })).toBeEnabled();
+  await expect(page.getByRole("button", { name: "最後まで進む" })).toBeEnabled();
+
+  await page.getByRole("button", { name: "一手進む" }).click();
   await expect(page.getByTestId("opening-current-move")).toContainText("3c3d");
-  await page.getByRole("button", { name: "1手戻る" }).click();
+  await page.getByRole("button", { name: "一手戻る" }).click();
   await expect(page.getByTestId("opening-current-move")).toContainText("7g7f");
-  await page.getByRole("button", { name: "1手進む" }).click();
+  await page.getByRole("button", { name: "一手進む" }).click();
   await page.getByRole("button", { name: "最初に戻る" }).click();
   await expect(page.getByText("まだ指し手はありません")).toBeVisible();
   await page.getByRole("button", { name: "最後まで進む" }).click();
   await expect(page.getByTestId("opening-feedback")).toContainText("この定跡手順を完了しました");
+  await expect(page.getByRole("button", { name: "一手進む" })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "最後まで進む" })).toBeDisabled();
 });
 
 
