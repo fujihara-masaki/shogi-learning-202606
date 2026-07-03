@@ -39,6 +39,138 @@ RAW_BASE = "https://raw.githubusercontent.com/tokuhirom/tanuki-tsume-shogi/main/
 EXPECTED_COUNTS = {1: 228, 3: 543, 5: 296}
 RANKS = "abcdefghi"
 
+PIECE_ORDER = "RBGSNLP"
+
+
+def _piece_type(value: Any) -> str:
+    piece = str(value)
+    if not piece:
+        raise ValueError("missing piece type")
+    if piece.startswith("+"):
+        return "+" + piece[1:].upper()
+    return piece.upper()
+
+
+def _piece_to_sfen(piece_type: Any, owner: str) -> str:
+    piece = _piece_type(piece_type)
+    if owner == "defender":
+        if piece.startswith("+"):
+            return "+" + piece[1:].lower()
+        return piece.lower()
+    if owner != "attacker":
+        raise ValueError(f"unsupported owner: {owner!r}")
+    return piece
+
+
+def _piece_square(piece: dict[str, Any]) -> str:
+    for key in ("square", "position", "pos"):
+        if key in piece:
+            return _square(piece[key])
+    if "file" in piece or "x" in piece:
+        return _square(piece)
+    raise ValueError(f"missing piece square: {piece!r}")
+
+
+def _pieces_to_board_sfen(pieces: Any) -> str:
+    board: dict[tuple[int, str], str] = {}
+    if isinstance(pieces, dict):
+        iterable = []
+        for square, piece in pieces.items():
+            if isinstance(piece, str):
+                iterable.append({"square": square, "type": piece, "owner": "attacker"})
+            else:
+                item = dict(piece)
+                item.setdefault("square", square)
+                iterable.append(item)
+    else:
+        iterable = pieces or []
+
+    for piece in iterable:
+        if not isinstance(piece, dict):
+            raise ValueError(f"unsupported piece entry: {piece!r}")
+        square = _piece_square(piece)
+        file = int(square[0])
+        rank = square[1]
+        owner = str(piece.get("owner") or piece.get("side") or "attacker")
+        board[(file, rank)] = _piece_to_sfen(piece.get("type") or piece.get("piece"), owner)
+
+    ranks: list[str] = []
+    for rank in RANKS:
+        empty = 0
+        row = ""
+        for file in range(9, 0, -1):
+            piece = board.get((file, rank))
+            if piece:
+                if empty:
+                    row += str(empty)
+                    empty = 0
+                row += piece
+            else:
+                empty += 1
+        if empty:
+            row += str(empty)
+        ranks.append(row)
+    return "/".join(ranks)
+
+
+def _iter_hand_counts(hand: Any) -> list[tuple[str, int]]:
+    if not hand:
+        return []
+    if isinstance(hand, dict):
+        return [(str(piece), int(count)) for piece, count in hand.items() if int(count) > 0]
+    if isinstance(hand, list):
+        counts: dict[str, int] = {}
+        for item in hand:
+            if isinstance(item, str):
+                counts[item] = counts.get(item, 0) + 1
+            elif isinstance(item, dict):
+                piece = str(item.get("type") or item.get("piece"))
+                count = int(item.get("count", 1))
+                counts[piece] = counts.get(piece, 0) + count
+            else:
+                raise ValueError(f"unsupported hand item: {item!r}")
+        return [(piece, count) for piece, count in counts.items() if count > 0]
+    raise ValueError(f"unsupported hand: {hand!r}")
+
+
+def _hands_to_sfen(hands: dict[str, Any] | None) -> str:
+    if not hands:
+        return "-"
+    by_piece: dict[str, int] = {}
+    for owner, hand in (("attacker", hands.get("attacker")), ("defender", hands.get("defender"))):
+        for piece, count in _iter_hand_counts(hand):
+            sfen_piece = _piece_to_sfen(piece, owner)
+            by_piece[sfen_piece] = by_piece.get(sfen_piece, 0) + count
+
+    parts: list[str] = []
+    for piece in PIECE_ORDER:
+        count = by_piece.get(piece, 0)
+        if count:
+            parts.append((str(count) if count > 1 else "") + piece)
+    for piece in PIECE_ORDER.lower():
+        count = by_piece.get(piece, 0)
+        if count:
+            parts.append((str(count) if count > 1 else "") + piece)
+    return "".join(parts) or "-"
+
+
+def initial_to_sfen(initial: Any) -> str:
+    """Convert tanuki initial object ({pieces, hands, sideToMove}) to SFEN."""
+    if isinstance(initial, str):
+        return initial
+    if not isinstance(initial, dict):
+        raise ValueError(f"unsupported initial: {initial!r}")
+    board = _pieces_to_board_sfen(initial.get("pieces"))
+    side = initial.get("sideToMove", "attacker")
+    if side == "attacker":
+        side_sfen = "b"
+    elif side == "defender":
+        side_sfen = "w"
+    else:
+        raise ValueError(f"unsupported sideToMove: {side!r}")
+    hands = _hands_to_sfen(initial.get("hands") or {})
+    return f"{board} {side_sfen} {hands} 1"
+
 
 def _square(value: Any) -> str:
     if isinstance(value, str):
@@ -79,7 +211,7 @@ def normalize_puzzle(raw: dict[str, Any], fallback_mate_length: int) -> dict[str
     external_id = str(raw.get("id") or raw.get("external_id") or raw.get("hash") or "")
     return {
         "title": f"[tanuki] {mate_length}手詰 #{external_id or raw.get('hash', '')}",
-        "initial_sfen": raw.get("initial") or raw.get("initial_sfen") or raw.get("sfen"),
+        "initial_sfen": initial_to_sfen(raw.get("initial") or raw.get("initial_sfen") or raw.get("sfen")),
         "mate_length": mate_length,
         "solution_moves": solution_moves,
         "opponent_moves": opponent_moves,
