@@ -311,6 +311,33 @@ SAMPLE_OPENING_LINES = [
     },
 ]
 
+WIKIPEDIA_OPENING_SOURCE_DEFAULTS = {
+    "source_url": "https://ja.wikipedia.org/wiki/将棋の戦法",
+    "source_title": "Wikipedia 将棋の戦法",
+    "license": "CC BY-SA",
+    "source_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+    "coverage_status": "短い手順のみ",
+}
+
+WIKIPEDIA_OPENING_SOURCE_BY_NAME = {
+    "棒銀": {"source_url": "https://ja.wikipedia.org/wiki/棒銀", "source_title": "Wikipedia 棒銀", "coverage_status": "局面図参考の短い手順"},
+    "原始棒銀": {"source_url": "https://ja.wikipedia.org/wiki/棒銀", "source_title": "Wikipedia 棒銀", "coverage_status": "局面図参考の短い手順"},
+    "角換わり": {"source_url": "https://ja.wikipedia.org/wiki/角換わり", "source_title": "Wikipedia 角換わり", "coverage_status": "短い手順のみ"},
+    "角換わり棒銀": {"source_url": "https://ja.wikipedia.org/wiki/角換わり", "source_title": "Wikipedia 角換わり", "coverage_status": "短い手順のみ"},
+    "角換わり早繰り銀": {"source_url": "https://ja.wikipedia.org/wiki/角換わり", "source_title": "Wikipedia 角換わり", "coverage_status": "短い手順のみ"},
+    "角換わり腰掛け銀": {"source_url": "https://ja.wikipedia.org/wiki/腰掛け銀", "source_title": "Wikipedia 腰掛け銀", "coverage_status": "短い手順のみ"},
+    "横歩取り": {"source_url": "https://ja.wikipedia.org/wiki/横歩取り", "source_title": "Wikipedia 横歩取り", "coverage_status": "基本局面まで"},
+    "石田流": {"source_url": "https://ja.wikipedia.org/wiki/石田流", "source_title": "Wikipedia 石田流", "coverage_status": "短い手順のみ"},
+    "ゴキゲン中飛車": {"source_url": "https://ja.wikipedia.org/wiki/ゴキゲン中飛車", "source_title": "Wikipedia ゴキゲン中飛車", "coverage_status": "短い手順のみ"},
+    "居飛車穴熊": {"source_url": "https://ja.wikipedia.org/wiki/穴熊囲い", "source_title": "Wikipedia 穴熊囲い", "coverage_status": "短い手順のみ"},
+}
+
+def _opening_source_metadata(opening: dict) -> dict:
+    metadata = dict(WIKIPEDIA_OPENING_SOURCE_DEFAULTS)
+    metadata.update(WIKIPEDIA_OPENING_SOURCE_BY_NAME.get(opening["name"], {}))
+    metadata.update({key: opening[key] for key in ("source_url", "source_title", "license", "source_note", "coverage_status") if key in opening})
+    return metadata
+
 OPENING_CATEGORY_SEEDS = [
     {"name_ja": "相居飛車", "sort_order": 10, "description": "双方が居飛車で戦う代表的な序盤分類です。", "source_url": "https://ja.wikibooks.org/wiki/将棋の戦法一覧", "license": "CC BY-SA"},
     {"name_ja": "対抗型", "sort_order": 20, "description": "居飛車対振り飛車の対抗形です。", "source_url": "https://ja.wikipedia.org/wiki/将棋の戦法", "license": "CC BY-SA"},
@@ -451,6 +478,7 @@ def seed_openings_if_empty(conn) -> None:
 
     for opening in SAMPLE_OPENING_LINES:
         opening.setdefault("comments", [f"{opening['name']}の代表手順 {i}手目です。" for i in range(1, len(opening["moves"]) + 1)])
+        metadata = _opening_source_metadata(opening)
         positions, move_rows = _opening_snapshots(shogi.STARTING_SFEN, opening["moves"])
         type_row = conn.execute(
             "SELECT id FROM opening_types WHERE name_ja = ?", (opening["name"],)
@@ -472,6 +500,7 @@ def seed_openings_if_empty(conn) -> None:
                 """
                 UPDATE opening_lines
                 SET opening_type_id = ?, opening_type = ?, initial_sfen = ?, moves = ?, comments = ?, tags = ?,
+                    source_url = ?, source_title = ?, license = ?, source_note = ?, coverage_status = ?,
                     updated_at = datetime('now')
                 WHERE id = ?
                 """,
@@ -482,14 +511,20 @@ def seed_openings_if_empty(conn) -> None:
                     json.dumps(opening["moves"], ensure_ascii=False),
                     json.dumps(opening["comments"], ensure_ascii=False),
                     json.dumps([opening["tag"]], ensure_ascii=False),
+                    metadata["source_url"],
+                    metadata["source_title"],
+                    metadata["license"],
+                    metadata["source_note"],
+                    metadata["coverage_status"],
                     line_id,
                 ),
             )
         else:
             cur = conn.execute(
                 """
-                INSERT INTO opening_lines(opening_type_id, name, opening_type, initial_sfen, moves, comments, tags)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO opening_lines(opening_type_id, name, opening_type, initial_sfen, moves, comments, tags,
+                                          source_url, source_title, license, source_note, coverage_status)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     type_id,
@@ -499,6 +534,11 @@ def seed_openings_if_empty(conn) -> None:
                     json.dumps(opening["moves"], ensure_ascii=False),
                     json.dumps(opening["comments"], ensure_ascii=False),
                     json.dumps([opening["tag"]], ensure_ascii=False),
+                    metadata["source_url"],
+                    metadata["source_title"],
+                    metadata["license"],
+                    metadata["source_note"],
+                    metadata["coverage_status"],
                 ),
             )
             line_id = int(cur.lastrowid)

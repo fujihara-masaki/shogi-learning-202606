@@ -206,6 +206,11 @@ export interface OpeningSourceSummary {
   name: string;
   license_name: string;
   license_url: string;
+  source_url?: string;
+  source_title?: string;
+  license?: string;
+  source_note?: string;
+  coverage_status?: string;
 }
 
 export interface OpeningSummary {
@@ -225,6 +230,9 @@ export interface ImportedOpeningMove {
   from_sfen: string;
   to_sfen: string;
   comment: string;
+  variation_group: string;
+  parent_move_id: number | null;
+  sort_order: number;
 }
 
 export interface ImportedOpeningPosition {
