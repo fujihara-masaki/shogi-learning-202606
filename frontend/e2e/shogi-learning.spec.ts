@@ -87,6 +87,13 @@ async function createE2eProblem(request: APIRequestContext, title: string) {
   return (await res.json()) as Problem;
 }
 
+
+async function showE2eOneMoveProblems(page: Page) {
+  await page.goto("/tsume");
+  await page.getByTestId("difficulty-filter").getByRole("button", { name: "1手詰", exact: true }).click();
+  await page.getByRole("combobox").selectOption("e2e");
+}
+
 async function playGoldDrop(page: Page, square: string) {
   const board = page.getByTestId("shogi-board");
   await board.getByRole("button", { name: "金" }).click();
@@ -113,8 +120,7 @@ test("tsume page plays an existing one-move problem and shows wrong/correct feed
   const title = `${E2E_PREFIX} tsume feedback ${Date.now()}`;
   const problem = await createE2eProblem(request, title);
 
-  await page.goto("/tsume");
-  await page.getByTestId("difficulty-filter").getByRole("button", { name: "1手詰", exact: true }).click();
+  await showE2eOneMoveProblems(page);
   await page.getByTestId(`problem-select-${problem.id}`).click();
   await expect(page.getByTestId("shogi-board")).toBeVisible();
 
@@ -191,8 +197,7 @@ test("creates a new problem, plays it, edits it, and deletes it", async ({ page 
   await page.getByRole("button", { name: "検証して保存" }).click();
   await expect(page.getByText("保存しました")).toBeVisible();
 
-  await page.goto("/tsume");
-  await page.getByTestId("difficulty-filter").getByRole("button", { name: "1手詰", exact: true }).click();
+  await showE2eOneMoveProblems(page);
   const createdProblemItem = page.getByTestId("problem-item").filter({ hasText: title });
   await expect(createdProblemItem).toBeVisible();
   await createdProblemItem.getByRole("button").first().click();
@@ -471,7 +476,7 @@ test("tsume list stays usable with more than one thousand problems", async ({ pa
   await page.getByRole("button", { name: "もっと読み込む" }).click();
   await expect(page.getByTestId("problem-item")).toHaveCount(75);
   expect(requestedUrls.some((url) => url.includes("tag=unloaded-only") && url.includes("offset=50"))).toBeTruthy();
-  await page.getByRole("button", { name: "1手詰" }).click();
+  await page.getByTestId("difficulty-filter").getByRole("button", { name: "1手詰", exact: true }).click();
   await expect(page.getByRole("combobox")).toContainText("1手詰（1075）");
   expect(requestedUrls.some((url) => url.includes("/api/tsume-problems/tags?mate_length=1"))).toBeTruthy();
   expect(requestedUrls.some((url) => url.includes("mate_length=1") && url.includes("tag=unloaded-only") && url.includes("offset=0"))).toBeTruthy();
