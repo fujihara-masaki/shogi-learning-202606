@@ -363,6 +363,7 @@ test("licenses page renders data source and MIT License from API", async ({ page
     await route.fulfill({
       contentType: "application/json",
       body: JSON.stringify({
+        tsume_sources: [],
         book_sources: [{
           id: 1,
           name: "Sample YaneuraOu Book",
