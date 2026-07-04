@@ -93,6 +93,7 @@ def list_problems(
     favorite: bool | None = None,
     random_order: bool = False,
     limit: int | None = None,
+    offset: int = 0,
 ):
     conn = get_connection()
     try:
@@ -110,8 +111,8 @@ def list_problems(
             params.append(1 if favorite else 0)
         sql += " ORDER BY RANDOM()" if random_order else " ORDER BY mate_length, id"
         if limit is not None:
-            sql += " LIMIT ?"
-            params.append(limit)
+            sql += " LIMIT ? OFFSET ?"
+            params.extend([limit, offset])
         rows = conn.execute(sql, params).fetchall()
         return [row_to_problem(conn, r) for r in rows]
     finally:

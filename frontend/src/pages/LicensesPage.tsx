@@ -9,6 +9,9 @@ export default function LicensesPage() {
     fetchLicenses().then(setData).catch((err: Error) => setError(err.message));
   }, []);
 
+  const bookSources = data?.book_sources ?? [];
+  const tsumeSources = data?.tsume_sources ?? [];
+
   return (
     <section className="licenses-page" data-testid="licenses-page">
       <h1>データ出典・ライセンス</h1>
@@ -17,9 +20,9 @@ export default function LicensesPage() {
       </p>
       {error && <p className="error">{error}</p>}
       {!data && !error && <p>読み込み中...</p>}
-      {data?.book_sources.length === 0 && data?.tsume_sources.length === 0 && <p>登録済みの外部データはありません。</p>}
+      {data && bookSources.length === 0 && tsumeSources.length === 0 && <p>登録済みの外部データはありません。</p>}
       <div className="license-source-list">
-        {data?.tsume_sources.map((source) => (
+        {tsumeSources.map((source) => (
           <article className="license-source-card" key={source.name}>
             <h2>{source.name}</h2>
             <dl>
@@ -36,7 +39,7 @@ export default function LicensesPage() {
             <p className="muted">詰将棋データの一部は tokuhirom/tanuki-tsume-shogi を利用しています。</p>
           </article>
         ))}
-        {data?.book_sources.map((source) => (
+        {bookSources.map((source) => (
           <article className="license-source-card" key={source.id}>
             <h2>{source.name}</h2>
             <dl>
