@@ -87,6 +87,13 @@ async function createE2eProblem(request: APIRequestContext, title: string) {
   return (await res.json()) as Problem;
 }
 
+
+async function showE2eOneMoveProblems(page: Page) {
+  await page.goto("/tsume");
+  await page.getByTestId("difficulty-filter").getByRole("button", { name: "1手詰", exact: true }).click();
+  await page.getByRole("combobox").selectOption("e2e");
+}
+
 async function playGoldDrop(page: Page, square: string) {
   const board = page.getByTestId("shogi-board");
   await board.getByRole("button", { name: "金" }).click();
@@ -113,8 +120,7 @@ test("tsume page plays an existing one-move problem and shows wrong/correct feed
   const title = `${E2E_PREFIX} tsume feedback ${Date.now()}`;
   const problem = await createE2eProblem(request, title);
 
-  await page.goto("/tsume");
-  await page.getByTestId("difficulty-filter").getByRole("button", { name: "1手詰", exact: true }).click();
+  await showE2eOneMoveProblems(page);
   await page.getByTestId(`problem-select-${problem.id}`).click();
   await expect(page.getByTestId("shogi-board")).toBeVisible();
 
@@ -191,8 +197,7 @@ test("creates a new problem, plays it, edits it, and deletes it", async ({ page 
   await page.getByRole("button", { name: "検証して保存" }).click();
   await expect(page.getByText("保存しました")).toBeVisible();
 
-  await page.goto("/tsume");
-  await page.getByTestId("difficulty-filter").getByRole("button", { name: "1手詰", exact: true }).click();
+  await showE2eOneMoveProblems(page);
   const createdProblemItem = page.getByTestId("problem-item").filter({ hasText: title });
   await expect(createdProblemItem).toBeVisible();
   await createdProblemItem.getByRole("button").first().click();
@@ -396,7 +401,7 @@ test("tsume list stays usable with more than one thousand problems", async ({ pa
     solution_moves: [ONE_MOVE_SOLUTION],
     opponent_moves: [],
     difficulty: 1,
-    tags: ["1手詰", "tanuki-tsume-shogi"],
+    tags: id > 1000 ? ["1手詰", "unloaded-only"] : ["1手詰", "tanuki-tsume-shogi"],
     explanation: "E2E large list problem",
     is_favorite: false,
     created_at: "2026-01-01T00:00:00",
@@ -416,6 +421,18 @@ test("tsume list stays usable with more than one thousand problems", async ({ pa
   await page.route("**/api/tsume-problems**", async (route) => {
     const url = new URL(route.request().url());
     requestedUrls.push(url.toString());
+    if (url.pathname === "/api/tsume-problems/tags") {
+      const mateLength = url.searchParams.get("mate_length");
+      const scopedProblems = mateLength ? problems.filter((p) => p.mate_length === Number(mateLength)) : problems;
+      const counts = new Map<string, number>();
+      for (const problem of scopedProblems) {
+        for (const tag of problem.tags) counts.set(tag, (counts.get(tag) ?? 0) + 1);
+      }
+      await route.fulfill({
+        json: Array.from(counts, ([tag, count]) => ({ tag, count })).sort((a, b) => a.tag.localeCompare(b.tag)),
+      });
+      return;
+    }
     const idMatch = url.pathname.match(/\/api\/tsume-problems\/(\d+)$/);
     if (idMatch) {
       const problem = problems.find((p) => p.id === Number(idMatch[1]));
@@ -438,6 +455,8 @@ test("tsume list stays usable with more than one thousand problems", async ({ pa
   await expect(page.getByTestId("problem-list")).toContainText("1手詰 / 正解");
   await expect(page.getByTestId("problem-list")).toContainText("編集");
   await expect(page.getByTestId("problem-list")).toContainText("出典: tokuhirom/tanuki-tsume-shogi");
+  await expect(page.getByRole("combobox")).toContainText("tanuki-tsume-shogi（1000）");
+  await expect(page.getByRole("combobox")).toContainText("unloaded-only（75）");
   await expect(page.getByTestId("shogi-board")).toBeVisible();
   await expect(page.locator(".problem-item.active")).toContainText("[tanuki] 1手詰 #1");
 
@@ -448,6 +467,19 @@ test("tsume list stays usable with more than one thousand problems", async ({ pa
 
   await page.getByRole("button", { name: "もっと読み込む" }).click();
   await expect(page.getByTestId("problem-item")).toHaveCount(100);
+
+  await page.getByRole("combobox").selectOption("unloaded-only");
+  await expect(page.getByRole("combobox")).toHaveValue("unloaded-only");
+  await expect(page.getByTestId("problem-item")).toHaveCount(50);
+  expect(requestedUrls.some((url) => url.includes("tag=unloaded-only") && url.includes("offset=0"))).toBeTruthy();
+  expect(requestedUrls.some((url) => url.includes("tag=unloaded-only%EF%BC%8875%EF%BC%89"))).toBeFalsy();
+  await page.getByRole("button", { name: "もっと読み込む" }).click();
+  await expect(page.getByTestId("problem-item")).toHaveCount(75);
+  expect(requestedUrls.some((url) => url.includes("tag=unloaded-only") && url.includes("offset=50"))).toBeTruthy();
+  await page.getByTestId("difficulty-filter").getByRole("button", { name: "1手詰", exact: true }).click();
+  await expect(page.getByRole("combobox")).toContainText("1手詰（1075）");
+  expect(requestedUrls.some((url) => url.includes("/api/tsume-problems/tags?mate_length=1"))).toBeTruthy();
+  expect(requestedUrls.some((url) => url.includes("mate_length=1") && url.includes("tag=unloaded-only") && url.includes("offset=0"))).toBeTruthy();
   expect(requestedUrls.some((url) => url.includes("limit=50"))).toBeTruthy();
   expect(requestedUrls.some((url) => url.includes("offset=50"))).toBeTruthy();
 });
