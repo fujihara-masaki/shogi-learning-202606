@@ -73,9 +73,7 @@ export default function TsumePage() {
       .then((tags) => {
         if (!ignore) {
           setAllTags(tags);
-          if (tagFilter && !tags.some((t) => t.tag === tagFilter)) {
-            setTagFilter("");
-          }
+          setTagFilter((current) => (current && !tags.some((t) => t.tag === current) ? "" : current));
         }
       })
       .catch((e) => {
@@ -84,7 +82,7 @@ export default function TsumePage() {
     return () => {
       ignore = true;
     };
-  }, [mateLength, tagFilter]);
+  }, [mateLength]);
 
   useEffect(() => {
     let ignore = false;
