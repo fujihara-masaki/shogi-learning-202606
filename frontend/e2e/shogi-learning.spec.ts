@@ -450,7 +450,8 @@ test("tsume list stays usable with more than one thousand problems", async ({ pa
   await expect(page.getByTestId("problem-list")).toContainText("1手詰 / 正解");
   await expect(page.getByTestId("problem-list")).toContainText("編集");
   await expect(page.getByTestId("problem-list")).toContainText("出典: tokuhirom/tanuki-tsume-shogi");
-  await expect(page.getByRole("combobox")).toContainText("unloaded-only");
+  await expect(page.getByRole("combobox")).toContainText("tanuki-tsume-shogi（1000）");
+  await expect(page.getByRole("combobox")).toContainText("unloaded-only（75）");
   await expect(page.getByTestId("shogi-board")).toBeVisible();
   await expect(page.locator(".problem-item.active")).toContainText("[tanuki] 1手詰 #1");
 
@@ -463,11 +464,17 @@ test("tsume list stays usable with more than one thousand problems", async ({ pa
   await expect(page.getByTestId("problem-item")).toHaveCount(100);
 
   await page.getByRole("combobox").selectOption("unloaded-only");
+  await expect(page.getByRole("combobox")).toHaveValue("unloaded-only");
   await expect(page.getByTestId("problem-item")).toHaveCount(50);
   expect(requestedUrls.some((url) => url.includes("tag=unloaded-only") && url.includes("offset=0"))).toBeTruthy();
+  expect(requestedUrls.some((url) => url.includes("tag=unloaded-only%EF%BC%8875%EF%BC%89"))).toBeFalsy();
   await page.getByRole("button", { name: "もっと読み込む" }).click();
   await expect(page.getByTestId("problem-item")).toHaveCount(75);
   expect(requestedUrls.some((url) => url.includes("tag=unloaded-only") && url.includes("offset=50"))).toBeTruthy();
+  await page.getByRole("button", { name: "1手詰" }).click();
+  await expect(page.getByRole("combobox")).toContainText("1手詰（1075）");
+  expect(requestedUrls.some((url) => url.includes("/api/tsume-problems/tags?mate_length=1"))).toBeTruthy();
+  expect(requestedUrls.some((url) => url.includes("mate_length=1") && url.includes("tag=unloaded-only") && url.includes("offset=0"))).toBeTruthy();
   expect(requestedUrls.some((url) => url.includes("limit=50"))).toBeTruthy();
   expect(requestedUrls.some((url) => url.includes("offset=50"))).toBeTruthy();
 });

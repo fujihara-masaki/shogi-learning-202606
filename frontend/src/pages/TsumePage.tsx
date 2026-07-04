@@ -8,6 +8,7 @@ import {
   postProblemResult,
   setFavorite,
   type TsumeProblem,
+  type TsumeTagSummary,
 } from "../api/client";
 import TsumePlayer from "../components/TsumePlayer";
 import type { SessionOutcome } from "../hooks/useTsumeSession";
@@ -30,7 +31,7 @@ export default function TsumePage() {
   const [selectedProblem, setSelectedProblem] = useState<TsumeProblem | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [hasMore, setHasMore] = useState(false);
-  const [allTags, setAllTags] = useState<string[]>([]);
+  const [allTags, setAllTags] = useState<TsumeTagSummary[]>([]);
 
   const selectedId = Number(searchParams.get("problem")) || null;
   const selected = selectedId ? (problems.find((p) => p.id === selectedId) ?? selectedProblem) : null;
@@ -71,7 +72,7 @@ export default function TsumePage() {
     fetchTsumeTags(mateLength > 0 ? { mate_length: mateLength } : {})
       .then((tags) => {
         if (!ignore) {
-          setAllTags(tags.map((t) => t.tag));
+          setAllTags(tags);
           if (tagFilter && !tags.some((t) => t.tag === tagFilter)) {
             setTagFilter("");
           }
@@ -167,8 +168,8 @@ export default function TsumePage() {
         <select value={tagFilter} onChange={(e) => setTagFilter(e.target.value)}>
           <option value="">タグ: すべて</option>
           {allTags.map((t) => (
-            <option key={t} value={t}>
-              {t}
+            <option key={t.tag} value={t.tag}>
+              {t.tag}（{t.count}）
             </option>
           ))}
         </select>
