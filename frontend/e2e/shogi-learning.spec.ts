@@ -396,7 +396,7 @@ test("tsume list stays usable with more than one thousand problems", async ({ pa
     solution_moves: [ONE_MOVE_SOLUTION],
     opponent_moves: [],
     difficulty: 1,
-    tags: ["1手詰", "tanuki-tsume-shogi"],
+    tags: id > 1000 ? ["1手詰", "unloaded-only"] : ["1手詰", "tanuki-tsume-shogi"],
     explanation: "E2E large list problem",
     is_favorite: false,
     created_at: "2026-01-01T00:00:00",
@@ -416,6 +416,18 @@ test("tsume list stays usable with more than one thousand problems", async ({ pa
   await page.route("**/api/tsume-problems**", async (route) => {
     const url = new URL(route.request().url());
     requestedUrls.push(url.toString());
+    if (url.pathname === "/api/tsume-problems/tags") {
+      const mateLength = url.searchParams.get("mate_length");
+      const scopedProblems = mateLength ? problems.filter((p) => p.mate_length === Number(mateLength)) : problems;
+      const counts = new Map<string, number>();
+      for (const problem of scopedProblems) {
+        for (const tag of problem.tags) counts.set(tag, (counts.get(tag) ?? 0) + 1);
+      }
+      await route.fulfill({
+        json: Array.from(counts, ([tag, count]) => ({ tag, count })).sort((a, b) => a.tag.localeCompare(b.tag)),
+      });
+      return;
+    }
     const idMatch = url.pathname.match(/\/api\/tsume-problems\/(\d+)$/);
     if (idMatch) {
       const problem = problems.find((p) => p.id === Number(idMatch[1]));
@@ -438,6 +450,7 @@ test("tsume list stays usable with more than one thousand problems", async ({ pa
   await expect(page.getByTestId("problem-list")).toContainText("1手詰 / 正解");
   await expect(page.getByTestId("problem-list")).toContainText("編集");
   await expect(page.getByTestId("problem-list")).toContainText("出典: tokuhirom/tanuki-tsume-shogi");
+  await expect(page.getByRole("combobox")).toContainText("unloaded-only");
   await expect(page.getByTestId("shogi-board")).toBeVisible();
   await expect(page.locator(".problem-item.active")).toContainText("[tanuki] 1手詰 #1");
 
@@ -448,6 +461,13 @@ test("tsume list stays usable with more than one thousand problems", async ({ pa
 
   await page.getByRole("button", { name: "もっと読み込む" }).click();
   await expect(page.getByTestId("problem-item")).toHaveCount(100);
+
+  await page.getByRole("combobox").selectOption("unloaded-only");
+  await expect(page.getByTestId("problem-item")).toHaveCount(50);
+  expect(requestedUrls.some((url) => url.includes("tag=unloaded-only") && url.includes("offset=0"))).toBeTruthy();
+  await page.getByRole("button", { name: "もっと読み込む" }).click();
+  await expect(page.getByTestId("problem-item")).toHaveCount(75);
+  expect(requestedUrls.some((url) => url.includes("tag=unloaded-only") && url.includes("offset=50"))).toBeTruthy();
   expect(requestedUrls.some((url) => url.includes("limit=50"))).toBeTruthy();
   expect(requestedUrls.some((url) => url.includes("offset=50"))).toBeTruthy();
 });

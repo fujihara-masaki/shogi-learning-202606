@@ -11,6 +11,7 @@ from ..schemas import (
     ProblemResultCreate,
     ProblemStats,
     TsumeProblem,
+    TsumeTagSummary,
     TsumeProblemCreate,
     TsumeProblemUpdate,
     ValidationResponse,
@@ -84,6 +85,26 @@ def validate_or_400(body: TsumeProblemCreate | TsumeProblemUpdate) -> None:
     )
     if errors:
         raise HTTPException(status_code=400, detail={"errors": errors})
+
+
+@router.get("/tags", response_model=list[TsumeTagSummary])
+def list_tags(mate_length: int | None = None):
+    conn = get_connection()
+    try:
+        sql = """
+            SELECT json_each.value AS tag, COUNT(DISTINCT tsume_problems.id) AS count
+            FROM tsume_problems, json_each(tsume_problems.tags)
+            WHERE json_each.value != ''
+        """
+        params: list = []
+        if mate_length is not None:
+            sql += " AND tsume_problems.mate_length = ?"
+            params.append(mate_length)
+        sql += " GROUP BY json_each.value ORDER BY json_each.value"
+        rows = conn.execute(sql, params).fetchall()
+        return [TsumeTagSummary(tag=row["tag"], count=row["count"]) for row in rows]
+    finally:
+        conn.close()
 
 
 @router.get("", response_model=list[TsumeProblem])

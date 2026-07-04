@@ -10,6 +10,11 @@ export interface ProblemStats {
   avg_elapsed_ms: number | null;
 }
 
+export interface TsumeTagSummary {
+  tag: string;
+  count: number;
+}
+
 export interface TsumeProblem {
   id: number;
   title: string;
@@ -111,7 +116,7 @@ export interface ProblemQuery {
   offset?: number;
 }
 
-export function fetchProblems(query: ProblemQuery = {}): Promise<TsumeProblem[]> {
+function buildProblemParams(query: ProblemQuery): URLSearchParams {
   const params = new URLSearchParams();
   if (query.mate_length !== undefined) params.set("mate_length", String(query.mate_length));
   if (query.tag) params.set("tag", query.tag);
@@ -119,8 +124,19 @@ export function fetchProblems(query: ProblemQuery = {}): Promise<TsumeProblem[]>
   if (query.random_order) params.set("random_order", "true");
   if (query.limit !== undefined) params.set("limit", String(query.limit));
   if (query.offset !== undefined) params.set("offset", String(query.offset));
-  const qs = params.toString();
+  return params;
+}
+
+export function fetchProblems(query: ProblemQuery = {}): Promise<TsumeProblem[]> {
+  const qs = buildProblemParams(query).toString();
   return request<TsumeProblem[]>(`/api/tsume-problems${qs ? `?${qs}` : ""}`);
+}
+
+export function fetchTsumeTags(query: Pick<ProblemQuery, "mate_length"> = {}): Promise<TsumeTagSummary[]> {
+  const params = new URLSearchParams();
+  if (query.mate_length !== undefined) params.set("mate_length", String(query.mate_length));
+  const qs = params.toString();
+  return request<TsumeTagSummary[]>(`/api/tsume-problems/tags${qs ? `?${qs}` : ""}`);
 }
 
 export function fetchProblem(id: number): Promise<TsumeProblem> {

@@ -38,6 +38,11 @@ class ProblemStats(BaseModel):
     avg_elapsed_ms: int | None = None
 
 
+class TsumeTagSummary(BaseModel):
+    tag: str
+    count: int
+
+
 class TsumeProblem(TsumeProblemBase):
     id: int
     is_favorite: bool = False

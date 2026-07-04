@@ -4,6 +4,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import {
   fetchProblem,
   fetchProblems,
+  fetchTsumeTags,
   postProblemResult,
   setFavorite,
   type TsumeProblem,
@@ -29,9 +30,10 @@ export default function TsumePage() {
   const [selectedProblem, setSelectedProblem] = useState<TsumeProblem | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [hasMore, setHasMore] = useState(false);
+  const [allTags, setAllTags] = useState<string[]>([]);
 
   const selectedId = Number(searchParams.get("problem")) || null;
-  const selected = problems.find((p) => p.id === selectedId) ?? selectedProblem;
+  const selected = selectedId ? (problems.find((p) => p.id === selectedId) ?? selectedProblem) : null;
 
   const query = useMemo(
     () => ({
@@ -66,15 +68,27 @@ export default function TsumePage() {
 
   useEffect(() => {
     let ignore = false;
-    if (!selectedId) {
-      setSelectedProblem(null);
-      return;
-    }
-    const inList = problems.find((p) => p.id === selectedId);
-    if (inList) {
-      setSelectedProblem(inList);
-      return;
-    }
+    fetchTsumeTags(mateLength > 0 ? { mate_length: mateLength } : {})
+      .then((tags) => {
+        if (!ignore) {
+          setAllTags(tags.map((t) => t.tag));
+          if (tagFilter && !tags.some((t) => t.tag === tagFilter)) {
+            setTagFilter("");
+          }
+        }
+      })
+      .catch((e) => {
+        if (!ignore) setError(`タグ一覧の取得に失敗しました: ${e}`);
+      });
+    return () => {
+      ignore = true;
+    };
+  }, [mateLength, tagFilter]);
+
+  useEffect(() => {
+    let ignore = false;
+    if (!selectedId) return;
+    if (problems.some((p) => p.id === selectedId)) return;
     fetchProblem(selectedId)
       .then((problem) => {
         if (!ignore) setSelectedProblem(problem);
@@ -86,11 +100,6 @@ export default function TsumePage() {
       ignore = true;
     };
   }, [problems, selectedId]);
-
-  const allTags = useMemo(
-    () => Array.from(new Set(problems.flatMap((p) => p.tags))).sort(),
-    [problems],
-  );
 
   const visibleProblems = problems;
 

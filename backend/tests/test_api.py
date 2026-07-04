@@ -43,6 +43,30 @@ def test_filter_by_tag(client):
     assert all("頭金" in p["tags"] for p in res.json())
 
 
+def test_list_tags(client):
+    res = client.get("/api/tsume-problems/tags")
+    assert res.status_code == 200
+    tags = res.json()
+    assert all(set(t.keys()) == {"tag", "count"} for t in tags)
+    by_tag = {t["tag"]: t["count"] for t in tags}
+    assert by_tag["頭金"] >= 2
+    assert "title" not in tags[0]
+
+
+def test_list_tags_filters_by_mate_length(client):
+    res = client.get("/api/tsume-problems/tags", params={"mate_length": 3})
+    assert res.status_code == 200
+    tags = res.json()
+
+    problems = client.get("/api/tsume-problems", params={"mate_length": 3}).json()
+    expected = {}
+    for problem in problems:
+        for tag in problem["tags"]:
+            expected[tag] = expected.get(tag, 0) + 1
+
+    assert {t["tag"]: t["count"] for t in tags} == dict(sorted(expected.items()))
+
+
 def test_get_problem(client):
     pid = client.get("/api/tsume-problems").json()[0]["id"]
     res = client.get(f"/api/tsume-problems/{pid}")
