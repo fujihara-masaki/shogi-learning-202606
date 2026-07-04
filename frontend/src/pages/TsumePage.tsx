@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import {
+  fetchProblem,
   fetchProblems,
   postProblemResult,
   setFavorite,
@@ -9,6 +10,8 @@ import {
 } from "../api/client";
 import TsumePlayer from "../components/TsumePlayer";
 import type { SessionOutcome } from "../hooks/useTsumeSession";
+
+const PROBLEM_PAGE_SIZE = 50;
 
 const MATE_LENGTHS = [
   { value: 0, label: "すべて" },
@@ -23,37 +26,73 @@ export default function TsumePage() {
   const [mateLength, setMateLength] = useState(0);
   const [tagFilter, setTagFilter] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [selectedProblem, setSelectedProblem] = useState<TsumeProblem | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [hasMore, setHasMore] = useState(false);
 
   const selectedId = Number(searchParams.get("problem")) || null;
-  const selected = problems.find((p) => p.id === selectedId) ?? null;
+  const selected = problems.find((p) => p.id === selectedId) ?? selectedProblem;
 
-  const load = useCallback(async () => {
-    try {
-      const list = await fetchProblems(
-        mateLength > 0 ? { mate_length: mateLength } : {},
-      );
-      setProblems(list);
-      setError(null);
-    } catch (e) {
-      setError(`問題一覧の取得に失敗しました: ${e}`);
-    }
-  }, [mateLength]);
+  const query = useMemo(
+    () => ({
+      ...(mateLength > 0 ? { mate_length: mateLength } : {}),
+      ...(tagFilter ? { tag: tagFilter } : {}),
+    }),
+    [mateLength, tagFilter],
+  );
+
+  const loadPage = useCallback(
+    async (offset: number) => {
+      setIsLoading(true);
+      try {
+        const list = await fetchProblems({ ...query, limit: PROBLEM_PAGE_SIZE, offset });
+        setProblems((prev) => (offset === 0 ? list : [...prev, ...list]));
+        setHasMore(list.length === PROBLEM_PAGE_SIZE);
+        setError(null);
+      } catch (e) {
+        setError(`問題一覧の取得に失敗しました: ${e}`);
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [query],
+  );
 
   useEffect(() => {
-    // マウント時とフィルタ変更時に API から問題一覧を取得する。
+    // マウント時とフィルタ変更時は先頭ページだけ取得し、1,000件以上を一括描画しない。
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    load();
-  }, [load]);
+    loadPage(0);
+  }, [loadPage]);
+
+  useEffect(() => {
+    let ignore = false;
+    if (!selectedId) {
+      setSelectedProblem(null);
+      return;
+    }
+    const inList = problems.find((p) => p.id === selectedId);
+    if (inList) {
+      setSelectedProblem(inList);
+      return;
+    }
+    fetchProblem(selectedId)
+      .then((problem) => {
+        if (!ignore) setSelectedProblem(problem);
+      })
+      .catch((e) => {
+        if (!ignore) setError(`問題の取得に失敗しました: ${e}`);
+      });
+    return () => {
+      ignore = true;
+    };
+  }, [problems, selectedId]);
 
   const allTags = useMemo(
     () => Array.from(new Set(problems.flatMap((p) => p.tags))).sort(),
     [problems],
   );
 
-  const visibleProblems = useMemo(
-    () => (tagFilter ? problems.filter((p) => p.tags.includes(tagFilter)) : problems),
-    [problems, tagFilter],
-  );
+  const visibleProblems = problems;
 
   const selectProblem = (id: number | null) => {
     if (id === null) {
@@ -61,6 +100,8 @@ export default function TsumePage() {
       setSearchParams(searchParams, { replace: true });
     } else {
       setSearchParams({ problem: String(id) }, { replace: true });
+      const problem = problems.find((p) => p.id === id);
+      if (problem) setSelectedProblem(problem);
     }
   };
 
@@ -139,6 +180,7 @@ export default function TsumePage() {
                 <span className="muted">
                   {p.mate_length}手詰 / 正解{p.stats.correct_count} 不正解{p.stats.wrong_count}
                 </span>
+                {p.source_name && <span className="muted problem-source">出典: {p.source_name}</span>}
               </button>
               <Link className="edit-button" to={`/problem-editor/${p.id}`}>編集</Link>
               <button
@@ -151,7 +193,13 @@ export default function TsumePage() {
               </button>
             </div>
           ))}
-          {visibleProblems.length === 0 && <p className="muted">問題がありません</p>}
+          {visibleProblems.length === 0 && !isLoading && <p className="muted">問題がありません</p>}
+          {hasMore && (
+            <button type="button" className="load-more-button" disabled={isLoading} onClick={() => loadPage(problems.length)}>
+              {isLoading ? "読み込み中…" : "もっと読み込む"}
+            </button>
+          )}
+          {isLoading && visibleProblems.length === 0 && <p className="muted">読み込み中…</p>}
         </aside>
         <main className="tsume-main">
           {selected ? (

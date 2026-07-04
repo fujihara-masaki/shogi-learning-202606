@@ -108,6 +108,7 @@ export interface ProblemQuery {
   favorite?: boolean;
   random_order?: boolean;
   limit?: number;
+  offset?: number;
 }
 
 export function fetchProblems(query: ProblemQuery = {}): Promise<TsumeProblem[]> {
@@ -117,6 +118,7 @@ export function fetchProblems(query: ProblemQuery = {}): Promise<TsumeProblem[]>
   if (query.favorite !== undefined) params.set("favorite", String(query.favorite));
   if (query.random_order) params.set("random_order", "true");
   if (query.limit !== undefined) params.set("limit", String(query.limit));
+  if (query.offset !== undefined) params.set("offset", String(query.offset));
   const qs = params.toString();
   return request<TsumeProblem[]>(`/api/tsume-problems${qs ? `?${qs}` : ""}`);
 }

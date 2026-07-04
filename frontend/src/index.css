@@ -477,7 +477,8 @@ select {
 }
 
 .problem-list {
-  width: 260px;
+  width: min(360px, 100%);
+  min-width: 280px;
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -492,6 +493,7 @@ select {
   border-radius: 8px;
   background: #fff;
   overflow: hidden;
+  min-height: 58px;
 }
 
 .problem-item.active {
@@ -508,11 +510,30 @@ select {
   flex-direction: column;
   gap: 2px;
   padding: 8px 10px;
+  min-width: 0;
+  color: inherit;
 }
 
 .problem-title {
   font-weight: 600;
   font-size: 0.92rem;
+  overflow-wrap: anywhere;
+}
+
+.problem-source {
+  font-size: 0.76rem;
+}
+
+.edit-button {
+  align-self: stretch;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 8px;
+  white-space: nowrap;
+}
+
+.load-more-button {
+  width: 100%;
 }
 
 .fav-button {

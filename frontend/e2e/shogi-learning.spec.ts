@@ -385,3 +385,68 @@ test("licenses page renders data source and MIT License from API", async ({ page
   await expect(page.getByTestId("licenses-page")).toContainText("Sample YaneuraOu Book");
   await expect(page.getByTestId("licenses-page")).toContainText("MIT License");
 });
+
+test("tsume list stays usable with more than one thousand problems", async ({ page }) => {
+  const makeProblem = (id: number) => ({
+    id,
+    title: id <= 8 ? `sample ${id}` : `[tanuki] 1手詰 #${id - 8}`,
+    initial_sfen: ONE_MOVE_SFEN,
+    mate_length: 1,
+    solution_moves: [ONE_MOVE_SOLUTION],
+    opponent_moves: [],
+    difficulty: 1,
+    tags: ["1手詰", "tanuki-tsume-shogi"],
+    explanation: "E2E large list problem",
+    is_favorite: false,
+    created_at: "2026-01-01T00:00:00",
+    updated_at: "2026-01-01T00:00:00",
+    source_name: id <= 8 ? "" : "tokuhirom/tanuki-tsume-shogi",
+    source_url: "",
+    source_license: "",
+    source_copyright: "",
+    external_id: String(id),
+    source_hash: `hash-${id}`,
+    source_metadata: {},
+    stats: { correct_count: id % 3, wrong_count: id % 2, last_answered_at: null, avg_elapsed_ms: null },
+  });
+  const problems = Array.from({ length: 1075 }, (_, index) => makeProblem(index + 1));
+  const requestedUrls: string[] = [];
+
+  await page.route("**/api/tsume-problems**", async (route) => {
+    const url = new URL(route.request().url());
+    requestedUrls.push(url.toString());
+    const idMatch = url.pathname.match(/\/api\/tsume-problems\/(\d+)$/);
+    if (idMatch) {
+      const problem = problems.find((p) => p.id === Number(idMatch[1]));
+      await route.fulfill({ status: problem ? 200 : 404, json: problem ?? { detail: "not found" } });
+      return;
+    }
+    const mateLength = url.searchParams.get("mate_length");
+    const tag = url.searchParams.get("tag");
+    const limit = Number(url.searchParams.get("limit") ?? problems.length);
+    const offset = Number(url.searchParams.get("offset") ?? 0);
+    let list = problems;
+    if (mateLength) list = list.filter((p) => p.mate_length === Number(mateLength));
+    if (tag) list = list.filter((p) => p.tags.includes(tag));
+    await route.fulfill({ json: list.slice(offset, offset + limit) });
+  });
+
+  await page.goto("/tsume?problem=9");
+  await expect(page.getByTestId("problem-item")).toHaveCount(50);
+  await expect(page.getByTestId("problem-list")).toContainText("[tanuki] 1手詰 #1");
+  await expect(page.getByTestId("problem-list")).toContainText("1手詰 / 正解");
+  await expect(page.getByTestId("problem-list")).toContainText("編集");
+  await expect(page.getByTestId("problem-list")).toContainText("出典: tokuhirom/tanuki-tsume-shogi");
+  await expect(page.getByTestId("shogi-board")).toBeVisible();
+  await expect(page.locator(".problem-item.active")).toContainText("[tanuki] 1手詰 #1");
+
+  await page.getByTestId("problem-select-10").click();
+  await expect(page).toHaveURL(/problem=10/);
+  await expect(page.locator(".problem-item.active")).toContainText("[tanuki] 1手詰 #2");
+  await expect(page.getByTestId("tsume-feedback")).toContainText("1手詰");
+
+  await page.getByRole("button", { name: "もっと読み込む" }).click();
+  await expect(page.getByTestId("problem-item")).toHaveCount(100);
+  expect(requestedUrls.some((url) => url.includes("limit=50"))).toBeTruthy();
+  expect(requestedUrls.some((url) => url.includes("offset=50"))).toBeTruthy();
+});
