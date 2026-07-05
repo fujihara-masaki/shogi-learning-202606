@@ -9,9 +9,11 @@ import ShogiBoard from "./ShogiBoard";
 interface Props {
   problem: TsumeProblem;
   onTerminal?: (outcome: SessionOutcome) => void;
+  /** クリア・答え表示後に「次の問題」へ進む導線(渡された場合のみ表示)。 */
+  onNext?: () => void;
 }
 
-export default function TsumePlayer({ problem, onTerminal }: Props) {
+export default function TsumePlayer({ problem, onTerminal, onNext }: Props) {
   const [flipped, setFlipped] = useState(false);
   const [hintLevel, setHintLevel] = useState(0);
   const session = useTsumeSession(problem, { onTerminal });
@@ -25,10 +27,10 @@ export default function TsumePlayer({ problem, onTerminal }: Props) {
   const statusBanner = () => {
     switch (session.status) {
       case "cleared":
-        return <div className="banner banner-success" data-testid="tsume-feedback">🎉 正解!クリアしました</div>;
+        return <div className="banner banner-success" role="status" data-testid="tsume-feedback">🎉 正解!クリアしました</div>;
       case "wrong":
         return (
-          <div className="banner banner-error" data-testid="tsume-feedback">
+          <div className="banner banner-error" role="alert" data-testid="tsume-feedback">
             ✗ 不正解{session.wrongMoveText ? `(${session.wrongMoveText})` : ""}
             <div className="banner-actions">
               <button type="button" onClick={session.retry}>
@@ -41,13 +43,13 @@ export default function TsumePlayer({ problem, onTerminal }: Props) {
           </div>
         );
       case "opponent":
-        return <div className="banner banner-info" data-testid="tsume-feedback">玉方の応手…</div>;
+        return <div className="banner banner-info" role="status" data-testid="tsume-feedback">玉方の応手…</div>;
       case "showing":
-        return <div className="banner banner-info" data-testid="tsume-feedback">答えを再生中…</div>;
+        return <div className="banner banner-info" role="status" data-testid="tsume-feedback">答えを再生中…</div>;
       case "shown":
-        return <div className="banner banner-info" data-testid="tsume-feedback">答えの表示が終わりました</div>;
+        return <div className="banner banner-info" role="status" data-testid="tsume-feedback">答えの表示が終わりました</div>;
       default:
-        return <div className="banner banner-info" data-testid="tsume-feedback">{problem.mate_length}手詰:先手番です</div>;
+        return <div className="banner banner-info" role="status" data-testid="tsume-feedback">{problem.mate_length}手詰:先手番です</div>;
     }
   };
 
@@ -61,11 +63,17 @@ export default function TsumePlayer({ problem, onTerminal }: Props) {
             flipped={flipped}
             interactive={interactive}
             lastMoveTo={session.lastMoveTo}
+            lastMoveFrom={session.lastMoveFrom}
             onUserMove={session.handleUserMove}
           />
         )}
+        <div className="visually-hidden" role="status" aria-live="polite">
+          {session.moves.length > 0
+            ? `${session.moves.length}手目 ${session.moves[session.moves.length - 1].text}`
+            : ""}
+        </div>
         <div className="board-controls">
-          <button type="button" onClick={() => setFlipped((f) => !f)}>
+          <button type="button" onClick={() => setFlipped((f) => !f)} aria-pressed={flipped}>
             盤面反転
           </button>
           <button type="button" onClick={session.undo} disabled={!session.canUndo}>
@@ -103,6 +111,18 @@ export default function TsumePlayer({ problem, onTerminal }: Props) {
               <p>{problem.explanation}</p>
             </div>
           )}
+        {(session.status === "cleared" || session.status === "shown") && (
+          <div className="post-clear-actions" data-testid="post-clear-actions">
+            {onNext && (
+              <button type="button" className="primary" onClick={onNext}>
+                次の問題
+              </button>
+            )}
+            <button type="button" onClick={session.reset}>
+              もう一度
+            </button>
+          </div>
+        )}
       </div>
       <div className="player-side">
         <MoveHistory moves={session.moves} />

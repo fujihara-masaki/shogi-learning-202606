@@ -1,5 +1,5 @@
 // 詰め将棋セッションの純粋ロジック(テスト対象)。
-import { Move, Position, formatMove } from "tsshogi";
+import { Move, Position, Square, formatMove } from "tsshogi";
 
 export interface AppliedMove {
   usi: string;
@@ -44,4 +44,9 @@ export function applyUsiMoves(
 /** 指し手が期待する正解手と一致するか。 */
 export function isCorrectMove(move: Move, expectedUsi: string): boolean {
   return move.usi === expectedUsi;
+}
+
+/** 指し手の移動元マス。持ち駒を打つ手は移動元がないので null。 */
+export function moveFromSquare(move: Move): Square | null {
+  return move.from instanceof Square ? move.from : null;
 }

@@ -116,7 +116,7 @@ export default function OpeningsPage() {
     <div className="openings-page" data-testid="openings-page">
       <h1>定跡学習</h1>
       <p className="muted">サンプル定跡・戦型一覧から序盤の流れを確認しましょう。</p>
-      {error && <div className="banner banner-error">{error}</div>}
+      {error && <div className="banner banner-error" role="alert">{error}</div>}
 
       <section className="opening-source-note" aria-label="データ出典">
         <h2>データ出典</h2>
