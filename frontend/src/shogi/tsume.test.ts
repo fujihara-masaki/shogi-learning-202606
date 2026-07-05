@@ -1,9 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { Color } from "tsshogi";
+import { Color, Square } from "tsshogi";
 import {
   applyUsiMoves,
   interleaveLine,
   isCorrectMove,
+  moveFromSquare,
   positionFromSfen,
 } from "./tsume";
 
@@ -75,5 +76,19 @@ describe("isCorrectMove", () => {
     const move = pos.createMoveByUSI("4c1c")!;
     expect(isCorrectMove(move, "4c1c")).toBe(true);
     expect(isCorrectMove(move, "G*2b")).toBe(false);
+  });
+});
+
+describe("moveFromSquare", () => {
+  it("盤上の手は移動元マスを返す", () => {
+    const pos = positionFromSfen(SFEN_3TE)!;
+    const move = pos.createMoveByUSI("4c1c")!;
+    expect(moveFromSquare(move)).toEqual(new Square(4, 3));
+  });
+
+  it("持ち駒を打つ手は null を返す", () => {
+    const pos = positionFromSfen("4k4/9/5+B3/9/9/9/9/9/9 b G 1")!;
+    const move = pos.createMoveByUSI("G*5b")!;
+    expect(moveFromSquare(move)).toBeNull();
   });
 });

@@ -1,9 +1,14 @@
 :root {
   --board-bg: #f3c970;
   --board-line: #8a6a33;
-  --cell-size: clamp(36px, 8.5vmin, 52px);
+  --cell-size: clamp(32px, min(8.5vmin, calc((100vw - 64px) / 9)), 52px);
   --accent: #2c6e49;
   --text: #2a2a2e;
+  /* コントラスト確保用トークン (WCAG AA: テキスト4.5:1 / UI境界3:1) */
+  --text-muted: #6d6557;
+  --text-muted-strong: #5f574b;
+  --border-strong: #8f887b;
+  --focus-ring: #17563a;
   font-family: "Hiragino Kaku Gothic ProN", "Noto Sans JP", "Yu Gothic", Meiryo,
     sans-serif;
   color: var(--text);
@@ -33,8 +38,9 @@ h3 {
 
 button {
   font: inherit;
-  padding: 6px 12px;
-  border: 1px solid #b9b3a8;
+  padding: 8px 14px;
+  min-height: 40px;
+  border: 1px solid var(--border-strong);
   border-radius: 6px;
   background: #fff;
   cursor: pointer;
@@ -63,14 +69,45 @@ button.primary:hover:not(:disabled) {
 
 select {
   font: inherit;
-  padding: 6px;
+  padding: 8px 6px;
+  min-height: 40px;
   border-radius: 6px;
-  border: 1px solid #b9b3a8;
+  border: 1px solid var(--border-strong);
 }
 
 .muted {
-  color: #82796b;
+  color: var(--text-muted);
   font-size: 0.85rem;
+}
+
+/* キーボードフォーカスの可視化 (WCAG 2.4.7) */
+:focus-visible {
+  outline: 3px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.app-nav a:focus-visible {
+  outline-color: #fff;
+}
+
+.board-cell:focus-visible {
+  outline: 3px solid var(--focus-ring);
+  outline-offset: -3px;
+  z-index: 1;
+}
+
+/* スクリーンリーダー専用テキスト */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
 }
 
 /* ---- ナビゲーション ---- */
@@ -87,7 +124,7 @@ select {
 .app-nav a {
   color: #e8e2d4;
   text-decoration: none;
-  padding: 6px 14px;
+  padding: 10px 14px;
   border-radius: 6px;
   font-size: 0.95rem;
 }
@@ -95,6 +132,11 @@ select {
 .app-nav a.active {
   background: var(--accent);
   color: #fff;
+}
+
+/* 「その他」はモバイル下部ナビ専用 */
+.app-nav .nav-more {
+  display: none;
 }
 
 .app-body {
@@ -177,11 +219,22 @@ select {
 }
 
 .board-grid {
+  background: var(--board-bg);
+  border: 2px solid var(--board-line);
+}
+
+/* ShogiBoard は role="row" の行ラッパーを持つ(APG Grid パターン) */
+.board-row {
+  display: grid;
+  grid-template-columns: repeat(9, var(--cell-size));
+  grid-auto-rows: var(--cell-size);
+}
+
+/* エディタ系の盤面は従来どおりセルを直接並べる */
+.editor-grid {
   display: grid;
   grid-template-columns: repeat(9, var(--cell-size));
   grid-template-rows: repeat(9, var(--cell-size));
-  background: var(--board-bg);
-  border: 2px solid var(--board-line);
 }
 
 .board-cell {
@@ -195,6 +248,7 @@ select {
 
 .board-cell.selected {
   background: rgba(64, 142, 198, 0.45);
+  box-shadow: inset 0 0 0 2px #1d5c9e;
 }
 
 .board-cell.target {
@@ -203,6 +257,15 @@ select {
 
 .board-cell.last-move {
   background: rgba(222, 165, 56, 0.55);
+}
+
+.board-cell.last-move-from {
+  background: rgba(222, 165, 56, 0.28);
+}
+
+.board-turn {
+  font-size: 0.9rem;
+  font-weight: 600;
 }
 
 .target-dot {
@@ -262,7 +325,9 @@ select {
 
 .hand-piece {
   position: relative;
-  padding: 2px 6px;
+  padding: 4px 8px;
+  min-width: 44px;
+  min-height: 40px;
   border: 1px solid transparent;
   background: transparent;
 }
@@ -294,7 +359,7 @@ select {
 
 .hand-empty {
   font-size: 0.8rem;
-  color: #968c79;
+  color: var(--text-muted-strong);
 }
 
 /* ---- 成り選択 ---- */
@@ -385,6 +450,12 @@ select {
   margin-left: 14px;
 }
 
+.post-clear-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
 .hint-box {
   background: #fff6da;
   border: 1px solid #e0cd8b;
@@ -422,15 +493,21 @@ select {
 }
 
 .move-number {
-  color: #82796b;
+  color: var(--text-muted);
   display: inline-block;
   min-width: 1.8em;
 }
 
 .move-usi {
-  color: #a39a89;
+  color: var(--text-muted);
   font-size: 0.75rem;
   margin-left: 6px;
+}
+
+.move-history .move-latest {
+  background: #f4efe3;
+  font-weight: 600;
+  border-radius: 4px;
 }
 
 .problem-meta {
@@ -449,7 +526,7 @@ select {
 
 .segmented {
   display: inline-flex;
-  border: 1px solid #b9b3a8;
+  border: 1px solid var(--border-strong);
   border-radius: 8px;
   overflow: hidden;
 }
@@ -457,7 +534,7 @@ select {
 .segmented button {
   border: none;
   border-radius: 0;
-  border-right: 1px solid #b9b3a8;
+  border-right: 1px solid var(--border-strong);
 }
 
 .segmented button:last-child {
@@ -540,12 +617,13 @@ select {
   border: none;
   background: none;
   font-size: 1.1rem;
-  color: #b9b3a8;
-  padding: 0 10px;
+  color: var(--text-muted);
+  padding: 0 12px;
+  min-width: 44px;
 }
 
 .fav-button.fav-on {
-  color: #e0a823;
+  color: #b8860b;
 }
 
 .tsume-main {
@@ -632,6 +710,41 @@ select {
 
 /* ---- スマホ ---- */
 @media (max-width: 720px) {
+  /* 主要4項目+「その他」の固定下部ナビ(親指で届く位置に主要導線を置く) */
+  .app-nav {
+    top: auto;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    position: fixed;
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 0;
+    padding: 4px 4px calc(4px + env(safe-area-inset-bottom));
+  }
+
+  .app-nav a {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    font-size: 0.78rem;
+    padding: 8px 2px;
+    min-height: 48px;
+  }
+
+  .app-nav .nav-secondary {
+    display: none;
+  }
+
+  .app-nav .nav-more {
+    display: flex;
+  }
+
+  .app-body {
+    padding-bottom: calc(72px + env(safe-area-inset-bottom));
+  }
+
   .problem-list {
     width: 100%;
     max-height: 200px;
@@ -644,8 +757,8 @@ select {
 
 /* ---- 問題作成・盤面エディタ ---- */
 .editor-page-layout { display: flex; gap: 18px; align-items: flex-start; flex-wrap: wrap; }
-.editor-main { flex: 1; min-width: 620px; display: flex; flex-direction: column; gap: 12px; }
-.editor-board-layout { display: flex; gap: 14px; align-items: flex-start; flex-wrap: wrap; }
+.editor-main { flex: 1; min-width: min(620px, 100%); display: flex; flex-direction: column; gap: 12px; }
+.editor-board-layout { display: flex; gap: 14px; align-items: flex-start; flex-wrap: wrap; overflow-x: auto; }
 .editor-tools, .editor-hands fieldset { background: #fff; border: 1px solid #d8d2c4; border-radius: 8px; padding: 10px; }
 .piece-palette, .tool-row { display: flex; gap: 6px; flex-wrap: wrap; margin: 6px 0 10px; }
 .piece-palette button.active, .tool-row button.active { background: var(--accent); color: #fff; }
@@ -655,7 +768,7 @@ select {
 .editor-hands input { width: 4em; }
 .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; align-items: end; }
 .problem-editor-page label { display: flex; flex-direction: column; gap: 4px; font-weight: 600; }
-.problem-editor-page input, .problem-editor-page textarea, .problem-editor-page select { font: inherit; padding: 7px; border: 1px solid #b9b3a8; border-radius: 6px; }
+.problem-editor-page input, .problem-editor-page textarea, .problem-editor-page select { font: inherit; padding: 7px; border: 1px solid var(--border-strong); border-radius: 6px; }
 .problem-editor-page textarea { min-height: 70px; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; }
 .problem-editor-page .problem-item a { color: inherit; text-decoration: none; }
 .edit-button { display: flex; align-items: center; padding: 0 8px; border-left: 1px solid #eee5d6; color: var(--accent); text-decoration: none; font-size: 0.8rem; }

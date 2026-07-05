@@ -69,7 +69,11 @@ async function cleanupE2eProblems(request: APIRequestContext) {
   );
 }
 
-async function createE2eProblem(request: APIRequestContext, title: string) {
+async function createE2eProblem(
+  request: APIRequestContext,
+  title: string,
+  overrides: Record<string, unknown> = {},
+) {
   const res = await request.post(`${API_BASE}/api/tsume-problems`, {
     data: {
       title,
@@ -81,6 +85,7 @@ async function createE2eProblem(request: APIRequestContext, title: string) {
       tags: ["e2e"],
       explanation: "E2E test problem",
       is_favorite: false,
+      ...overrides,
     },
   });
   expect(res.ok()).toBeTruthy();
@@ -482,4 +487,120 @@ test("tsume list stays usable with more than one thousand problems", async ({ pa
   expect(requestedUrls.some((url) => url.includes("mate_length=1") && url.includes("tag=unloaded-only") && url.includes("offset=0"))).toBeTruthy();
   expect(requestedUrls.some((url) => url.includes("limit=50"))).toBeTruthy();
   expect(requestedUrls.some((url) => url.includes("offset=50"))).toBeTruthy();
+});
+
+// ---- UX/UI 改修分の追加テスト ----
+
+// 成りが任意になる1手詰(飛車が 1b→5b で成り/不成どちらでも詰み)
+const PROMOTION_SFEN = "3lkl3/8R/5S3/9/9/9/9/9/9 b - 1";
+const PROMOTION_SOLUTION = "1b5b+";
+
+test("board shows turn indicator and supports keyboard play with Escape cancel", async ({ page, request }) => {
+  const problem = await createE2eProblem(request, `${E2E_PREFIX} keyboard ${Date.now()}`);
+  await showE2eOneMoveProblems(page);
+  await page.getByTestId(`problem-select-${problem.id}`).click();
+  const board = page.getByTestId("shogi-board");
+  await expect(board).toBeVisible();
+  await expect(page.getByTestId("turn-indicator")).toContainText("▲先手");
+
+  // Enter キーで持ち駒の金を選択できる
+  const gold = board.getByRole("button", { name: "金" });
+  await gold.press("Enter");
+  await expect(gold).toHaveAttribute("aria-pressed", "true");
+  await expect(board.locator(".board-cell.target")).not.toHaveCount(0);
+
+  // 持ち駒ボタンにフォーカスが残ったままでも Escape で選択解除できる
+  await gold.press("Escape");
+  await expect(gold).toHaveAttribute("aria-pressed", "false");
+  await expect(board.locator(".board-cell.target")).toHaveCount(0);
+
+  // 矢印キーで 5五 → 5二 へ移動し Enter で着手して正解になる
+  await gold.press("Enter");
+  await board.locator('[data-square="55"]').focus();
+  await page.keyboard.press("ArrowUp");
+  await page.keyboard.press("ArrowUp");
+  await page.keyboard.press("ArrowUp");
+  await page.keyboard.press("Enter");
+  await expect(page.getByTestId("tsume-feedback")).toContainText("正解");
+});
+
+test("promotion dialog is accessible and Escape cancels without playing a move", async ({ page, request }) => {
+  const problem = await createE2eProblem(request, `${E2E_PREFIX} promotion ${Date.now()}`, {
+    initial_sfen: PROMOTION_SFEN,
+    solution_moves: [PROMOTION_SOLUTION],
+  });
+  await showE2eOneMoveProblems(page);
+  await page.getByTestId(`problem-select-${problem.id}`).click();
+  const board = page.getByTestId("shogi-board");
+  await board.locator('[data-square="12"]').click();
+  await board.locator('[data-square="52"]').click();
+
+  const dialog = page.getByRole("dialog", { name: "成り選択" });
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByRole("button", { name: "キャンセル" })).toBeVisible();
+
+  // Escape はキャンセル扱いで手は指されない
+  await page.keyboard.press("Escape");
+  await expect(dialog).toHaveCount(0);
+  await expect(page.getByText("まだ指し手はありません")).toBeVisible();
+
+  await board.locator('[data-square="12"]').click();
+  await board.locator('[data-square="52"]').click();
+  await dialog.getByRole("button", { name: "成る", exact: true }).click();
+  await expect(page.getByTestId("tsume-feedback")).toContainText("正解");
+});
+
+test("post-clear actions offer retry and next problem", async ({ page, request }) => {
+  const stamp = Date.now();
+  const first = await createE2eProblem(request, `${E2E_PREFIX} next A ${stamp}`);
+  await createE2eProblem(request, `${E2E_PREFIX} next B ${stamp}`);
+  await showE2eOneMoveProblems(page);
+  await page.getByTestId(`problem-select-${first.id}`).click();
+  await playGoldDrop(page, "52");
+  await expect(page.getByTestId("tsume-feedback")).toContainText("正解");
+
+  const actions = page.getByTestId("post-clear-actions");
+  await expect(actions).toBeVisible();
+  await expect(actions.getByRole("button", { name: "もう一度" })).toBeVisible();
+  await actions.getByRole("button", { name: "次の問題" }).click();
+  await expect
+    .poll(async () => new URL(page.url()).searchParams.get("problem"))
+    .not.toBe(String(first.id));
+  await expect(page.getByTestId("tsume-feedback")).toContainText("1手詰");
+});
+
+test.describe("mobile layout (360px)", () => {
+  test.use({ viewport: { width: 360, height: 740 } });
+
+  test("bottom navigation shows primary items and その他 leads to secondary pages", async ({ page }) => {
+    await page.goto("/");
+    const nav = page.getByRole("navigation", { name: "メインナビゲーション" });
+    for (const name of ["ホーム", "詰め将棋", "定跡学習", "復習", "その他"]) {
+      await expect(nav.getByRole("link", { name })).toBeVisible();
+    }
+    await expect(nav.getByRole("link", { name: "タイムアタック" })).toBeHidden();
+    await nav.getByRole("link", { name: "その他" }).click();
+    await expect(page.getByTestId("more-page")).toBeVisible();
+    for (const name of ["タイムアタック", "履歴", "問題作成", "データ出典"]) {
+      await expect(
+        page.getByTestId("more-page").getByRole("heading", { name, exact: true }),
+      ).toBeVisible();
+    }
+  });
+
+  test("tsume board and problem editor fit within the viewport width", async ({ page, request }) => {
+    const problem = await createE2eProblem(request, `${E2E_PREFIX} mobile ${Date.now()}`);
+    await showE2eOneMoveProblems(page);
+    await page.getByTestId(`problem-select-${problem.id}`).click();
+    await expect(page.getByTestId("shogi-board")).toBeVisible();
+    expect(
+      await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
+    ).toBe(true);
+
+    await page.goto("/problem-editor");
+    await expect(page.getByTestId("editor-board")).toBeVisible();
+    expect(
+      await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
+    ).toBe(true);
+  });
 });

@@ -6,7 +6,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { Move, Position, Square } from "tsshogi";
 import { formatMove } from "tsshogi";
 import type { TsumeProblem } from "../api/client";
-import { positionFromSfen, type AppliedMove } from "../shogi/tsume";
+import { moveFromSquare, positionFromSfen, type AppliedMove } from "../shogi/tsume";
 
 export type SessionStatus =
   | "loading"
@@ -28,6 +28,7 @@ export interface TsumeSession {
   position: Position | null;
   moves: AppliedMove[];
   lastMoveTo: Square | null;
+  lastMoveFrom: Square | null;
   mistakeCount: number;
   wrongMoveText: string | null;
   handleUserMove: (move: Move) => void;
@@ -53,6 +54,7 @@ export function useTsumeSession(problem: TsumeProblem | null, options: Options =
   const [position, setPosition] = useState<Position | null>(null);
   const [moves, setMoves] = useState<AppliedMove[]>([]);
   const [lastMoveTo, setLastMoveTo] = useState<Square | null>(null);
+  const [lastMoveFrom, setLastMoveFrom] = useState<Square | null>(null);
   const [mistakeCount, setMistakeCount] = useState(0);
   const [wrongMoveText, setWrongMoveText] = useState<string | null>(null);
 
@@ -85,6 +87,7 @@ export function useTsumeSession(problem: TsumeProblem | null, options: Options =
     startedAtRef.current = Date.now();
     setMoves([]);
     setLastMoveTo(null);
+    setLastMoveFrom(null);
     setMistakeCount(0);
     setWrongMoveText(null);
     if (!problem) {
@@ -119,6 +122,7 @@ export function useTsumeSession(problem: TsumeProblem | null, options: Options =
       next.doMove(move);
       setMoves((prev) => [...prev, { usi: move.usi, text }]);
       setLastMoveTo(move.to);
+      setLastMoveFrom(moveFromSquare(move));
       setPosition(next);
       return next;
     },
@@ -175,6 +179,7 @@ export function useTsumeSession(problem: TsumeProblem | null, options: Options =
     sendTerminal(false, mistakeCount);
     setMoves([]);
     setLastMoveTo(null);
+    setLastMoveFrom(null);
     setWrongMoveText(null);
     setPosition(pos);
     setStatus("showing");
@@ -217,6 +222,7 @@ export function useTsumeSession(problem: TsumeProblem | null, options: Options =
     setMoves(kept);
     setPosition(current);
     setLastMoveTo(null);
+    setLastMoveFrom(null);
     setWrongMoveText(null);
     setStatus("playing");
   }, [problem, status, moves]);
@@ -229,6 +235,7 @@ export function useTsumeSession(problem: TsumeProblem | null, options: Options =
     position,
     moves,
     lastMoveTo,
+    lastMoveFrom,
     mistakeCount,
     wrongMoveText,
     handleUserMove,

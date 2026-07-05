@@ -154,7 +154,7 @@ export default function TimeAttackPage() {
   return (
     <div className="time-attack-page">
       <h1>タイムアタック</h1>
-      {error && <div className="banner banner-error">{error}</div>}
+      {error && <div className="banner banner-error" role="alert">{error}</div>}
 
       {phase === "setup" && (
         <div className="ta-setup">
@@ -166,6 +166,7 @@ export default function TimeAttackPage() {
                   key={n}
                   type="button"
                   className={mateLength === n ? "active" : ""}
+                  aria-pressed={mateLength === n}
                   onClick={() => setMateLength(n)}
                 >
                   {n}手詰
@@ -181,6 +182,7 @@ export default function TimeAttackPage() {
                   key={n}
                   type="button"
                   className={totalQuestions === n ? "active" : ""}
+                  aria-pressed={totalQuestions === n}
                   onClick={() => setTotalQuestions(n)}
                 >
                   {n}問
@@ -212,7 +214,10 @@ export default function TimeAttackPage() {
             {currentProblem.mate_length}手詰: {currentProblem.title}
           </p>
           {feedback && (
-            <div className={`banner ${feedback === "correct" ? "banner-success" : "banner-error"}`}>
+            <div
+              className={`banner ${feedback === "correct" ? "banner-success" : "banner-error"}`}
+              role={feedback === "correct" ? "status" : "alert"}
+            >
               {feedback === "correct" ? "○ 正解!" : "✗ ミス!次の問題へ"}
             </div>
           )}
@@ -222,9 +227,15 @@ export default function TimeAttackPage() {
               flipped={false}
               interactive={interactive && !feedback}
               lastMoveTo={session.lastMoveTo}
+              lastMoveFrom={session.lastMoveFrom}
               onUserMove={session.handleUserMove}
             />
           )}
+          <div className="visually-hidden" role="status" aria-live="polite">
+            {session.moves.length > 0
+              ? `${session.moves.length}手目 ${session.moves[session.moves.length - 1].text}`
+              : ""}
+          </div>
         </div>
       )}
 

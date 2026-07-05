@@ -121,6 +121,17 @@ export default function TsumePage() {
     selectProblem(pick.id);
   };
 
+  // クリア後の「次の問題」: 一覧の次を選ぶ。末尾ならランダムに切り替える。
+  const selectNext = () => {
+    if (visibleProblems.length === 0) return;
+    const index = visibleProblems.findIndex((p) => p.id === selectedId);
+    if (index >= 0 && index + 1 < visibleProblems.length) {
+      selectProblem(visibleProblems[index + 1].id);
+    } else {
+      pickRandom();
+    }
+  };
+
   const handleTerminal = useCallback(
     async (outcome: SessionOutcome) => {
       if (!selectedId) return;
@@ -149,7 +160,7 @@ export default function TsumePage() {
   return (
     <div className="tsume-page">
       <h1>詰め将棋</h1>
-      {error && <div className="banner banner-error">{error}</div>}
+      {error && <div className="banner banner-error" role="alert">{error}</div>}
       <div className="filter-bar">
         <div className="segmented" data-testid="difficulty-filter">
           {MATE_LENGTHS.map((m) => (
@@ -157,13 +168,14 @@ export default function TsumePage() {
               key={m.value}
               type="button"
               className={mateLength === m.value ? "active" : ""}
+              aria-pressed={mateLength === m.value}
               onClick={() => setMateLength(m.value)}
             >
               {m.label}
             </button>
           ))}
         </div>
-        <select value={tagFilter} onChange={(e) => setTagFilter(e.target.value)}>
+        <select value={tagFilter} aria-label="タグで絞り込み" onChange={(e) => setTagFilter(e.target.value)}>
           <option value="">タグ: すべて</option>
           {allTags.map((t) => (
             <option key={t.tag} value={t.tag}>
@@ -195,6 +207,8 @@ export default function TsumePage() {
                 type="button"
                 className={`fav-button ${p.is_favorite ? "fav-on" : ""}`}
                 title="お気に入り"
+                aria-label={p.is_favorite ? "お気に入りを解除" : "お気に入りに追加"}
+                aria-pressed={p.is_favorite}
                 onClick={() => toggleFavorite(p)}
               >
                 {p.is_favorite ? "★" : "☆"}
@@ -211,7 +225,7 @@ export default function TsumePage() {
         </aside>
         <main className="tsume-main">
           {selected ? (
-            <TsumePlayer key={selected.id} problem={selected} onTerminal={handleTerminal} />
+            <TsumePlayer key={selected.id} problem={selected} onTerminal={handleTerminal} onNext={selectNext} />
           ) : (
             <p className="muted">左の一覧から問題を選ぶか、ランダム出題を押してください。</p>
           )}

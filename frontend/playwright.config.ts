@@ -12,6 +12,10 @@ export default defineConfig({
   use: {
     baseURL: `http://127.0.0.1:${frontendPort}`,
     trace: "retain-on-failure",
+    // ブラウザの再ダウンロードができない環境では、既存のChromium実行ファイルを指定できる。
+    ...(process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE
+      ? { launchOptions: { executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE } }
+      : {}),
   },
   webServer: [
     {

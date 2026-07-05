@@ -13,6 +13,7 @@ import {
   openingFromLearningSample,
   type OpeningLine,
 } from "../shogi/openings";
+import { moveFromSquare } from "../shogi/tsume";
 
 export default function OpeningStudyPage() {
   const { id } = useParams();
@@ -29,6 +30,7 @@ function OpeningStudyContent({ id }: { id: string | undefined }) {
   const [feedback, setFeedback] = useState<string | null>(null);
   const [hintVisible, setHintVisible] = useState(false);
   const [lastMoveTo, setLastMoveTo] = useState<Square | null>(null);
+  const [lastMoveFrom, setLastMoveFrom] = useState<Square | null>(null);
 
   useEffect(() => {
     if (!id || !isSampleRoute) return;
@@ -75,7 +77,7 @@ function OpeningStudyContent({ id }: { id: string | undefined }) {
     return (
       <div className="opening-study-page" data-testid="opening-study-page">
         <Link to="/openings">← 定跡一覧へ</Link>
-        <div className="banner banner-error">{loadError}</div>
+        <div className="banner banner-error" role="alert">{loadError}</div>
       </div>
     );
   }
@@ -103,6 +105,7 @@ function OpeningStudyContent({ id }: { id: string | undefined }) {
     setPath((prev) => [...prev, 0]);
     setFeedback(`正解: ${expected.notation}`);
     setLastMoveTo(move.to);
+    setLastMoveFrom(moveFromSquare(move));
   }
 
   function stepForward() {
@@ -111,6 +114,7 @@ function OpeningStudyContent({ id }: { id: string | undefined }) {
     setFeedback(`再生: ${expected.notation}`);
     setHintVisible(false);
     setLastMoveTo(null);
+    setLastMoveFrom(null);
   }
 
   function chooseBranch(index: number) {
@@ -120,6 +124,7 @@ function OpeningStudyContent({ id }: { id: string | undefined }) {
     setFeedback(`分岐を選択: ${node.branchLabel || node.notation}`);
     setHintVisible(false);
     setLastMoveTo(null);
+    setLastMoveFrom(null);
   }
 
   function switchBranch(stepIndex: number, branchIndex: number) {
@@ -127,6 +132,7 @@ function OpeningStudyContent({ id }: { id: string | undefined }) {
     setFeedback("分岐点まで戻して別分岐を選択しました");
     setHintVisible(false);
     setLastMoveTo(null);
+    setLastMoveFrom(null);
   }
 
   function undo() {
@@ -134,6 +140,7 @@ function OpeningStudyContent({ id }: { id: string | undefined }) {
     setFeedback(null);
     setHintVisible(false);
     setLastMoveTo(null);
+    setLastMoveFrom(null);
   }
 
   function reset() {
@@ -141,6 +148,7 @@ function OpeningStudyContent({ id }: { id: string | undefined }) {
     setFeedback(null);
     setHintVisible(false);
     setLastMoveTo(null);
+    setLastMoveFrom(null);
   }
 
   function goToEnd() {
@@ -155,6 +163,7 @@ function OpeningStudyContent({ id }: { id: string | undefined }) {
     setFeedback("最後まで再生しました");
     setHintVisible(false);
     setLastMoveTo(null);
+    setLastMoveFrom(null);
   }
 
   return (
@@ -166,6 +175,7 @@ function OpeningStudyContent({ id }: { id: string | undefined }) {
         <div className="player-board">
           <div
             className={`banner ${feedback?.startsWith("不正解") ? "banner-error" : completed ? "banner-success" : "banner-info"}`}
+            role={feedback?.startsWith("不正解") ? "alert" : "status"}
             data-testid="opening-feedback"
           >
             {completed ? "この定跡手順を完了しました。Wikipediaで確認できる手順はここまでです。" : feedback ?? "盤面上で推奨手を指してください"}
@@ -176,8 +186,14 @@ function OpeningStudyContent({ id }: { id: string | undefined }) {
             flipped={false}
             interactive={!completed}
             lastMoveTo={lastMoveTo}
+            lastMoveFrom={lastMoveFrom}
             onUserMove={handleUserMove}
           />
+          <div className="visually-hidden" role="status" aria-live="polite">
+            {state.moves.length > 0
+              ? `${state.moves.length}手目 ${state.moves[state.moves.length - 1].text}`
+              : ""}
+          </div>
           <div className="board-controls opening-replay-controls">
             <button type="button" onClick={reset} disabled={path.length === 0}>
               最初に戻る
@@ -191,7 +207,7 @@ function OpeningStudyContent({ id }: { id: string | undefined }) {
             <button type="button" onClick={goToEnd} disabled={completed}>
               最後まで進む
             </button>
-            <button type="button" onClick={() => setHintVisible((v) => !v)} disabled={completed}>
+            <button type="button" onClick={() => setHintVisible((v) => !v)} aria-pressed={hintVisible} disabled={completed}>
               ヒント
             </button>
           </div>
@@ -302,7 +318,7 @@ function BookCandidatesPanel({ response, loading, error, sfen }: BookCandidatesP
       <h2>この局面の定跡候補</h2>
       {sfen && <p className="muted book-candidates-sfen">SFEN: <code>{sfen}</code></p>}
       {loading && <p className="muted">定跡候補を読み込み中...</p>}
-      {error && <div className="banner banner-error">{error}</div>}
+      {error && <div className="banner banner-error" role="alert">{error}</div>}
       {!loading && !error && response && response.candidates.length === 0 && (
         <p>この局面の定跡候補はありません。</p>
       )}

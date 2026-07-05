@@ -65,6 +65,7 @@ export default function EditorBoard({ position, onChange }: Props) {
           <button
             type="button"
             className={tool.kind === "move" ? "active" : ""}
+            aria-pressed={tool.kind === "move"}
             onClick={() => setTool({ kind: "move" })}
           >
             移動
@@ -72,6 +73,7 @@ export default function EditorBoard({ position, onChange }: Props) {
           <button
             type="button"
             className={tool.kind === "erase" ? "active" : ""}
+            aria-pressed={tool.kind === "erase"}
             onClick={() => setTool({ kind: "erase" })}
           >
             削除
@@ -90,6 +92,10 @@ export default function EditorBoard({ position, onChange }: Props) {
                       ? "active"
                       : ""
                   }
+                  aria-pressed={
+                    tool.kind === "piece" && tool.piece.color === color && tool.piece.code === code
+                  }
+                  aria-label={`${color === "b" ? "先手" : "後手"}の${PIECE_LABEL[code]}を配置`}
                   onClick={() => setTool({ kind: "piece", piece: { color, code } })}
                 >
                   {PIECE_LABEL[code]}
@@ -116,6 +122,9 @@ export default function EditorBoard({ position, onChange }: Props) {
                     selected?.[0] === rowIndex && selected?.[1] === colIndex ? "selected" : ""
                   }`}
                   data-testid={`editor-square-${9 - colIndex}-${rowIndex + 1}`}
+                  aria-label={`${9 - colIndex}${RANKS[rowIndex]} ${
+                    piece ? `${piece.color === "b" ? "先手" : "後手"}の${pieceText(piece)}` : "空きマス"
+                  }`}
                   onClick={() => click(rowIndex, colIndex)}
                 >
                   {piece && (

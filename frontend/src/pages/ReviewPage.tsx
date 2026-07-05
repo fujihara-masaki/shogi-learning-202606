@@ -36,11 +36,12 @@ export default function ReviewPage() {
   return (
     <div className="review-page" data-testid="review-page">
       <h1>復習</h1>
-      {error && <div className="banner banner-error">{error}</div>}
+      {error && <div className="banner banner-error" role="alert">{error}</div>}
       <div className="segmented">
         <button
           type="button"
           className={tab === "wrong" ? "active" : ""}
+          aria-pressed={tab === "wrong"}
           onClick={() => setTab("wrong")}
         >
           間違えた問題 ({wrongProblems.length})
@@ -48,6 +49,7 @@ export default function ReviewPage() {
         <button
           type="button"
           className={tab === "favorite" ? "active" : ""}
+          aria-pressed={tab === "favorite"}
           onClick={() => setTab("favorite")}
         >
           お気に入り ({favoriteProblems.length})

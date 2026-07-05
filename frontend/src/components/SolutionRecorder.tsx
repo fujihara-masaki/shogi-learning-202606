@@ -112,7 +112,7 @@ export default function SolutionRecorder({ initialPosition, onMovesChange }: Pro
       <p className="muted">
         攻め方の手は solution_moves、玉方の応手は opponent_moves に交互に自動振り分けします。
       </p>
-      {error && <div className="banner banner-error">{error}</div>}
+      {error && <div className="banner banner-error" role="alert">{error}</div>}
       <div className="board-controls">
         <span className="banner banner-info">
           次: {recorded.length % 2 === 0 ? "攻め方(solution)" : "玉方(opponent)"} / 手番{" "}
@@ -146,6 +146,10 @@ export default function SolutionRecorder({ initialPosition, onMovesChange }: Pro
                     type="button"
                     key={`${color}-${code}`}
                     className="hand-piece"
+                    aria-label={`${color === "b" ? "先手" : "後手"}の持ち駒 ${PIECE_LABEL[code]} ${count}枚`}
+                    aria-pressed={
+                      selection?.kind === "hand" && selection.color === color && selection.code === code
+                    }
                     onClick={() => clickHand(color, code)}
                   >
                     {PIECE_LABEL[code]}
@@ -177,6 +181,9 @@ export default function SolutionRecorder({ initialPosition, onMovesChange }: Pro
                         : ""
                     }`}
                     data-testid={`recorder-square-${9 - colIndex}-${rowIndex + 1}`}
+                    aria-label={`${9 - colIndex}${RANKS[rowIndex]} ${
+                      piece ? `${piece.color === "b" ? "先手" : "後手"}の${PIECE_LABEL[piece.code]}` : "空きマス"
+                    }`}
                     onClick={() => clickSquare(rowIndex, colIndex)}
                   >
                     {piece && (
