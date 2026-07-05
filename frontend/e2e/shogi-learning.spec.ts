@@ -509,9 +509,8 @@ test("board shows turn indicator and supports keyboard play with Escape cancel",
   await expect(gold).toHaveAttribute("aria-pressed", "true");
   await expect(board.locator(".board-cell.target")).not.toHaveCount(0);
 
-  // 盤面フォーカス中の Escape で選択解除できる
-  await board.locator('[data-square="55"]').focus();
-  await page.keyboard.press("Escape");
+  // 持ち駒ボタンにフォーカスが残ったままでも Escape で選択解除できる
+  await gold.press("Escape");
   await expect(gold).toHaveAttribute("aria-pressed", "false");
   await expect(board.locator(".board-cell.target")).toHaveCount(0);
 

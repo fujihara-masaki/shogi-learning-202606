@@ -223,9 +223,6 @@ export default function ShogiBoard({
         e.preventDefault();
         handleSquareActivate(focusedSq);
         return;
-      case "Escape":
-        clearSelection();
-        return;
       default:
         return;
     }
@@ -235,6 +232,13 @@ export default function ShogiBoard({
     if (nextFile !== focusedSq.file || nextRank !== focusedSq.rank) {
       setFocusedSq(new Square(nextFile, nextRank));
     }
+  }
+
+  // Escape は盤面セル・持ち駒ボタンのどちらにフォーカスがあっても選択解除できるよう、
+  // board-wrapper 全体で受ける(成りダイアログの Escape は stopPropagation 済みで届かない)。
+  function handleWrapperKeyDown(e: React.KeyboardEvent<HTMLDivElement>) {
+    if (e.key !== "Escape" || pendingPromotion) return;
+    clearSelection();
   }
 
   function handleDialogKeyDown(e: React.KeyboardEvent<HTMLDivElement>) {
@@ -315,7 +319,7 @@ export default function ShogiBoard({
   const bottomColor = flipped ? Color.WHITE : Color.BLACK;
 
   return (
-    <div className="board-wrapper" data-testid="shogi-board">
+    <div className="board-wrapper" data-testid="shogi-board" onKeyDown={handleWrapperKeyDown}>
       <div className="board-turn" data-testid="turn-indicator">
         手番: {position.color === Color.BLACK ? "▲先手" : "△後手"}
       </div>
