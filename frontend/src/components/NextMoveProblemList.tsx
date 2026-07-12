@@ -107,7 +107,10 @@ export default function NextMoveProblemList() {
             </article>
           ))}
         {!samplesLoading && !samples.error && samples.data.length === 0 && (
-          <p className="muted">出題できる問題がまだありません。定跡DBを取り込むと問題が追加されます。</p>
+          <div className="muted" data-testid="next-move-empty-state">
+            <p>出題できる問題がまだありません。定跡DBを取り込み、学習用サンプルを抽出すると問題が追加されます。</p>
+            <p>詳しくはREADMEの「やねうら王定跡からの学習用サンプル抽出」を参照してください。</p>
+          </div>
         )}
       </div>
     </section>
