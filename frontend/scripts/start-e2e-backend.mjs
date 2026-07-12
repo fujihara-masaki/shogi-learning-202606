@@ -9,7 +9,14 @@ const repoRoot = resolve(frontendDir, "..");
 const backendDir = resolve(repoRoot, "backend");
 const dbPath = process.env.SHOGI_DB_PATH ?? resolve(frontendDir, ".e2e", "shogi-e2e.db");
 const port = process.env.E2E_BACKEND_PORT ?? "8000";
+const frontendPort = process.env.E2E_FRONTEND_PORT ?? "5173";
 const python = process.env.PYTHON ?? (process.platform === "win32" ? "python" : "python3");
+
+// backend の CORS 許可オリジンはデフォルトで 5173 固定のため、
+// E2E_FRONTEND_PORT を変えた場合でもブラウザからの API 呼び出しが通るように揃える。
+const corsOrigins =
+  process.env.SHOGI_CORS_ORIGINS ??
+  `http://localhost:${frontendPort},http://127.0.0.1:${frontendPort}`;
 
 mkdirSync(dirname(dbPath), { recursive: true });
 
@@ -18,7 +25,7 @@ const child = spawn(
   ["-m", "uvicorn", "app.main:app", "--host", "127.0.0.1", "--port", port],
   {
     cwd: backendDir,
-    env: { ...process.env, SHOGI_DB_PATH: dbPath, E2E_BACKEND_PORT: port },
+    env: { ...process.env, SHOGI_DB_PATH: dbPath, E2E_BACKEND_PORT: port, SHOGI_CORS_ORIGINS: corsOrigins },
     stdio: "inherit",
   },
 );

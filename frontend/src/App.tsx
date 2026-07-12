@@ -7,6 +7,7 @@ import HistoryPage from "./pages/HistoryPage";
 import ProblemEditorPage from "./pages/ProblemEditorPage";
 import OpeningsPage from "./pages/OpeningsPage";
 import OpeningStudyPage from "./pages/OpeningStudyPage";
+import NextMoveStudyPage from "./pages/NextMoveStudyPage";
 import LicensesPage from "./pages/LicensesPage";
 import MorePage from "./pages/MorePage";
 
@@ -35,6 +36,7 @@ export default function App() {
           <Route path="/review" element={<ReviewPage />} />
           <Route path="/history" element={<HistoryPage />} />
           <Route path="/openings" element={<OpeningsPage />} />
+          <Route path="/openings/next-move/:id" element={<NextMoveStudyPage />} />
           <Route path="/openings/:id" element={<OpeningStudyPage />} />
           <Route path="/problem-editor" element={<ProblemEditorPage />} />
           <Route path="/problem-editor/:id" element={<ProblemEditorPage />} />
