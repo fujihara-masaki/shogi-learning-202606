@@ -1,241 +1,54 @@
-import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
-import {
-  fetchOpeningCategories,
-  fetchOpeningTags,
-  fetchOpeningTypeLines,
-  fetchOpeningTypes,
-  fetchOpenings,
-  fetchLearningSampleOpenings,
-  fetchLearningSamples,
-  type OpeningCategory,
-  type OpeningSummary,
-  type OpeningTagSummary,
-  type OpeningType,
-  type LearningSample,
-  type LearningSampleOpeningSummary,
-} from "../api/client";
-import { OPENING_LINES, countMainLineMoves } from "../shogi/openings";
+import { useSearchParams } from "react-router-dom";
+import NextMoveProblemList from "../components/NextMoveProblemList";
+import OpeningLineStudySection from "../components/OpeningLineStudySection";
+
+type OpeningsMode = "lines" | "next-move";
 
 export default function OpeningsPage() {
-  const [tags, setTags] = useState<OpeningTagSummary[]>([]);
-  const [selectedTag, setSelectedTag] = useState("");
-  const [categories, setCategories] = useState<OpeningCategory[]>([]);
-  const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(null);
-  const [openingTypes, setOpeningTypes] = useState<OpeningType[]>([]);
-  const [imported, setImported] = useState<OpeningSummary[]>([]);
-  const [selectedType, setSelectedType] = useState<OpeningType | null>(null);
-  const [typeLines, setTypeLines] = useState<OpeningSummary[]>([]);
-  const [sampleOpenings, setSampleOpenings] = useState<LearningSampleOpeningSummary[]>([]);
-  const [selectedSampleOpening, setSelectedSampleOpening] = useState("");
-  const [learningSamples, setLearningSamples] = useState<LearningSample[]>([]);
-  const [error, setError] = useState<string | null>(null);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const mode: OpeningsMode = searchParams.get("mode") === "next-move" ? "next-move" : "lines";
 
-  useEffect(() => {
-    let cancelled = false;
-    Promise.all([
-      fetchOpeningTags(),
-      fetchOpenings(selectedTag || undefined),
-      fetchOpeningCategories(),
-      fetchOpeningTypes(selectedCategoryId ?? undefined),
-      fetchLearningSampleOpenings(),
-    ])
-      .then(([tagList, openingList, categoryList, typeList, sampleOpeningList]) => {
-        if (cancelled) return;
-        setTags(tagList);
-        setImported(openingList);
-        setCategories(categoryList);
-        setOpeningTypes(typeList);
-        setSampleOpenings(sampleOpeningList);
-        const nextSampleOpening = selectedSampleOpening || sampleOpeningList[0]?.opening_key || "";
-        setSelectedSampleOpening(nextSampleOpening);
-        setError(null);
-      })
-      .catch((e) => {
-        if (!cancelled) setError(`定跡データの取得に失敗しました: ${e}`);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [selectedTag, selectedCategoryId, selectedSampleOpening]);
-
-  useEffect(() => {
-    if (!selectedType || selectedType.opening_line_count === 0) return;
-    let cancelled = false;
-    fetchOpeningTypeLines(selectedType.id)
-      .then((lines) => {
-        if (!cancelled) setTypeLines(lines);
-      })
-      .catch((e) => {
-        if (!cancelled) setError(`関連定跡ラインの取得に失敗しました: ${e}`);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [selectedType]);
-
-  useEffect(() => {
-    if (!selectedSampleOpening) return;
-    let cancelled = false;
-    fetchLearningSamples(selectedSampleOpening, 12)
-      .then((samples) => {
-        if (!cancelled) setLearningSamples(samples);
-      })
-      .catch((e) => {
-        if (!cancelled) setError(`学習サンプルの取得に失敗しました: ${e}`);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [selectedSampleOpening]);
-
-  function resetSelectedTypeLines() {
-    setSelectedType(null);
-    setTypeLines([]);
+  function switchMode(next: OpeningsMode) {
+    if (next === mode) return;
+    setSearchParams(next === "lines" ? {} : { mode: next }, { replace: true });
   }
-
-  function handleTagChange(tag: string) {
-    setSelectedTag(tag);
-    resetSelectedTypeLines();
-  }
-
-  function handleCategorySelect(categoryId: number | null) {
-    setSelectedCategoryId(categoryId);
-    resetSelectedTypeLines();
-  }
-
-  function handleTypeLinesClick(type: OpeningType) {
-    setSelectedType(type);
-    setTypeLines([]);
-  }
-
-  const hasImported = imported.length > 0;
-  const staticOpenings = useMemo(() => (selectedTag || selectedCategoryId ? [] : OPENING_LINES), [selectedTag, selectedCategoryId]);
 
   return (
     <div className="openings-page" data-testid="openings-page">
       <h1>定跡学習</h1>
-      <p className="muted">サンプル定跡・戦型一覧から序盤の流れを確認しましょう。</p>
-      {error && <div className="banner banner-error" role="alert">{error}</div>}
+      <p className="muted">学び方を選んでください。手順をなぞって覚えるモードと、局面から一手を考えるモードがあります。</p>
 
       <section className="opening-source-note" aria-label="データ出典">
         <h2>データ出典</h2>
         <p>
-          戦型一覧の初期データは Wikibooks「将棋の戦法一覧」、Wikipedia「将棋の戦法」、Wikipediaカテゴリ「将棋の戦法」を参考に手作業で確認した seed データです。ライセンスは CC BY-SA です。
+          戦型一覧の初期データは Wikibooks「将棋の戦法一覧」、Wikipedia「将棋の戦法」、Wikipediaカテゴリ「将棋の戦法」を参考に手作業で確認した seed データです。ライセンスは CC BY-SA です。次の一手の問題は、取り込み済みの定跡DB(出典・ライセンスは各問題に表示)から作成しています。
         </p>
       </section>
 
-      <div className="filter-bar">
-        <select value={selectedTag} onChange={(e) => handleTagChange(e.target.value)} aria-label="戦型タグ">
-          <option value="">定跡タグ: すべて</option>
-          {tags.map((tag) => (
-            <option key={tag.tag} value={tag.tag}>{tag.label} ({tag.count})</option>
-          ))}
-        </select>
+      <div className="opening-mode-switch" role="group" aria-label="学習モード選択" data-testid="opening-mode-switch">
+        <button
+          type="button"
+          className={mode === "lines" ? "opening-mode-button active" : "opening-mode-button"}
+          aria-pressed={mode === "lines"}
+          onClick={() => switchMode("lines")}
+          data-testid="opening-mode-lines"
+        >
+          <strong>定跡手順を学ぶ</strong>
+          <span>定跡の手順を一手ずつなぞって覚える</span>
+        </button>
+        <button
+          type="button"
+          className={mode === "next-move" ? "opening-mode-button active" : "opening-mode-button"}
+          aria-pressed={mode === "next-move"}
+          onClick={() => switchMode("next-move")}
+          data-testid="opening-mode-next-move"
+        >
+          <strong>次の一手に挑戦する</strong>
+          <span>局面を見て自分で一手を考える</span>
+        </button>
       </div>
 
-      <section>
-        <h2>戦型カテゴリ</h2>
-        <div className="opening-category-grid" data-testid="opening-category-list">
-          <button className={!selectedCategoryId ? "opening-category-card active" : "opening-category-card"} onClick={() => handleCategorySelect(null)} type="button">
-            <strong>すべて</strong><span>全カテゴリの戦型を表示</span>
-          </button>
-          {categories.map((category) => (
-            <button key={category.id} className={selectedCategoryId === category.id ? "opening-category-card active" : "opening-category-card"} onClick={() => handleCategorySelect(category.id)} type="button" data-testid="opening-category-card">
-              <strong>{category.name_ja}</strong><span>{category.description}</span>
-            </button>
-          ))}
-        </div>
-      </section>
-
-      <section>
-        <h2>戦型一覧</h2>
-        <div className="opening-list" data-testid="opening-type-list">
-          {openingTypes.map((type) => (
-            <article key={type.id} className="opening-card" data-testid="opening-type-card">
-              <div>
-                <p className="opening-category">{type.category_name_ja}</p>
-                <h2 data-testid="opening-type-card-title">{type.name_ja}</h2>
-                <p>{type.description_short}</p>
-                <p className="muted">かな: {type.name_kana} / English: {type.name_en}</p>
-                <p className="muted">出典: {type.source_name} / ライセンス: {type.license}</p>
-              </div>
-              {type.opening_line_count > 0 ? (
-                <button type="button" className="primary-link" onClick={() => handleTypeLinesClick(type)}>
-                  関連定跡ラインを見る ({type.opening_line_count})
-                </button>
-              ) : <strong className="muted">定跡手順は準備中</strong>}
-            </article>
-          ))}
-        </div>
-      </section>
-
-      {selectedType && (
-        <section>
-          <h2>{selectedType.name_ja}の関連定跡ライン</h2>
-          <div className="opening-list" data-testid="opening-type-line-list">
-            {typeLines.map((opening) => (
-              <article key={`type-${opening.id}`} className="opening-card" data-testid="opening-type-line-card">
-                <div>
-                  <p className="opening-category">{opening.opening_type}</p>
-                  <h2 data-testid="opening-card-title">{opening.name}</h2>
-                  <p className="muted">手数: {opening.move_count}手</p>
-                  {opening.source.license_name && <p className="muted">ライセンス: {opening.source.license_name}</p>}
-                </div>
-                <Link className="primary-link" to={`/openings/${opening.id}`}>学習する</Link>
-              </article>
-            ))}
-            {typeLines.length === 0 && <p className="muted">関連定跡ラインを読み込み中です。</p>}
-          </div>
-        </section>
-      )}
-
-      <section>
-        <h2>定跡DB 学習サンプル</h2>
-        <p className="muted">PR #16〜#17で抽出した learning_samples を戦型別に選び、SFEN局面と候補手で1手学習できます。</p>
-        <div className="filter-bar">
-          <select value={selectedSampleOpening} onChange={(e) => setSelectedSampleOpening(e.target.value)} aria-label="学習サンプル戦型">
-            {sampleOpenings.length === 0 && <option value="">学習サンプルなし</option>}
-            {sampleOpenings.map((opening) => (
-              <option key={opening.opening_key} value={opening.opening_key}>{opening.opening_name} ({opening.sample_count})</option>
-            ))}
-          </select>
-        </div>
-        <div className="opening-list" data-testid="learning-sample-list">
-          {learningSamples.map((sample) => (
-            <article key={sample.id} className="opening-card" data-testid="learning-sample-card">
-              <div>
-                <p className="opening-category">{sample.opening_name} / #{sample.sample_rank}</p>
-                <h2>サンプル局面 {sample.id}</h2>
-                <p>{sample.sample_reason}</p>
-                <p className="muted">候補手: {sample.candidates.map((candidate) => candidate.move_usi).join("、") || "なし"}</p>
-                <p className="muted">出典: {sample.source.name}{sample.source.license_name && ` / ${sample.source.license_name}`}</p>
-              </div>
-              <Link className="primary-link" to={`/openings/sample-${sample.id}`}>この局面で学習する</Link>
-            </article>
-          ))}
-          {selectedSampleOpening && learningSamples.length === 0 && <p className="muted">この戦型の学習サンプルはありません。</p>}
-        </div>
-      </section>
-
-      <section>
-        <h2>学習できる定跡ライン</h2>
-        <div className="opening-list" data-testid="opening-list">
-          {imported.map((opening) => (
-            <article key={`imported-${opening.id}`} className="opening-card" data-testid="opening-card">
-              <div><p className="opening-category">{opening.opening_type}</p><h2 data-testid="opening-card-title">{opening.name}</h2><p>インポート済み定跡ライン</p><p className="muted">手数: {opening.move_count}手</p>{opening.source.license_name && <p className="muted">ライセンス: {opening.source.license_name}</p>}</div>
-              <Link className="primary-link" to={`/openings/${opening.id}`}>学習する</Link>
-            </article>
-          ))}
-          {!hasImported && staticOpenings.map((opening) => (
-            <article key={opening.id} className="opening-card" data-testid="opening-card">
-              <div><p className="opening-category">{opening.category}</p><h2 data-testid="opening-card-title">{opening.name}</h2><p>{opening.description}</p><p className="muted">手数: {countMainLineMoves(opening)}手</p></div>
-              <Link className="primary-link" to={`/openings/${opening.id}`}>学習する</Link>
-            </article>
-          ))}
-          {!hasImported && staticOpenings.length === 0 && <p className="muted">該当する定跡ラインはありません。定跡手順は準備中です。</p>}
-        </div>
-      </section>
+      {mode === "lines" ? <OpeningLineStudySection /> : <NextMoveProblemList />}
     </div>
   );
 }
