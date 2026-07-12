@@ -107,7 +107,7 @@ $env:PYTHON = "..\backend\.venv\Scripts\python.exe"
 npm run test:e2e
 ```
 
-ポートやE2E用DBを変更したい場合は、`E2E_BACKEND_PORT` / `E2E_FRONTEND_PORT` / `SHOGI_DB_PATH` を指定できます。
+ポートやE2E用DBを変更したい場合は、`E2E_BACKEND_PORT` / `E2E_FRONTEND_PORT` / `SHOGI_DB_PATH` を指定できます。テスト内のAPI接続先は `E2E_BACKEND_PORT` から生成され、backend の CORS 許可オリジンも `E2E_FRONTEND_PORT` に合わせて自動設定されます(`SHOGI_CORS_ORIGINS` を明示した場合はそちらを優先)。
 
 ```bash
 E2E_BACKEND_PORT=18000 E2E_FRONTEND_PORT=15173 SHOGI_DB_PATH=./.e2e/custom.db npm run test:e2e

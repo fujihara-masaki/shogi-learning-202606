@@ -115,6 +115,8 @@ test("learning_samplesが無い場合は抽出手順を案内する空状態を�
   const empty = page.getByTestId("next-move-empty-state");
   await expect(empty).toContainText("出題できる問題がまだありません。定跡DBを取り込み、学習用サンプルを抽出すると問題が追加されます。");
   await expect(empty).toContainText("READMEの「やねうら王定跡からの学習用サンプル抽出」を参照");
+  // API到達失敗でも同じ文言が出てしまわないよう、エラーバナーが無いことも確認する
+  await expect(page.getByTestId("next-move-section").locator('[role="alert"]')).toHaveCount(0);
 });
 
 test.describe("次の一手学習モード", () => {

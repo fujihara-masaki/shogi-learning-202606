@@ -1,6 +1,7 @@
 import { expect, test, type APIRequestContext, type Page } from "@playwright/test";
 
-const API_BASE = "http://127.0.0.1:8000";
+const backendPort = process.env.E2E_BACKEND_PORT ?? "8000";
+const API_BASE = `http://127.0.0.1:${backendPort}`;
 const E2E_PREFIX = "[e2e]";
 const ONE_MOVE_SFEN = "4k4/9/5+B3/9/9/9/9/9/9 b G 1";
 const ONE_MOVE_SOLUTION = "G*5b";
