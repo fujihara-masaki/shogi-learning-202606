@@ -31,7 +31,11 @@ export default function NextMoveProblemList() {
     let cancelled = false;
     fetchLearningSampleOpenings()
       .then((list) => {
-        if (!cancelled) setOpenings({ loaded: true, data: list, error: null });
+        if (cancelled) return;
+        setOpenings({ loaded: true, data: list, error: null });
+        // 全戦型を混ぜた取得はAPIの並び順の都合で特定の戦型に偏るため、
+        // 先頭の戦型を初期選択して常に戦型単位で出題する。
+        setSelectedOpening((prev) => prev || list[0]?.opening_key || "");
       })
       .catch((e) => {
         if (!cancelled) setOpenings({ loaded: true, data: [], error: `戦型一覧の取得に失敗しました: ${e}` });
@@ -42,8 +46,9 @@ export default function NextMoveProblemList() {
   }, []);
 
   useEffect(() => {
+    if (!selectedOpening) return;
     let cancelled = false;
-    fetchLearningSamples(selectedOpening || undefined, 30)
+    fetchLearningSamples(selectedOpening, 30)
       .then((list) => {
         if (!cancelled) setSamples({ key: selectedOpening, data: list, error: null });
       })
@@ -55,7 +60,8 @@ export default function NextMoveProblemList() {
     };
   }, [selectedOpening]);
 
-  const samplesLoading = samples.key !== selectedOpening;
+  const samplesLoading = selectedOpening !== "" && samples.key !== selectedOpening;
+  const noOpenings = openings.loaded && !openings.error && openings.data.length === 0;
 
   return (
     <section data-testid="next-move-section">
@@ -64,21 +70,22 @@ export default function NextMoveProblemList() {
         実戦形の局面を見て、次の一手を自分で考える練習問題です。答え(定跡DBの候補手と評価値)は着手後に表示されます。
       </p>
       {openings.error && <div className="banner banner-error" role="alert">{openings.error}</div>}
-      <div className="filter-bar">
-        <select
-          value={selectedOpening}
-          onChange={(e) => setSelectedOpening(e.target.value)}
-          aria-label="戦型で絞り込む"
-          data-testid="next-move-opening-filter"
-        >
-          <option value="">戦型: すべて</option>
-          {openings.data.map((opening) => (
-            <option key={opening.opening_key} value={opening.opening_key}>
-              {opening.opening_name}({opening.sample_count}問)
-            </option>
-          ))}
-        </select>
-      </div>
+      {!noOpenings && (
+        <div className="filter-bar">
+          <select
+            value={selectedOpening}
+            onChange={(e) => setSelectedOpening(e.target.value)}
+            aria-label="戦型を選ぶ"
+            data-testid="next-move-opening-filter"
+          >
+            {openings.data.map((opening) => (
+              <option key={opening.opening_key} value={opening.opening_key}>
+                {opening.opening_name}({opening.sample_count}問)
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
       {!samplesLoading && samples.error && <div className="banner banner-error" role="alert">{samples.error}</div>}
       {samplesLoading && <p className="muted">問題を読み込み中...</p>}
       <div className="opening-list" data-testid="next-move-problem-list">

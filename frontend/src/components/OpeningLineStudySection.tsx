@@ -106,11 +106,11 @@ export default function OpeningLineStudySection() {
       <section>
         <h3>戦型カテゴリ</h3>
         <div className="opening-category-grid" data-testid="opening-category-list">
-          <button className={!selectedCategoryId ? "opening-category-card active" : "opening-category-card"} onClick={() => handleCategorySelect(null)} type="button">
+          <button className={!selectedCategoryId ? "opening-category-card active" : "opening-category-card"} aria-pressed={!selectedCategoryId} onClick={() => handleCategorySelect(null)} type="button">
             <strong>すべて</strong><span>全カテゴリの戦型を表示</span>
           </button>
           {categories.map((category) => (
-            <button key={category.id} className={selectedCategoryId === category.id ? "opening-category-card active" : "opening-category-card"} onClick={() => handleCategorySelect(category.id)} type="button" data-testid="opening-category-card">
+            <button key={category.id} className={selectedCategoryId === category.id ? "opening-category-card active" : "opening-category-card"} aria-pressed={selectedCategoryId === category.id} onClick={() => handleCategorySelect(category.id)} type="button" data-testid="opening-category-card">
               <strong>{category.name_ja}</strong><span>{category.description}</span>
             </button>
           ))}
@@ -124,7 +124,7 @@ export default function OpeningLineStudySection() {
             <article key={type.id} className="opening-card" data-testid="opening-type-card">
               <div>
                 <p className="opening-category">{type.category_name_ja}</p>
-                <h2 data-testid="opening-type-card-title">{type.name_ja}</h2>
+                <h4 data-testid="opening-type-card-title">{type.name_ja}</h4>
                 <p>{type.description_short}</p>
                 <p className="muted">かな: {type.name_kana} / English: {type.name_en}</p>
                 <p className="muted">出典: {type.source_name} / ライセンス: {type.license}</p>
@@ -147,7 +147,7 @@ export default function OpeningLineStudySection() {
               <article key={`type-${opening.id}`} className="opening-card" data-testid="opening-type-line-card">
                 <div>
                   <p className="opening-category">{opening.opening_type}</p>
-                  <h2 data-testid="opening-card-title">{opening.name}</h2>
+                  <h4 data-testid="opening-card-title">{opening.name}</h4>
                   <p className="muted">手数: {opening.move_count}手</p>
                   {opening.source.license_name && <p className="muted">ライセンス: {opening.source.license_name}</p>}
                 </div>
@@ -164,13 +164,13 @@ export default function OpeningLineStudySection() {
         <div className="opening-list" data-testid="opening-list">
           {imported.map((opening) => (
             <article key={`imported-${opening.id}`} className="opening-card" data-testid="opening-card">
-              <div><p className="opening-category">{opening.opening_type}</p><h2 data-testid="opening-card-title">{opening.name}</h2><p>インポート済み定跡ライン</p><p className="muted">手数: {opening.move_count}手</p>{opening.source.license_name && <p className="muted">ライセンス: {opening.source.license_name}</p>}</div>
+              <div><p className="opening-category">{opening.opening_type}</p><h4 data-testid="opening-card-title">{opening.name}</h4><p>インポート済み定跡ライン</p><p className="muted">手数: {opening.move_count}手</p>{opening.source.license_name && <p className="muted">ライセンス: {opening.source.license_name}</p>}</div>
               <Link className="primary-link" to={`/openings/${opening.id}`}>学習する</Link>
             </article>
           ))}
           {!hasImported && staticOpenings.map((opening) => (
             <article key={opening.id} className="opening-card" data-testid="opening-card">
-              <div><p className="opening-category">{opening.category}</p><h2 data-testid="opening-card-title">{opening.name}</h2><p>{opening.description}</p><p className="muted">手数: {countMainLineMoves(opening)}手</p></div>
+              <div><p className="opening-category">{opening.category}</p><h4 data-testid="opening-card-title">{opening.name}</h4><p>{opening.description}</p><p className="muted">手数: {countMainLineMoves(opening)}手</p></div>
               <Link className="primary-link" to={`/openings/${opening.id}`}>学習する</Link>
             </article>
           ))}

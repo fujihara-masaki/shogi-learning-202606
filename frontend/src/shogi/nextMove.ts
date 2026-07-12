@@ -46,7 +46,10 @@ export interface NextMoveVerdict {
   candidateRank: number | null;
   /** 最上位候補(候補が1つも無い場合は null) */
   best: NextMoveCandidateLike | null;
-  /** 最上位候補との評価値差(best.score - candidate.score)。どちらかが欠けていれば null */
+  /**
+   * 最上位候補との評価値の絶対差。どちらかの score が欠けていれば null。
+   * 評価値の向き・単位はデータから確定できないため、符号付きの差は扱わない。
+   */
   scoreDiffFromBest: number | null;
 }
 
@@ -80,7 +83,7 @@ export function judgeNextMove(moveUsi: string, candidates: NextMoveCandidateLike
   const candidate = candidates[index];
   const rank = displayRank(candidate, index);
   const scoreDiffFromBest =
-    best && best.score !== null && candidate.score !== null ? best.score - candidate.score : null;
+    best && best.score !== null && candidate.score !== null ? Math.abs(best.score - candidate.score) : null;
   if (index === 0) {
     return {
       kind: "top",

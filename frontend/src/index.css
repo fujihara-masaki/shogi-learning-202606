@@ -1100,6 +1100,11 @@ select {
   padding: 16px;
 }
 
+.next-move-result h2 {
+  margin: 0 0 8px;
+  font-size: 1rem;
+}
+
 .next-move-verdict {
   margin: 0 0 8px;
   font-size: 1.1rem;

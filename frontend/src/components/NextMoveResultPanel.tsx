@@ -29,7 +29,12 @@ export function NextMoveResultPanel({ verdict, basePosition, source }: NextMoveR
   const { candidate, best } = verdict;
   const isBestMove = verdict.kind === "top";
   return (
-    <section className={`next-move-result next-move-result-${verdict.kind}`} data-testid="next-move-result">
+    <section
+      className={`next-move-result next-move-result-${verdict.kind}`}
+      data-testid="next-move-result"
+      aria-labelledby="next-move-result-heading"
+    >
+      <h2 id="next-move-result-heading">判定結果</h2>
       <p className="next-move-verdict">
         <span aria-hidden="true">{VERDICT_ICON[verdict.kind]}</span> {verdict.label}
       </p>
@@ -62,7 +67,7 @@ export function NextMoveResultPanel({ verdict, basePosition, source }: NextMoveR
         )}
         {verdict.scoreDiffFromBest !== null && !isBestMove && (
           <>
-            <dt>最上位候補との評価値差</dt>
+            <dt>最上位候補との評価値の絶対差(参考)</dt>
             <dd>{verdict.scoreDiffFromBest}</dd>
           </>
         )}

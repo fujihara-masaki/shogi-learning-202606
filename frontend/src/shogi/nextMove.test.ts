@@ -41,6 +41,22 @@ describe("judgeNextMove", () => {
     expect(verdict.description).not.toContain("不正解");
   });
 
+  it("評価値差は絶対値で返す(最上位より score が大きい候補でも正の値)", () => {
+    const reversed = [
+      candidate({ move_usi: "7g7f", rank: 1, score: -10 }),
+      candidate({ move_usi: "2g2f", rank: 2, score: 30 }),
+    ];
+    expect(judgeNextMove("2g2f", reversed).scoreDiffFromBest).toBe(40);
+  });
+
+  it("双方が負の score でも評価値差は絶対値になる", () => {
+    const negatives = [
+      candidate({ move_usi: "7g7f", rank: 1, score: -5 }),
+      candidate({ move_usi: "2g2f", rank: 2, score: -45 }),
+    ];
+    expect(judgeNextMove("2g2f", negatives).scoreDiffFromBest).toBe(40);
+  });
+
   it("rank 4 以降はその他の登録候補として扱う", () => {
     const verdict = judgeNextMove("9g9f", CANDIDATES);
     expect(verdict.kind).toBe("listed");

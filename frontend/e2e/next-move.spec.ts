@@ -32,14 +32,21 @@ function candidate(moveUsi: string, rank: number, score: number | null, pv: stri
   };
 }
 
-function sample(id: number, openingKey: string, openingName: string, rank: number, candidates: ReturnType<typeof candidate>[]) {
+function sample(
+  id: number,
+  openingKey: string,
+  openingName: string,
+  rank: number,
+  candidates: ReturnType<typeof candidate>[],
+  sfen: string = INITIAL_SFEN,
+) {
   return {
     id,
     book_source_id: SOURCE.id,
     book_position_id: id,
     opening_key: openingKey,
     opening_name: openingName,
-    sfen: INITIAL_SFEN,
+    sfen,
     sample_rank: rank,
     sample_reason: "test sample",
     created_at: "2026-01-01T00:00:00",
@@ -47,6 +54,9 @@ function sample(id: number, openingKey: string, openingName: string, rank: numbe
     candidates,
   };
 }
+
+// 後手番で、後手の歩が5七(白視点で成り任意の位置)から5八へ進める局面
+const GOTE_PROMOTION_SFEN = "4k4/9/9/9/9/9/4p4/9/4K4 w - 1";
 
 const SAMPLES = [
   sample(101, "bogin", "棒銀", 1, [
@@ -57,6 +67,15 @@ const SAMPLES = [
   ]),
   sample(102, "bogin", "棒銀", 2, [candidate("7g7f", 1, 10, "7g7f")]),
   sample(201, "shikenbisha", "四間飛車", 3, [candidate("2h6h", 1, 15, "2h6h 8c8d")]),
+  // 一覧(OPENINGS)には含めず、URL直接アクセスで後手番・成りの判定を確認する
+  sample(
+    301,
+    "gote-sample",
+    "後手番サンプル",
+    1,
+    [candidate("5g5h+", 1, 20, "5g5h+"), candidate("5g5h", 2, 5, null)],
+    GOTE_PROMOTION_SFEN,
+  ),
 ];
 
 const OPENINGS = [
@@ -108,7 +127,9 @@ test.describe("次の一手学習モード", () => {
     await expect(nextMoveButton).toHaveAttribute("aria-pressed", "true");
     await expect(page).toHaveURL(/mode=next-move/);
     await expect(page.getByTestId("next-move-section")).toBeVisible();
-    await expect(page.getByTestId("next-move-problem-card")).toHaveCount(3);
+    // 初期状態では先頭の戦型(棒銀)が選択され、その問題のみ表示される
+    await expect(page.getByTestId("next-move-opening-filter")).toHaveValue("bogin");
+    await expect(page.getByTestId("next-move-problem-card")).toHaveCount(2);
     // 一覧では内部ID・SFEN・候補手・評価値を出さない
     await expect(page.getByTestId("next-move-problem-list")).not.toContainText("サンプル局面");
     await expect(page.getByTestId("next-move-problem-list")).not.toContainText("7g7f");
@@ -120,11 +141,14 @@ test.describe("次の一手学習モード", () => {
     const requestedUrls: string[] = [];
     await mockNextMoveApi(page, requestedUrls);
     await page.goto("/openings?mode=next-move");
-    await expect(page.getByTestId("next-move-problem-card")).toHaveCount(3);
+    await expect(page.getByTestId("next-move-problem-card")).toHaveCount(2);
+    expect(requestedUrls.some((url) => url.includes("opening_key=bogin"))).toBeTruthy();
     await page.getByTestId("next-move-opening-filter").selectOption("shikenbisha");
     await expect(page.getByTestId("next-move-problem-card")).toHaveCount(1);
     await expect(page.getByTestId("next-move-problem-list")).toContainText("四間飛車");
     expect(requestedUrls.some((url) => url.includes("opening_key=shikenbisha"))).toBeTruthy();
+    // 戦型を選ばない全件取得は行わない(取得の偏り対策)
+    expect(requestedUrls.every((url) => !url.match(/\/api\/learning-samples\?(?!.*opening_key=)/))).toBeTruthy();
   });
 
   test("着手前は候補手・評価値・PVを表示しない", async ({ page }) => {
@@ -244,6 +268,33 @@ test.describe("次の一手学習モード", () => {
     await expect(page).toHaveURL(/next-move\/102/);
   });
 
+  test("後手番の局面では盤面が反転し、成る手・成らない手が別候補として判定される", async ({ page }) => {
+    await page.goto("/openings/next-move/301");
+    await expect(page.getByTestId("turn-indicator")).toContainText("△後手");
+    // 後手視点に盤面が反転している(筋座標が 1→9 の順)
+    await expect(page.locator(".file-coords span").first()).toHaveText("1");
+    await expect(page.getByTestId("next-move-feedback")).toContainText("後手番です");
+
+    // 後手の歩 5七→5八 で成り選択ダイアログが開き、「成る」は最上位候補(5g5h+)
+    await playMove(page, "57", "58");
+    const dialog = page.getByRole("dialog", { name: "成り選択" });
+    await expect(dialog).toBeVisible();
+    await dialog.getByRole("button", { name: "成る", exact: true }).click();
+    await expect(page.getByTestId("next-move-feedback")).toContainText("最有力候補");
+    const result = page.getByTestId("next-move-result");
+    await expect(result).toContainText("第1候補");
+    await expect(result).toContainText("5g5h+");
+
+    // 同じ移動でも「成らず」は第2候補(5g5h)として区別して判定される
+    await page.getByTestId("next-move-retry-button").click();
+    await playMove(page, "57", "58");
+    await expect(dialog).toBeVisible();
+    await dialog.getByRole("button", { name: "成らず" }).click();
+    await expect(page.getByTestId("next-move-feedback")).toContainText("有力候補");
+    await expect(result).toContainText("第2候補");
+    await expect(result).toContainText("5g5h");
+  });
+
   test("存在しない問題はエラー表示と一覧への導線を出す", async ({ page }) => {
     await page.goto("/openings/next-move/999");
     await expect(page.getByRole("alert")).toContainText("問題の取得に失敗しました");
@@ -260,7 +311,7 @@ test.describe("次の一手 mobile layout (360px)", () => {
 
   test("一覧と挑戦画面が360px幅で横スクロールしない", async ({ page }) => {
     await page.goto("/openings?mode=next-move");
-    await expect(page.getByTestId("next-move-problem-card")).toHaveCount(3);
+    await expect(page.getByTestId("next-move-problem-card")).toHaveCount(2);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 
     await page.goto("/openings/next-move/101");
