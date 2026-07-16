@@ -117,9 +117,35 @@ test.afterEach(async ({ request }) => {
 test("home shows the main feature links", async ({ page }) => {
   await page.goto("/");
   await expect(page.getByRole("heading", { name: "将棋学習アプリ" })).toBeVisible();
-  for (const name of ["詰め将棋", "タイムアタック", "復習", "履歴", "定跡学習", "問題作成", "データ出典"]) {
+  for (const name of ["詰め将棋", "タイムアタック", "復習", "履歴", "定跡学習", "次の一手", "問題作成", "データ出典"]) {
     await expect(page.getByRole("link", { name }).first()).toBeVisible();
   }
+  // 定跡学習と次の一手は別カードとして表示され、説明から学習方法の違いが分かる
+  const menu = page.locator(".home-menu");
+  await expect(menu.getByRole("heading", { name: "定跡学習", exact: true })).toBeVisible();
+  await expect(menu.getByRole("heading", { name: "次の一手", exact: true })).toBeVisible();
+  await expect(menu).toContainText("なぞって覚える");
+  await expect(menu).toContainText("自分ならどう指すか");
+});
+
+test("desktop nav separates 定跡学習 and 次の一手 with current-page state", async ({ page }) => {
+  await page.goto("/openings");
+  const nav = page.getByRole("navigation", { name: "メインナビゲーション" });
+  const openingsLink = nav.getByRole("link", { name: "定跡学習" });
+  const nextMoveLink = nav.getByRole("link", { name: "次の一手" });
+  await expect(openingsLink).toBeVisible();
+  await expect(nextMoveLink).toBeVisible();
+  await expect(openingsLink).toHaveAttribute("aria-current", "page");
+  await expect(nextMoveLink).not.toHaveAttribute("aria-current", "page");
+  // ページ内モード切替UIは廃止され、定跡手順の内容が直接表示される
+  await expect(page.getByTestId("opening-mode-switch")).toHaveCount(0);
+  await expect(page.getByTestId("opening-line-study-section")).toBeVisible();
+
+  // 個別の定跡学習画面(/openings/:id)でも「定跡学習」が現在位置になる
+  await openingCardByExactTitle(page, "棒銀").getByRole("link", { name: "学習する" }).click();
+  await expect(page.getByTestId("opening-study-page")).toBeVisible();
+  await expect(openingsLink).toHaveAttribute("aria-current", "page");
+  await expect(nextMoveLink).not.toHaveAttribute("aria-current", "page");
 });
 
 test("tsume page plays an existing one-move problem and shows wrong/correct feedback", async ({ page, request }) => {
@@ -576,17 +602,26 @@ test.describe("mobile layout (360px)", () => {
   test("bottom navigation shows primary items and その他 leads to secondary pages", async ({ page }) => {
     await page.goto("/");
     const nav = page.getByRole("navigation", { name: "メインナビゲーション" });
-    for (const name of ["ホーム", "詰め将棋", "定跡学習", "復習", "その他"]) {
-      await expect(nav.getByRole("link", { name })).toBeVisible();
+    for (const name of ["ホーム", "詰め将棋", "定跡", "次の一手", "その他"]) {
+      await expect(nav.getByRole("link", { name, exact: true })).toBeVisible();
     }
+    // 「復習」は下部ナビから「その他」へ移動し、副次項目は表示しない
+    await expect(nav.getByRole("link", { name: "復習" })).toBeHidden();
     await expect(nav.getByRole("link", { name: "タイムアタック" })).toBeHidden();
+    // 5項目でも横スクロールが発生しない
+    expect(
+      await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
+    ).toBe(true);
     await nav.getByRole("link", { name: "その他" }).click();
     await expect(page.getByTestId("more-page")).toBeVisible();
-    for (const name of ["タイムアタック", "履歴", "問題作成", "データ出典"]) {
+    for (const name of ["復習", "タイムアタック", "履歴", "問題作成", "データ出典"]) {
       await expect(
         page.getByTestId("more-page").getByRole("heading", { name, exact: true }),
       ).toBeVisible();
     }
+    // 「その他」から復習画面へ移動できる
+    await page.getByTestId("more-page").getByRole("link", { name: "復習" }).click();
+    await expect(page.getByTestId("review-page")).toBeVisible();
   });
 
   test("tsume board and problem editor fit within the viewport width", async ({ page, request }) => {
