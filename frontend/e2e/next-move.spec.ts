@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 
-// 「次の一手」学習モードのE2E。
+// 「次の一手」機能のE2E。
 // E2E用DBには定跡DB由来の learning_samples が無いため、既存テストと同様に API をモックする。
 
 const INITIAL_SFEN = "lnsgkgsnl/1r5b1/ppppppppp/9/9/9/PPPPPPPPP/1B5R1/LNSGKGSNL b - 1";
@@ -111,7 +111,7 @@ async function playMove(page: Page, from: string, to: string) {
 
 // APIをモックせず実バックエンドを使う(E2E用DBには learning_samples が無い)
 test("learning_samplesが無い場合は抽出手順を案内する空状態を表示する", async ({ page }) => {
-  await page.goto("/openings?mode=next-move");
+  await page.goto("/next-move");
   const empty = page.getByTestId("next-move-empty-state");
   await expect(empty).toContainText("出題できる問題がまだありません。定跡DBを取り込み、学習用サンプルを抽出すると問題が追加されます。");
   await expect(empty).toContainText("READMEの「やねうら王定跡からの学習用サンプル抽出」を参照");
@@ -119,23 +119,14 @@ test("learning_samplesが無い場合は抽出手順を案内する空状態を�
   await expect(page.getByTestId("next-move-section").locator('[role="alert"]')).toHaveCount(0);
 });
 
-test.describe("次の一手学習モード", () => {
+test.describe("次の一手", () => {
   test.beforeEach(async ({ page }) => {
     await mockNextMoveApi(page);
   });
 
-  test("定跡学習トップでモードを切り替えられ、次の一手一覧では答えを表示しない", async ({ page }) => {
-    await page.goto("/openings");
-    const linesButton = page.getByTestId("opening-mode-lines");
-    const nextMoveButton = page.getByTestId("opening-mode-next-move");
-    await expect(linesButton).toHaveAttribute("aria-pressed", "true");
-    await expect(page.getByTestId("opening-line-study-section")).toBeVisible();
-    await expect(page.getByTestId("openings-page")).not.toContainText("PR #16");
-    await expect(page.getByTestId("openings-page")).not.toContainText("learning_samples");
-
-    await nextMoveButton.click();
-    await expect(nextMoveButton).toHaveAttribute("aria-pressed", "true");
-    await expect(page).toHaveURL(/mode=next-move/);
+  test("次の一手一覧を独立ページとして表示し、答えを表示しない", async ({ page }) => {
+    await page.goto("/next-move");
+    await expect(page.getByTestId("next-move-list-page").getByRole("heading", { name: "次の一手", level: 1 })).toBeVisible();
     await expect(page.getByTestId("next-move-section")).toBeVisible();
     // 初期状態では先頭の戦型(棒銀)が選択され、その問題のみ表示される
     await expect(page.getByTestId("next-move-opening-filter")).toHaveValue("bogin");
@@ -147,10 +138,53 @@ test.describe("次の一手学習モード", () => {
     await expect(page.getByTestId("next-move-problem-list")).toContainText("出典: Sample YaneuraOu Book");
   });
 
+  test("ナビの「次の一手」が一覧・個別問題で現在位置になる", async ({ page }) => {
+    await page.goto("/next-move");
+    const nav = page.getByRole("navigation", { name: "メインナビゲーション" });
+    const nextMoveLink = nav.getByRole("link", { name: "次の一手" });
+    await expect(nextMoveLink).toHaveAttribute("aria-current", "page");
+    await expect(nav.getByRole("link", { name: "定跡学習" })).not.toHaveAttribute("aria-current", "page");
+
+    await page.goto("/next-move/101");
+    await expect(page.getByTestId("next-move-heading")).toContainText("棒銀");
+    await expect(nextMoveLink).toHaveAttribute("aria-current", "page");
+    await expect(nav.getByRole("link", { name: "定跡学習" })).not.toHaveAttribute("aria-current", "page");
+  });
+
+  test("旧URLは新URLへリダイレクトされ、戻る操作でループしない", async ({ page }) => {
+    await page.goto("/");
+    await page.goto("/openings?mode=next-move");
+    await expect(page).toHaveURL(/\/next-move$/);
+    await expect(page.getByTestId("next-move-problem-card")).toHaveCount(2);
+
+    await page.goto("/openings/next-move/101");
+    await expect(page).toHaveURL(/\/next-move\/101$/);
+    await expect(page.getByTestId("next-move-heading")).toContainText("棒銀");
+
+    // リダイレクトはreplaceのため、戻る操作で旧URLへ戻ってループしない
+    await page.goBack();
+    await expect(page).toHaveURL(/\/next-move$/);
+    await page.goBack();
+    await expect(new URL(page.url()).pathname).toBe("/");
+  });
+
+  test("個別問題の戻るリンクは次の一手一覧(/next-move)へ戻る", async ({ page }) => {
+    await page.goto("/next-move/101");
+    await page.getByRole("link", { name: "← 次の一手一覧へ" }).click();
+    await expect(page).toHaveURL(/\/next-move$/);
+    await expect(page.getByTestId("next-move-problem-card")).toHaveCount(2);
+
+    // 解答後の「次の一手一覧へ戻る」も同じ一覧へ戻る
+    await page.goto("/next-move/101");
+    await playMove(page, "77", "76");
+    await page.getByRole("link", { name: "次の一手一覧へ戻る" }).click();
+    await expect(page).toHaveURL(/\/next-move$/);
+  });
+
   test("戦型フィルターで問題を絞り込める", async ({ page }) => {
     const requestedUrls: string[] = [];
     await mockNextMoveApi(page, requestedUrls);
-    await page.goto("/openings?mode=next-move");
+    await page.goto("/next-move");
     await expect(page.getByTestId("next-move-problem-card")).toHaveCount(2);
     expect(requestedUrls.some((url) => url.includes("opening_key=bogin"))).toBeTruthy();
     await page.getByTestId("next-move-opening-filter").selectOption("shikenbisha");
@@ -162,7 +196,7 @@ test.describe("次の一手学習モード", () => {
   });
 
   test("着手前は候補手・評価値・PVを表示しない", async ({ page }) => {
-    await page.goto("/openings/next-move/101");
+    await page.goto("/next-move/101");
     await expect(page.getByTestId("next-move-heading")).toContainText("棒銀");
     await expect(page.getByTestId("next-move-progress")).toContainText("問題 1 / 2");
     await expect(page.getByTestId("shogi-board")).toBeVisible();
@@ -174,7 +208,7 @@ test.describe("次の一手学習モード", () => {
   });
 
   test("段階ヒントは要求したときだけ表示される", async ({ page }) => {
-    await page.goto("/openings/next-move/101");
+    await page.goto("/next-move/101");
     await expect(page.getByTestId("next-move-hints")).toHaveCount(0);
     await page.getByTestId("next-move-hint-button").click();
     await expect(page.getByTestId("next-move-hints")).toContainText("ヒント1");
@@ -186,7 +220,7 @@ test.describe("次の一手学習モード", () => {
   });
 
   test("最上位候補を指すと順位・評価値・候補比較が表示される", async ({ page }) => {
-    await page.goto("/openings/next-move/101");
+    await page.goto("/next-move/101");
     await playMove(page, "77", "76");
     await expect(page.getByTestId("next-move-feedback")).toContainText("最有力候補");
     const result = page.getByTestId("next-move-result");
@@ -206,7 +240,7 @@ test.describe("次の一手学習モード", () => {
   });
 
   test("第2候補を指しても不正解扱いにならず、最上位候補との差を表示する", async ({ page }) => {
-    await page.goto("/openings/next-move/101");
+    await page.goto("/next-move/101");
     await playMove(page, "27", "26");
     const feedback = page.getByTestId("next-move-feedback");
     await expect(feedback).toContainText("有力候補");
@@ -220,7 +254,7 @@ test.describe("次の一手学習モード", () => {
   });
 
   test("候補外の合法手はDB未登録の説明になり、悪手とは断定しない", async ({ page }) => {
-    await page.goto("/openings/next-move/101");
+    await page.goto("/next-move/101");
     await playMove(page, "17", "16");
     const feedback = page.getByTestId("next-move-feedback");
     await expect(feedback).toContainText("定跡DBには候補手として登録されていません");
@@ -233,7 +267,7 @@ test.describe("次の一手学習モード", () => {
   });
 
   test("「もう一度考える」で初期局面に戻る", async ({ page }) => {
-    await page.goto("/openings/next-move/101");
+    await page.goto("/next-move/101");
     await playMove(page, "77", "76");
     await expect(page.getByTestId("next-move-result")).toBeVisible();
     await page.getByTestId("next-move-retry-button").click();
@@ -245,7 +279,7 @@ test.describe("次の一手学習モード", () => {
   });
 
   test("「次の問題」で同じ戦型の別サンプルへ進み、見出しへフォーカスする", async ({ page }) => {
-    await page.goto("/openings/next-move/101");
+    await page.goto("/next-move/101");
     await playMove(page, "77", "76");
     await page.getByTestId("next-move-next-button").click();
     await expect(page).toHaveURL(/next-move\/102/);
@@ -256,7 +290,7 @@ test.describe("次の一手学習モード", () => {
   });
 
   test("キーボードだけで着手から結果確認・次の問題まで操作できる", async ({ page }) => {
-    await page.goto("/openings/next-move/101");
+    await page.goto("/next-move/101");
     const board = page.getByTestId("shogi-board");
     // 7七の歩をキーボードで選択し、7六へ移動して着手
     await board.locator('[data-square="55"]').focus();
@@ -279,7 +313,7 @@ test.describe("次の一手学習モード", () => {
   });
 
   test("後手番の局面では盤面が反転し、成る手・成らない手が別候補として判定される", async ({ page }) => {
-    await page.goto("/openings/next-move/301");
+    await page.goto("/next-move/301");
     await expect(page.getByTestId("turn-indicator")).toContainText("△後手");
     // 後手視点に盤面が反転している(筋座標が 1→9 の順)
     await expect(page.locator(".file-coords span").first()).toHaveText("1");
@@ -306,7 +340,7 @@ test.describe("次の一手学習モード", () => {
   });
 
   test("存在しない問題はエラー表示と一覧への導線を出す", async ({ page }) => {
-    await page.goto("/openings/next-move/999");
+    await page.goto("/next-move/999");
     await expect(page.getByRole("alert")).toContainText("問題の取得に失敗しました");
     await expect(page.getByRole("link", { name: "← 次の一手一覧へ" })).toBeVisible();
   });
@@ -320,11 +354,11 @@ test.describe("次の一手 mobile layout (360px)", () => {
   });
 
   test("一覧と挑戦画面が360px幅で横スクロールしない", async ({ page }) => {
-    await page.goto("/openings?mode=next-move");
+    await page.goto("/next-move");
     await expect(page.getByTestId("next-move-problem-card")).toHaveCount(2);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 
-    await page.goto("/openings/next-move/101");
+    await page.goto("/next-move/101");
     await expect(page.getByTestId("shogi-board")).toBeVisible();
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 

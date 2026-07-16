@@ -1,4 +1,4 @@
-// 定跡学習トップの「次の一手に挑戦する」一覧。
+// 「次の一手」一覧ページ(/next-move)の問題一覧。ページ見出し・説明は NextMovePage が持つ。
 // 出題前に答えが分かってしまわないよう、候補手・評価値・SFEN はここでは表示しない。
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
@@ -65,10 +65,6 @@ export default function NextMoveProblemList() {
 
   return (
     <section data-testid="next-move-section">
-      <h2>次の一手に挑戦する</h2>
-      <p className="muted">
-        実戦形の局面を見て、次の一手を自分で考える練習問題です。答え(定跡DBの候補手と評価値)は着手後に表示されます。
-      </p>
       {openings.error && <div className="banner banner-error" role="alert">{openings.error}</div>}
       {!noOpenings && (
         <div className="filter-bar">
@@ -101,7 +97,7 @@ export default function NextMoveProblemList() {
                   {sample.source.license_name && ` / ${sample.source.license_name}`}
                 </p>
               </div>
-              <Link className="primary-link" to={`/openings/next-move/${sample.id}`}>
+              <Link className="primary-link" to={`/next-move/${sample.id}`}>
                 挑戦する
               </Link>
             </article>

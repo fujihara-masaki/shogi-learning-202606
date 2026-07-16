@@ -139,6 +139,11 @@ select {
   display: none;
 }
 
+/* 短縮ラベル(「定跡」)はモバイル下部ナビ専用。display:noneの側はアクセシビリティツリーからも除外される。 */
+.app-nav .nav-label-short {
+  display: none;
+}
+
 .app-body {
   max-width: 1100px;
   margin: 0 auto;
@@ -741,6 +746,14 @@ select {
     display: flex;
   }
 
+  .app-nav .nav-label-full {
+    display: none;
+  }
+
+  .app-nav .nav-label-short {
+    display: inline;
+  }
+
   .app-body {
     padding-bottom: calc(72px + env(safe-area-inset-bottom));
   }
@@ -1025,42 +1038,7 @@ select {
   color: #4b5563;
 }
 
-/* ---- 次の一手学習モード ---- */
-.opening-mode-switch {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-  gap: 12px;
-  margin: 16px 0 24px;
-}
-
-.opening-mode-button {
-  min-height: 72px;
-  padding: 14px;
-  border: 2px solid #d8d2c4;
-  border-radius: 10px;
-  background: #fff;
-  color: inherit;
-  text-align: left;
-  cursor: pointer;
-}
-
-.opening-mode-button strong,
-.opening-mode-button span {
-  display: block;
-}
-
-.opening-mode-button span {
-  margin-top: 6px;
-  color: #665f53;
-  font-size: 0.9rem;
-}
-
-.opening-mode-button.active {
-  border-color: var(--accent);
-  background: #f2f8f4;
-  box-shadow: 0 0 0 2px rgba(42, 107, 71, 0.15);
-}
-
+/* ---- 次の一手 ---- */
 .next-move-page h1 {
   margin-bottom: 4px;
 }

@@ -92,7 +92,7 @@ function NextMoveStudyContent({ id }: { id: string | undefined }) {
   if (sampleId === null) {
     return (
       <div className="next-move-page" data-testid="next-move-page">
-        <Link to="/openings?mode=next-move">← 次の一手一覧へ</Link>
+        <Link to="/next-move">← 次の一手一覧へ</Link>
         <div className="banner banner-error" role="alert">この問題は見つかりませんでした。</div>
       </div>
     );
@@ -100,7 +100,7 @@ function NextMoveStudyContent({ id }: { id: string | undefined }) {
   if (loading) {
     return (
       <div className="next-move-page" data-testid="next-move-page">
-        <Link to="/openings?mode=next-move">← 次の一手一覧へ</Link>
+        <Link to="/next-move">← 次の一手一覧へ</Link>
         <p className="muted">問題を読み込み中...</p>
       </div>
     );
@@ -108,7 +108,7 @@ function NextMoveStudyContent({ id }: { id: string | undefined }) {
   if (loadError || !sample) {
     return (
       <div className="next-move-page" data-testid="next-move-page">
-        <Link to="/openings?mode=next-move">← 次の一手一覧へ</Link>
+        <Link to="/next-move">← 次の一手一覧へ</Link>
         <div className="banner banner-error" role="alert">{loadError ?? "この問題は見つかりませんでした。"}</div>
       </div>
     );
@@ -116,7 +116,7 @@ function NextMoveStudyContent({ id }: { id: string | undefined }) {
   if (session.invalidPosition || !session.position) {
     return (
       <div className="next-move-page" data-testid="next-move-page">
-        <Link to="/openings?mode=next-move">← 次の一手一覧へ</Link>
+        <Link to="/next-move">← 次の一手一覧へ</Link>
         <div className="banner banner-error" role="alert">この問題の局面データを読み込めませんでした。</div>
       </div>
     );
@@ -135,7 +135,7 @@ function NextMoveStudyContent({ id }: { id: string | undefined }) {
 
   return (
     <div className="next-move-page" data-testid="next-move-page">
-      <Link to="/openings?mode=next-move">← 次の一手一覧へ</Link>
+      <Link to="/next-move">← 次の一手一覧へ</Link>
       <h1 tabIndex={-1} ref={headingRef} data-testid="next-move-heading">
         次の一手: {sample.opening_name}
       </h1>
@@ -185,7 +185,7 @@ function NextMoveStudyContent({ id }: { id: string | undefined }) {
               <button
                 type="button"
                 onClick={() =>
-                  nextSample && navigate(`/openings/next-move/${nextSample.id}`, { state: { autoFocusHeading: true } })
+                  nextSample && navigate(`/next-move/${nextSample.id}`, { state: { autoFocusHeading: true } })
                 }
                 disabled={!nextSample}
                 data-testid="next-move-next-button"
@@ -204,7 +204,7 @@ function NextMoveStudyContent({ id }: { id: string | undefined }) {
               >
                 候補手を比較する
               </button>
-              <Link to="/openings" className="next-move-back-link">定跡一覧へ戻る</Link>
+              <Link to="/next-move" className="next-move-back-link">次の一手一覧へ戻る</Link>
             </div>
           )}
         </div>

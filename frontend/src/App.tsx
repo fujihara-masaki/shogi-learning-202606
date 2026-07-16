@@ -1,4 +1,4 @@
-import { BrowserRouter, NavLink, Route, Routes } from "react-router-dom";
+import { BrowserRouter, Navigate, NavLink, Route, Routes, useParams } from "react-router-dom";
 import HomePage from "./pages/HomePage";
 import TsumePage from "./pages/TsumePage";
 import TimeAttackPage from "./pages/TimeAttackPage";
@@ -7,9 +7,16 @@ import HistoryPage from "./pages/HistoryPage";
 import ProblemEditorPage from "./pages/ProblemEditorPage";
 import OpeningsPage from "./pages/OpeningsPage";
 import OpeningStudyPage from "./pages/OpeningStudyPage";
+import NextMovePage from "./pages/NextMovePage";
 import NextMoveStudyPage from "./pages/NextMoveStudyPage";
 import LicensesPage from "./pages/LicensesPage";
 import MorePage from "./pages/MorePage";
+
+// 旧URL(/openings/next-move/:id)からの互換リダイレクト。
+function LegacyNextMoveRedirect() {
+  const { id } = useParams();
+  return <Navigate to={`/next-move/${id}`} replace />;
+}
 
 export default function App() {
   return (
@@ -20,8 +27,13 @@ export default function App() {
           ホーム
         </NavLink>
         <NavLink to="/tsume">詰め将棋</NavLink>
-        <NavLink to="/openings">定跡学習</NavLink>
-        <NavLink to="/review">復習</NavLink>
+        <NavLink to="/openings">
+          {/* モバイルでは短縮ラベル「定跡」に切り替える(display:none側はアクセシビリティツリーからも除外される) */}
+          <span className="nav-label-full">定跡学習</span>
+          <span className="nav-label-short">定跡</span>
+        </NavLink>
+        <NavLink to="/next-move">次の一手</NavLink>
+        <NavLink to="/review" className="nav-secondary">復習</NavLink>
         <NavLink to="/time-attack" className="nav-secondary">タイムアタック</NavLink>
         <NavLink to="/history" className="nav-secondary">履歴</NavLink>
         <NavLink to="/problem-editor" className="nav-secondary">問題作成</NavLink>
@@ -36,8 +48,10 @@ export default function App() {
           <Route path="/review" element={<ReviewPage />} />
           <Route path="/history" element={<HistoryPage />} />
           <Route path="/openings" element={<OpeningsPage />} />
-          <Route path="/openings/next-move/:id" element={<NextMoveStudyPage />} />
+          <Route path="/openings/next-move/:id" element={<LegacyNextMoveRedirect />} />
           <Route path="/openings/:id" element={<OpeningStudyPage />} />
+          <Route path="/next-move" element={<NextMovePage />} />
+          <Route path="/next-move/:id" element={<NextMoveStudyPage />} />
           <Route path="/problem-editor" element={<ProblemEditorPage />} />
           <Route path="/problem-editor/:id" element={<ProblemEditorPage />} />
           <Route path="/editor" element={<ProblemEditorPage />} />
