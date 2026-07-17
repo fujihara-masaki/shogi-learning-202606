@@ -5,6 +5,7 @@ import { Link } from "react-router-dom";
 import {
   fetchLearningSampleOpenings,
   fetchLearningSamples,
+  isNextMoveUnavailable,
   type LearningSample,
   type LearningSampleOpeningSummary,
 } from "../api/client";
@@ -38,7 +39,9 @@ export default function NextMoveProblemList() {
         setSelectedOpening((prev) => prev || list[0]?.opening_key || "");
       })
       .catch((e) => {
-        if (!cancelled) setOpenings({ loaded: true, data: [], error: `戦型一覧の取得に失敗しました: ${e}` });
+        if (!cancelled) setOpenings({ loaded: true, data: [], error: isNextMoveUnavailable(e)
+          ? "次の一手データを利用できません。専用DBの設定を確認してください。"
+          : `戦型一覧の取得に失敗しました: ${e}` });
       });
     return () => {
       cancelled = true;
@@ -53,7 +56,9 @@ export default function NextMoveProblemList() {
         if (!cancelled) setSamples({ key: selectedOpening, data: list, error: null });
       })
       .catch((e) => {
-        if (!cancelled) setSamples({ key: selectedOpening, data: [], error: `問題一覧の取得に失敗しました: ${e}` });
+        if (!cancelled) setSamples({ key: selectedOpening, data: [], error: isNextMoveUnavailable(e)
+          ? "次の一手データを利用できません。専用DBの設定を確認してください。"
+          : `問題一覧の取得に失敗しました: ${e}` });
       });
     return () => {
       cancelled = true;
@@ -66,7 +71,7 @@ export default function NextMoveProblemList() {
   return (
     <section data-testid="next-move-section">
       {openings.error && <div className="banner banner-error" role="alert">{openings.error}</div>}
-      {!noOpenings && (
+      {!openings.error && !noOpenings && (
         <div className="filter-bar">
           <select
             value={selectedOpening}
@@ -102,7 +107,7 @@ export default function NextMoveProblemList() {
               </Link>
             </article>
           ))}
-        {!samplesLoading && !samples.error && samples.data.length === 0 && (
+        {!samplesLoading && !openings.error && !samples.error && samples.data.length === 0 && (
           <div className="muted" data-testid="next-move-empty-state">
             <p>出題できる問題がまだありません。定跡DBを取り込み、学習用サンプルを抽出すると問題が追加されます。</p>
             <p>詳しくはREADMEの「やねうら王定跡からの学習用サンプル抽出」を参照してください。</p>

@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pytest
 
-from app.database import get_connection, init_db
+from app.next_move_database import get_next_move_write_connection as get_connection, init_next_move_db as init_db
 from app.importers.yaneuraou_book import import_book
 from app.learning_samples import build_learning_sample_plan
 
@@ -19,7 +19,7 @@ def count_samples():
 
 
 def imported_source(tmp_path):
-    os.environ["SHOGI_DB_PATH"] = str(tmp_path / "samples.db")
+    os.environ["NEXT_MOVE_DB_PATH"] = str(tmp_path / "samples.db")
     result = import_book(FIXTURE, name="sample", license_name="MIT")
     return result.source_id
 
@@ -77,7 +77,7 @@ def test_seed_makes_results_reproducible(tmp_path):
 
 
 def test_learning_sample_summary_api(client, tmp_path):
-    os.environ["SHOGI_DB_PATH"] = str(tmp_path / "api.db")
+    os.environ["NEXT_MOVE_DB_PATH"] = str(tmp_path / "api.db")
     init_db()
     result = import_book(FIXTURE, name="Sample YaneuraOu Book", version="fixture", license_name="MIT", copyright_notice="fixture copyright")
     build_learning_sample_plan(result.source_id, limit=2, per_opening_limit=10, seed=1, dry_run=False)
@@ -116,7 +116,7 @@ def test_learning_sample_plan_includes_diagnostics(tmp_path):
 
 
 def test_learning_samples_can_be_listed_by_opening_with_candidates(client, tmp_path):
-    os.environ["SHOGI_DB_PATH"] = str(tmp_path / "samples_api.db")
+    os.environ["NEXT_MOVE_DB_PATH"] = str(tmp_path / "samples_api.db")
     init_db()
     result = import_book(FIXTURE, name="Sample YaneuraOu Book", version="fixture", license_name="MIT")
     build_learning_sample_plan(result.source_id, limit=4, per_opening_limit=10, seed=1, dry_run=False)

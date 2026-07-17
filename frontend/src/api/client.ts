@@ -93,13 +93,27 @@ export interface StatsResponse {
   recent_results: RecentResult[];
 }
 
+export class ApiError extends Error {
+  readonly status: number;
+
+  constructor(status: number, message: string) {
+    super(message);
+    this.status = status;
+    this.name = "ApiError";
+  }
+}
+
+export function isNextMoveUnavailable(error: unknown): boolean {
+  return error instanceof ApiError && error.status === 503;
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
     headers: { "Content-Type": "application/json" },
     ...init,
   });
   if (!res.ok) {
-    throw new Error(`API error ${res.status}: ${await res.text()}`);
+    throw new ApiError(res.status, `API error ${res.status}: ${await res.text()}`);
   }
   if (res.status === 204) {
     return undefined as T;

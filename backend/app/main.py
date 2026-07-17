@@ -4,12 +4,14 @@
 初回起動時にテーブル作成とサンプル問題の投入を行う。
 """
 import os
+import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from .database import init_db
+from .next_move_database import NextMoveDatabaseUnavailable, get_next_move_connection, next_move_db_path
 from .routers import book, openings, stats, time_attack, tsume
 from .seed import seed_if_empty
 
@@ -18,6 +20,12 @@ from .seed import seed_if_empty
 async def lifespan(_: FastAPI):
     init_db()
     seed_if_empty()
+    try:
+        next_move_conn = get_next_move_connection()
+        next_move_conn.close()
+        logging.getLogger(__name__).info("次の一手専用DBを認識しました: %s", next_move_db_path())
+    except NextMoveDatabaseUnavailable as exc:
+        logging.getLogger(__name__).warning("%s", exc)
     yield
 
 

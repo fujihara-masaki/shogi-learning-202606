@@ -1,7 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 
 // 「次の一手」機能のE2E。
-// E2E用DBには定跡DB由来の learning_samples が無いため、既存テストと同様に API をモックする。
+// 小規模専用DBと実backendを通すケースに加え、詳細なUI操作はAPIモックで検証する。
 
 const INITIAL_SFEN = "lnsgkgsnl/1r5b1/ppppppppp/9/9/9/PPPPPPPPP/1B5R1/LNSGKGSNL b - 1";
 
@@ -109,14 +109,36 @@ async function playMove(page: Page, from: string, to: string) {
   await board.locator(`[data-square="${to}"]`).click();
 }
 
-// APIをモックせず実バックエンドを使う(E2E用DBには learning_samples が無い)
-test("learning_samplesが無い場合は抽出手順を案内する空状態を表示する", async ({ page }) => {
+// APIをモックせず、小規模専用DBと実backendを通す。
+test("専用DBから次の一手一覧と出典を取得できる", async ({ page }) => {
   await page.goto("/next-move");
-  const empty = page.getByTestId("next-move-empty-state");
-  await expect(empty).toContainText("出題できる問題がまだありません。定跡DBを取り込み、学習用サンプルを抽出すると問題が追加されます。");
-  await expect(empty).toContainText("READMEの「やねうら王定跡からの学習用サンプル抽出」を参照");
-  // API到達失敗でも同じ文言が出てしまわないよう、エラーバナーが無いことも確認する
+  await expect(page.getByTestId("next-move-problem-card").first()).toBeVisible();
+  await expect(page.getByTestId("next-move-problem-list")).toContainText("出典: E2E YaneuraOu fixture");
   await expect(page.getByTestId("next-move-section").locator('[role="alert"]')).toHaveCount(0);
+});
+
+test("戦型取得が503の場合は利用不可だけを表示する", async ({ page }) => {
+  await page.route("**/api/learning-samples/openings", (route) =>
+    route.fulfill({ status: 503, json: { detail: "next move database unavailable" } }),
+  );
+  await page.goto("/next-move");
+  await expect(page.getByRole("alert")).toContainText("次の一手データを利用できません");
+  await expect(page.getByTestId("next-move-opening-filter")).toHaveCount(0);
+  await expect(page.getByTestId("next-move-empty-state")).toHaveCount(0);
+});
+
+test("問題一覧取得が503の場合も専用DBの利用不可を表示する", async ({ page }) => {
+  await page.route("**/api/learning-samples**", async (route) => {
+    const path = new URL(route.request().url()).pathname;
+    if (path.endsWith("/openings")) {
+      await route.fulfill({ json: OPENINGS });
+    } else {
+      await route.fulfill({ status: 503, json: { detail: "next move database unavailable" } });
+    }
+  });
+  await page.goto("/next-move");
+  await expect(page.getByRole("alert")).toContainText("次の一手データを利用できません");
+  await expect(page.getByTestId("next-move-empty-state")).toHaveCount(0);
 });
 
 test.describe("次の一手", () => {

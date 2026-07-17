@@ -374,3 +374,27 @@ This application can import tsume-shogi puzzle data from [`tokuhirom/tanuki-tsum
 - Copyright (c) 2026 tokuhirom
 - Licensed under the MIT License
 - See [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md) for the full license text.
+
+## 通常DBと次の一手専用DB
+
+通常起動では用途の異なる2つのSQLite DBを使用します。
+
+- `backend/data/shogi.db` (`SHOGI_DB_PATH`): 詰め将棋、Wikipedia等の定跡学習、履歴、統計、タイムアタック
+- `backend/data/next_move.db` (`NEXT_MOVE_DB_PATH`): `book_sources`、`book_positions`、`book_moves`、`learning_samples`
+
+外部定跡・学習サンプルAPI (`/api/book/candidates`、`/api/book/sources*`、`/api/learning-samples*`) は専用DBだけを参照します。`/api/licenses` は通常DBの詰め将棋出典と専用DBの外部定跡出典を合成します。専用DBは通常起動時に読み取り専用で開かれ、存在しない場合も空ファイルを作りません。欠落、SQLite接続エラー、必須テーブル・カラム欠落、サンプル0件の場合、backend自体は起動し、該当APIだけが原因を含むHTTP 503を返します。
+
+パスは `backend/.env.example` の環境変数で個別に変更できます。外部定跡のimportとsample抽出は `NEXT_MOVE_DB_PATH` のDBを明示的に作成・更新します。
+
+```bash
+cd backend
+NEXT_MOVE_DB_PATH=./data/next_move.db python -m app.importers.yaneuraou_book <book.db> \
+  --name "YaneuraOu Book" --source-url <URL> --license-name <LICENSE>
+NEXT_MOVE_DB_PATH=./data/next_move.db python -m app.scripts.extract_learning_samples \
+  --source-id <ID> --limit 10000 --per-opening-limit 500 --seed 1
+python scripts/validate_next_move_db.py ./data/next_move.db --expected-learning-samples 10000
+```
+
+検証コマンドはintegrity/foreign key、孤立参照、件数、出典・ライセンス、重複を読み取り専用で確認します。`--expected-learning-samples` を省略するとサンプル件数は任意です。差し替え時はbackendを停止し、新DBを別名で生成・検証してから `next_move.db` を置換してください。自動テストとE2Eは数局面だけのYaneuraOuテキストfixtureから一時DBを生成し、正式な10,000件DBを複製しません。大規模な外部定跡DBは容量と再配布ライセンスの確認が必要なためGit管理せず、出典・ライセンス情報を `book_sources` に必ず登録してください。
+
+`learning_samples.id` は再生成で変わり得る内部IDです。将来、履歴やお気に入りを通常DBへ保存する場合は、出典、正規化SFEN、対象手、生成条件から作る安定キーを利用してください。

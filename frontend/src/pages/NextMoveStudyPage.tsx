@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { Color } from "tsshogi";
-import { fetchLearningSample, fetchLearningSamples, type LearningSample } from "../api/client";
+import { fetchLearningSample, fetchLearningSamples, isNextMoveUnavailable, type LearningSample } from "../api/client";
 import { NextMoveCandidateComparison, NextMoveResultPanel } from "../components/NextMoveResultPanel";
 import ShogiBoard from "../components/ShogiBoard";
 import { useNextMoveSession } from "../hooks/useNextMoveSession";
@@ -50,7 +50,9 @@ function NextMoveStudyContent({ id }: { id: string | undefined }) {
         if (!cancelled) setSampleState({ id: sampleId, sample: data, error: null });
       })
       .catch((e) => {
-        if (!cancelled) setSampleState({ id: sampleId, sample: null, error: `問題の取得に失敗しました: ${e}` });
+        if (!cancelled) setSampleState({ id: sampleId, sample: null, error: isNextMoveUnavailable(e)
+          ? "次の一手データを利用できません。専用DBの設定を確認してください。"
+          : `問題の取得に失敗しました: ${e}` });
       });
     return () => {
       cancelled = true;
