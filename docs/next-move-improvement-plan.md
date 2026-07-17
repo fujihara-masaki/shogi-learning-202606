@@ -111,19 +111,28 @@ problem_key = "v1:" + sha256(
 
 - `stable_source_key`: 定跡ソースを安定して識別する値(`book_sources` の name / version / source_url から構成)。同一局面でもソースが異なれば候補手・評価値が異なる別問題として扱う。**ファイル全体の `file_sha256` は含めない**(ファイルの一部が更新されただけで、変更のない全局面のキーが変わってしまうため)。`file_sha256` は監査用メタデータとして別途保存する。
 - `normalized_sfen`: SFENの手数(ply)フィールドを除去し、盤面・手番・持ち駒を python-shogi / tsshogi の再シリアライズで正規化する。再生成時の表記ゆれ(持ち駒の並び・空白等)でキーが変わることを防ぐ。
-- `candidate_definition_fingerprint`: その局面に登録されている候補手と順位の定義を局面単位でハッシュ化した値。**`effective_rank` と `move_usi` の組の配列**を canonical JSON 化して算出する(`move_usi` の並びだけでは、候補手の並びが同じまま数値順位だけが変わるケース—例: `sort_order` が `[0, 2]`→`[0, 3]` になり第3候補が第4候補へ変わって verdict が strong→listed に変わる—を検出できないため)。
+- `candidate_definition_fingerprint`: その局面に登録されている候補手と、**判定に実際に使う候補順序**を局面単位でハッシュ化した値。前提として、候補の順序決定を共通関数 **`canonicalize_candidates_for_judgment(candidates)`** に一元化し、(1) API の候補返却順、(2) frontend の `judgeNextMove`、(3) backend の verdict / candidate_rank 算出、(4) fingerprint、(5) テスト、のすべてで同一実装(同一規則)を使う。
+
+  **判定用候補順序の規則**(現行APIの ORDER BY を安定化したもの):
+
+  1. `effective_rank` 昇順(DB の rank = `sort_order + 1` があればそれ、無ければ判定に使う並び順から補完。`sort_order` の欠番・非連続値も実際の判定順位をそのまま反映)
+  2. 同順位は `score` 降順(NULL は非NULLの後)
+  3. 次に `depth` 降順(NULL は非NULLの後)
+  4. 最後に `move_usi` 昇順
+
+  **DB の行ID・挿入順は順序決定に使わない**(行IDはDB再生成で変わるため、安定キーの意味を決める tie-breaker には不適。現行APIの最終 tie-breaker `bm.id` は PR-A で `move_usi` に置き換える)。
+
+  fingerprint の canonical 入力は、この共通関数の結果順に **`judgment_position`(判定後の位置=1始まりの連番)・`effective_rank`・`move_usi`** の組を並べた配列とし、canonical JSON(キー順・空白を固定)にしてハッシュ化する:
 
   ```json
   [
-    {"effective_rank": 1, "move_usi": "2g2f"},
-    {"effective_rank": 4, "move_usi": "7g7f"}
+    {"judgment_position": 1, "effective_rank": 1, "move_usi": "2g2f"},
+    {"judgment_position": 2, "effective_rank": 1, "move_usi": "7g7f"}
   ]
   ```
 
-  - `effective_rank` は **API 表示と backend/frontend の判定で実際に使う順位と完全に同一の計算規則**とする(DB の rank(`sort_order + 1`)があればそれ、無ければ判定に使う並び順から補完—現行 `displayRank` と同じ規則)。`sort_order` の欠番・非連続値がある場合も、実際の判定順位をそのまま反映する。
-  - 配列は `effective_rank` 昇順、同順位は `move_usi` 昇順で決定的に並べ、canonical JSON(キー順・空白を固定)にしてハッシュ化する。DB の行順に依存しない。
-  - `effective_rank` の算出は共通関数に切り出し、API レスポンス・記録時の verdict/candidate_rank 算出・fingerprint・テストで同一実装を使う(規則のずれを構造的に防ぐ)。
-  - score・PV は含めない(数値の微修正やPV追記のたびに別問題化するのを避ける。判定は候補手の有無と順位で決まるため、verdict に影響し得る変更=候補手・順位の変更は fingerprint で必ず検出できる)。候補手が同じでも `effective_rank` が変われば fingerprint が変わり、別問題として扱われる。
+  - score・depth の**生の数値そのものは fingerprint に含めない**(数値の微修正やPV追記のたびに別問題化するのを避ける)。ただし score/depth の変化で同順位候補の順序が入れ替わった場合は `judgment_position` と `move_usi` の対応が変わるため、fingerprint と `problem_key` も変わる。つまり: **score/depth が変わっても判定順が変わらなければキーは維持され、top候補や判定順が変われば必ずキーが変わる**(同順位候補の score 更新で top が入れ替わったのに旧キーが照合を通過し、新しい候補順の verdict で誤記録される穴を塞ぐ)。
+  - 候補手・順位・判定順のいずれかが変われば fingerprint が変わり、別問題として扱われる。同順位候補は禁止しない(判定順で一意化する)。
 - `problem_definition_version`: problem_key の意味や fingerprint の計算方法を変更する場合に備えたバージョン(初期値 `1`)。先頭の `v1:` はキー文字列形式のバージョンで、これと合わせて管理する。
 
 `opening_key` はキーに**含めない**: 戦型分類は分類器の改良で変わり得る表示・集計用メタデータであり、分類が変わっても問題自体は同一だからである(記録側には集計用に非正規化して保存する)。
@@ -199,7 +208,12 @@ extracted_at         -- 抽出日時
 ### P0-1 解答記録
 
 - 挑戦画面で合法手を指すと `POST /api/next-move/results` が1回呼ばれる。クライアントが送るのは `sample_id`(**一時参照**)・`problem_key`(**問題取得APIが返した値**)・`move_usi`・`hint_count`・`elapsed_ms` の5項目のみ。
-- **verdict と candidate_rank は backend 側で算出する**: backend は `sample_id` から next_move.db の現在の問題・候補手・出典メタデータを読み、`problem_key` を再算出する。**クライアントが送った `problem_key` と再算出値が一致した場合のみ**、`move_usi` を候補手と突き合わせて verdict・candidate_rank を確定し保存する。クライアント申告の判定は信用しない(フロントの判定ロジックは即時表示専用とし、順位付け規則は backend と同一の `effective_rank` 規則であることをテストで担保する)。
+- **verdict と candidate_rank は backend 側で算出する**: backend は `sample_id` から next_move.db の現在の問題・候補手・出典メタデータを読み、`problem_key` を再算出する。**クライアントが送った `problem_key` と再算出値が一致した場合のみ**、`canonicalize_candidates_for_judgment` の結果順で `move_usi` を突き合わせて verdict・candidate_rank・judgment_position を確定し保存する。クライアント申告の判定は信用しない(フロントの判定ロジックは即時表示専用とし、候補順序・順位規則は backend と同一の共通関数規則であることをテストで担保する)。
+- **同順位候補がある場合の判定の意味**(candidate_rank と judgment_position の分離):
+  - `judgment_position` = `canonicalize_candidates_for_judgment` の結果順の位置(1始まり)。**top は judgment_position = 1 の候補**(現行 `judgeNextMove` の「先頭候補 = top」と同じ)。
+  - `candidate_rank` = `effective_rank`(API表示の「第N候補」と同じ値)。同順位候補は同じ `candidate_rank` を持ち得る。
+  - verdict 区分: judgment_position = 1 → `top`。それ以外は `effective_rank` ≤ 3 → `strong`、4以上 → `listed`(現行規則の維持。同 effective_rank = 1 の2番目の候補は `strong` になる)。
+  - 記録には `candidate_rank`(表示順位)と `judgment_position`(判定位置)の**両方**を保存し、意味の曖昧さを残さない。
 - **problem_key 不一致時は履歴を保存せず HTTP 409 を返す**(構造化エラーコード例: `NEXT_MOVE_PROBLEM_CHANGED`)。これは、問題表示後〜解答送信の間に next_move.db が再生成・差し替えされ、同じ `learning_samples.id` が**別問題に再利用された**ケースの検出である(この場合 `sample_id` は存在するため404にも503にもならず、照合なしでは差し替え後の別問題に誤って履歴が保存されてしまう)。`next_move_results` にも `next_move_problem_refs` にも書き込まない。
 - 409 を受けたフロントエンドは「問題データが更新されました。再読み込みしてください」等を表示する。**盤面上で算出済みの解答結果表示自体は妨げない**(記録されなかったことのみ控えめに伝える)。
 - `sample_id` が存在しない場合は404、next_move.db が利用不可の場合は503を返す(いずれも記録は行われない)。
@@ -297,7 +311,8 @@ CREATE TABLE IF NOT EXISTS next_move_results (
     opening_name TEXT NOT NULL DEFAULT '',
     move_usi TEXT NOT NULL,
     verdict TEXT NOT NULL,              -- top / strong / listed / unlisted(backend算出)
-    candidate_rank INTEGER,             -- 候補外は NULL(backend算出)
+    candidate_rank INTEGER,             -- effective_rank(表示順位)。候補外は NULL(backend算出)
+    judgment_position INTEGER,          -- 判定用候補順序上の位置(1始まり)。候補外は NULL(backend算出)
     hint_count INTEGER NOT NULL DEFAULT 0,
     elapsed_ms INTEGER,
     answered_at TEXT NOT NULL DEFAULT (datetime('now'))
@@ -326,6 +341,7 @@ next_move.db 側(抽出ツールが生成。実行時は読み取り専用のま
 補足:
 
 - 既存 `GET /api/learning-samples` / `GET /api/learning-samples/{id}` のレスポンスに `problem_key` を追加する(backend が算出。一覧バッジ・status API との突合に使用)。
+- 候補手の返却順を `canonicalize_candidates_for_judgment` に統一する。既存の ORDER BY との差分は最終 tie-breaker のみ(`bm.id` → `move_usi`。行IDはDB再生成で変わるため安定キーの順序決定に使わない)。
 - 既存 `GET /api/learning-samples` に `total_count` 相当(または `X-Total-Count`)と `offset` を追加(P0-2 の注記/P2-2 のページング)。
 
 ### フロントエンド
@@ -339,7 +355,7 @@ next_move.db 側(抽出ツールが生成。実行時は読み取り専用のま
 | `src/components/NextMoveResultPanel.tsx` | 用語ヘルプ | P1-4 |
 | `src/pages/HistoryPage.tsx` | 次の一手セクション | P1-1 |
 | `src/pages/ReviewPage.tsx` | 次の一手タブ | P1-2 |
-| `src/shogi/nextMove.ts` | verdict→バッジ表示のマッピング等の純関数追加 | P0-2 |
+| `src/shogi/nextMove.ts` | 判定用候補順序を共通規則(`canonicalize_candidates_for_judgment` 相当)に合わせる、verdict→バッジ表示のマッピング等の純関数追加 | P0-1 / P0-2 |
 | `src/index.css` | バッジ・サマリー・完了メッセージのスタイル(360px確認込み) | 各PR |
 
 ### テスト
@@ -365,14 +381,17 @@ next_move.db 側(抽出ツールが生成。実行時は読み取り専用のま
   - (b) その状態でPOSTすると、クライアント送信の `problem_key` と backend 再算出値が不一致になる。
   - (c) 409(`NEXT_MOVE_PROBLEM_CHANGED`)が返り、`next_move_results` にも `next_move_problem_refs` にも1行も保存されない。
   - (d) `problem_key` が一致する通常ケースでは正常に保存される。
+  - (e) 問題表示後に、**同順位候補の top 順だけが変わった**(score/depth 更新で判定順が入れ替わった)DB へ差し替えた場合も、fingerprint の差により `problem_key` 照合が409となり履歴が保存されない。
 - `problem_key` の導出:
   - (a) `limit`・`per_opening_limit`・`seed` を変更して再抽出しても、同じ問題(同一出典・同一正規化局面・同一候補手定義)の `problem_key` が一致する。
   - (b) ソースファイルの**無関係な局面だけ**が変更(追加・削除・修正)されても、対象問題の `problem_key` は一致する(`file_sha256` がキーに影響しないこと)。
-  - (c) 対象局面の**候補手または候補順位が変わる**と `problem_key` が変わる(fingerprint 検出)。score・PV のみの変更ではキーが変わらない。特に以下を検証する:
+  - (c) 対象局面の**候補手・候補順位・判定順のいずれかが変わる**と `problem_key` が変わる(fingerprint 検出)。判定順に影響しない変更ではキーが変わらない。特に以下を検証する:
     - 同じ `move_usi` 配列・同じ並びでも、`effective_rank` が変わる(例: `sort_order` の変更で 3→4)と fingerprint と `problem_key` が変わる。
-    - `effective_rank` と `move_usi` が同じなら、DB の行順(挿入順・id順)が異なっても同じ fingerprint になる。
-    - 同順位の候補が複数ある場合も、`move_usi` による第2ソートで fingerprint が決定的になる。
-    - backend の verdict/candidate_rank 算出と fingerprint が**同一の `effective_rank` 共通関数**を使っていることを検証する(同一fixtureに対する順位が一致すること)。
+    - 同じ `effective_rank` の候補が複数ある場合、`canonicalize_candidates_for_judgment` によって判定順が決定的になる(score降順→depth降順→move_usi昇順。NULL は非NULLの後)。
+    - **score または depth の変更で同順位候補の順序が入れ替わる**と、`judgment_position` の対応が変わり fingerprint と `problem_key` が変わる。
+    - score / depth が変わっても**候補順が変わらなければ** fingerprint は変わらない。
+    - DB の行ID・挿入順が変わっても、同じ候補定義・同じ判定順なら fingerprint は一致する。
+    - API の候補返却順、frontend 判定、backend の verdict/candidate_rank 算出、fingerprint の `judgment_position` が**同一の共通関数規則**で一致することを、同一fixtureで検証する(top の一致を含む)。
   - (d) **異なる出典に同一SFENが含まれる場合はキーが異なる**(`stable_source_key` の分離)。
   - (e) 手数フィールドの違いや持ち駒順・空白などの表記ゆれは正規化され、キーが一致する。
   - (f) `problem_definition_version` を変えるとキーが変わる。
@@ -385,6 +404,7 @@ next_move.db 側(抽出ツールが生成。実行時は読み取り専用のま
 ### フロントエンド(vitest)
 
 - バッジ/進捗表示の純関数、ポリシー付き「次の問題」選択ロジック、経過時間の丸め。
+- `judgeNextMove` が判定用候補順序の共通規則(同順位は score降順→depth降順→move_usi昇順、NULLは後)に従うこと(backend側テストと同一の共通fixtureを使用)。
 - `client.ts`: 503 detail の抽出、409(`NEXT_MOVE_PROBLEM_CHANGED`)の構造化エラーの取り出し、記録API失敗時に例外を伝播させないこと。
 
 ### E2E(Playwright)— 既存アサーションは全て維持
@@ -404,7 +424,7 @@ next_move.db 側(抽出ツールが生成。実行時は読み取り専用のま
 依存関係順。各PRは単独でテスト green を維持する。
 
 1. **PR-A: 解答記録の基盤**(P0-1)
-   - `problem_key` の定義・算出(stable_source_key・normalized_sfen・candidate_definition_fingerprint・problem_definition_version)と、`effective_rank` 共通関数(API表示・verdict算出・fingerprint で同一実装)、抽出ツール側の `extraction_runs` メタデータ保存(`extract_learning_samples.py` / `validate_next_move_db.py` 対応)。
+   - `problem_key` の定義・算出(stable_source_key・normalized_sfen・candidate_definition_fingerprint・problem_definition_version)と、判定用候補順序の共通関数 `canonicalize_candidates_for_judgment`(API返却順・frontend判定・backend判定・fingerprint で同一実装。APIの最終 tie-breaker を `bm.id`→`move_usi` に変更)、抽出ツール側の `extraction_runs` メタデータ保存(`extract_learning_samples.py` / `validate_next_move_db.py` 対応)。
    - shogi.db スキーマ追加(`next_move_problem_refs` + `next_move_results`)、`POST /api/next-move/results`(`problem_key` 照合→一致時のみ backend で verdict・candidate_rank を算出・保存、不一致は 409 `NEXT_MOVE_PROBLEM_CHANGED`)、learning-samples レスポンスへの `problem_key` 追加、セッションでの自動記録と409時の再読み込み案内(UI変更は最小)。
    - README の安定キー方針の更新(下記ドキュメント欄参照)。
    - backend/frontend/E2E テスト(problem_key 安定性・fingerprint 検出・DB差し替え409を含む)。ここが全ての土台。
