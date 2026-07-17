@@ -98,23 +98,52 @@
 
 前提となる設計判断: **解答記録・お気に入りなどのユーザーデータは通常DB(shogi.db)に保存し、next_move.db は読み取り専用のまま**とする。next_move.db は再生成・差し替えされる(`learning_samples` は再抽出で DELETE→INSERT され **id が変わる**)ため、記録のキーには `id` を用いない。
 
-記録のキーには、READMEの安定キー方針(出典・正規化SFEN・生成条件から作る)に沿った **出典を含む正規化済み安定キー `problem_key`** を用いる。SFEN + opening_key だけでは、複数の外部定跡ソースに同一局面が存在した場合に、候補手・順位・評価値が異なる**別問題を同一視してしまう**ため不可。
+記録のキーには **問題の意味(出典・局面・候補手定義)にのみ依存する安定キー `problem_key`** を用いる。SFEN + opening_key だけでは、複数の外部定跡ソースに同一局面が存在した場合に、候補手・順位・評価値が異なる**別問題を同一視してしまう**ため不可。一方で、抽出件数・seed などの**抽出実行条件はキーに含めない**。含めてしまうと、サンプルを10,000件→100,000件に増やす・seedを変えるといった問題の意味と無関係な操作だけで全履歴・進捗・復習状態・お気に入りが失われるため。抽出実行条件は後述の `extraction_run_key` として分離して保存する。
 
 ```
 problem_key = "v1:" + sha256(
-    source_key        -- 出典識別: book_sources.name / version / file_sha256 を連結
-  + normalized_sfen   -- 手数フィールドを除去し、ライブラリ再シリアライズで正規化したSFEN
-  + opening_key       -- 戦型分類キー
-  + extraction_key    -- 抽出・生成条件(抽出器バージョン + limit/per_opening_limit/seed 等)
+    stable_source_key                  -- 出典の安定識別子
+  + normalized_sfen                    -- 正規化局面
+  + candidate_definition_fingerprint   -- 候補手定義のフィンガープリント
+  + problem_definition_version         -- 問題定義のバージョン
 )
 ```
 
-- `source_key`: どの定跡ソース由来の問題かを識別する。同一局面でもソースが異なれば候補手・評価値が異なる別問題として扱う。
-- `normalized_sfen`: SFENの手数(ply)部分を除去し、盤面・手番・持ち駒を python-shogi / tsshogi の再シリアライズで正規化する。再生成時の表記ゆれ(持ち駒の並び・空白等)でキーが変わることを防ぐ。
-- `extraction_key`: 抽出条件・生成バージョン。分類器や抽出ロジックの変更で問題セットの意味が変わった場合はキーも変わる(= 別問題として記録し直す)。抽出時に next_move.db 側へメタデータとして保存し、API提供時に参照する。
-- 先頭の `v1:` はキー形式自体のバージョンで、キー定義を変更する場合に備える。
+- `stable_source_key`: 定跡ソースを安定して識別する値(`book_sources` の name / version / source_url から構成)。同一局面でもソースが異なれば候補手・評価値が異なる別問題として扱う。**ファイル全体の `file_sha256` は含めない**(ファイルの一部が更新されただけで、変更のない全局面のキーが変わってしまうため)。`file_sha256` は監査用メタデータとして別途保存する。
+- `normalized_sfen`: SFENの手数(ply)フィールドを除去し、盤面・手番・持ち駒を python-shogi / tsshogi の再シリアライズで正規化する。再生成時の表記ゆれ(持ち駒の並び・空白等)でキーが変わることを防ぐ。
+- `candidate_definition_fingerprint`: その局面に登録されている候補手と順位の定義を局面単位でハッシュ化した値。**rank順に正規化した `move_usi` の配列**から算出する。score・PV は含めない(数値の微修正やPV追記のたびに別問題化するのを避ける。判定は候補手の有無と順位で決まるため、verdict に影響し得る変更=候補手・順位の変更は必ず検出できる)。候補手または候補順位が変われば fingerprint が変わり、別問題として扱われる。
+- `problem_definition_version`: problem_key の意味や fingerprint の計算方法を変更する場合に備えたバージョン(初期値 `1`)。先頭の `v1:` はキー文字列形式のバージョンで、これと合わせて管理する。
 
-`problem_key` は backend が `learning_samples` の各レコードに対して算出し、API レスポンスに含める。同一の出典・生成条件で next_move.db を再生成した場合は履歴が引き継がれ、出典や生成条件を変えた場合は意図的に別問題として扱われる(このトレードオフはREADMEに明記する)。
+`opening_key` はキーに**含めない**: 戦型分類は分類器の改良で変わり得る表示・集計用メタデータであり、分類が変わっても問題自体は同一だからである(記録側には集計用に非正規化して保存する)。
+
+`problem_key` は backend が `learning_samples` の各レコードに対して算出し、API レスポンスに含める。
+
+**抽出実行メタデータ(`extraction_run_key`)の分離**: 以下は problem_key に含めず、「どの抽出実行・どのソースファイルから生成されたか」を追跡する監査用メタデータとして next_move.db 側に保存する。
+
+```
+extraction_run_key   -- 抽出実行の識別子(下記フィールドから生成)
+extractor_version    -- 抽出器・分類器のバージョン
+limit                -- 抽出件数上限
+per_opening_limit    -- 戦型別上限
+seed                 -- 抽選seed
+source_file_sha256   -- 取り込み元ファイルのハッシュ(監査用)
+extracted_at         -- 抽出日時
+```
+
+**履歴を引き継ぐケース**(problem_key が一致する):
+
+- 抽出件数を増減した(例: 10,000件→100,000件)
+- `limit`・`per_opening_limit`・`seed` を変更して再抽出した
+- 同じ出典・同じ正規化局面・同じ候補手定義の問題が再抽出された
+- ソースファイルの**別局面だけ**が変更された(対象問題の候補手定義が不変なら `file_sha256` が変わっても引き継ぐ)
+- 戦型分類(opening_key)だけが変わった
+
+**別問題として扱うケース**(problem_key が変わる):
+
+- 出典(`stable_source_key`)が異なる
+- 正規化局面が異なる
+- 候補手または候補順位の定義が変わった(fingerprint が変わる)
+- `problem_definition_version` を変更した
 
 ### P0 — 継続利用の土台(記録と最小限の出題改善)
 
@@ -158,11 +187,11 @@ problem_key = "v1:" + sha256(
 ### P0-1 解答記録
 
 - 挑戦画面で合法手を指すと `POST /api/next-move/results` が1回呼ばれる。クライアントが送るのは `sample_id`(**一時参照**)・`move_usi`・`hint_count`・`elapsed_ms` のみ。
-- **verdict と candidate_rank は backend 側で算出する**: backend は `sample_id` から next_move.db の該当サンプルと候補手を読み、`move_usi` を候補手と突き合わせて verdict・candidate_rank を確定し、`problem_key`・`source_key`・`normalized_sfen`・`opening_key` とともに保存する。クライアント申告の判定は信用しない(フロントの判定ロジックは即時表示専用とし、順位付け規則は backend と同一仕様であることをテストで担保する)。
+- **verdict と candidate_rank は backend 側で算出する**: backend は `sample_id` から next_move.db の該当サンプル・候補手・出典メタデータを読み、`move_usi` を候補手と突き合わせて verdict・candidate_rank を確定し、`problem_key`(および問題参照テーブルへのキー構成要素)とともに保存する。クライアント申告の判定は信用しない(フロントの判定ロジックは即時表示専用とし、順位付け規則は backend と同一仕様であることをテストで担保する)。
 - `sample_id` が存在しない場合は404、next_move.db が利用不可の場合は503を返す(解答中にDBが差し替えられたケース。記録は行われない)。
 - 「もう一度考える」→再着手でも新しいレコードとして記録される(上書きしない)。
 - 記録APIの失敗は挑戦フローを妨げない(結果表示は正常に出る。控えめなエラー表示のみ)。
-- next_move.db には書き込まない。同一の出典・生成条件で next_move.db を再生成・差し替えした場合、`problem_key` が一致し記録が引き継がれる。異なる出典に同一局面が含まれる場合は別問題として区別される(同一SFENでもキーが衝突しないことをテストで担保)。
+- next_move.db には実行時書き込みを行わない。§4冒頭の「履歴を引き継ぐケース」(抽出件数・seed変更、無関係な局面のみの変更等)で `problem_key` が一致して記録が引き継がれ、「別問題として扱うケース」(出典・局面・候補手定義・定義バージョンの変更)で区別されることをテストで担保する。
 - 記録は所要時間を含む(問題表示〜着手までのms)。
 
 ### P0-2 進捗表示
@@ -230,13 +259,27 @@ problem_key = "v1:" + sha256(
 
 - `backend/app/database.py` — 追加テーブル:
 
+キー構成要素を解答のたびに全カラム重複保存するのは冗長なため、**問題参照テーブル(problem_key ごとに1行)+スリムな結果テーブル**の2表構成とする。
+
 ```sql
+-- 問題参照(problem_key ごとに1行。POST時に backend が upsert。デバッグ・将来のキー移行用)
+CREATE TABLE IF NOT EXISTS next_move_problem_refs (
+    problem_key TEXT PRIMARY KEY,
+    stable_source_key TEXT NOT NULL,
+    normalized_sfen TEXT NOT NULL,
+    candidate_definition_fingerprint TEXT NOT NULL,
+    problem_definition_version INTEGER NOT NULL DEFAULT 1,
+    last_extraction_run_key TEXT NOT NULL DEFAULT '',   -- 監査用(キーには不使用)
+    last_source_file_sha256 TEXT NOT NULL DEFAULT '',   -- 監査用(キーには不使用)
+    first_seen_at TEXT NOT NULL DEFAULT (datetime('now')),
+    last_seen_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+-- 解答記録(1解答=1行。キー構成要素は problem_refs 側に持たせて重複保存しない)
 CREATE TABLE IF NOT EXISTS next_move_results (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    problem_key TEXT NOT NULL,          -- 出典を含む正規化済み安定キー(§4冒頭。next_move.db 再生成に耐える)
-    source_key TEXT NOT NULL,           -- キー構成要素も個別保存(デバッグ・将来のキー移行用)
-    normalized_sfen TEXT NOT NULL,
-    opening_key TEXT NOT NULL DEFAULT '',
+    problem_key TEXT NOT NULL REFERENCES next_move_problem_refs(problem_key),
+    opening_key TEXT NOT NULL DEFAULT '',   -- 集計用の非正規化(分類変更時は表示上のグルーピングのみ変わる)
     opening_name TEXT NOT NULL DEFAULT '',
     move_usi TEXT NOT NULL,
     verdict TEXT NOT NULL,              -- top / strong / listed / unlisted(backend算出)
@@ -247,12 +290,13 @@ CREATE TABLE IF NOT EXISTS next_move_results (
 );
 CREATE INDEX IF NOT EXISTS idx_next_move_results_key ON next_move_results(problem_key);
 CREATE INDEX IF NOT EXISTS idx_next_move_results_opening ON next_move_results(opening_key, answered_at);
--- P2-1 で追加: next_move_favorites(problem_key UNIQUE, opening_key, created_at)
+-- P2-1 で追加: next_move_favorites(problem_key UNIQUE REFERENCES next_move_problem_refs, created_at)
 ```
 
 next_move.db 側(抽出ツールが生成。実行時は読み取り専用のまま):
 
-- 抽出時に `extraction_key`(抽出器バージョン・limit/per_opening_limit/seed 等)をメタデータとして保存する(例: `learning_sample_meta` テーブル、または `learning_samples` への追加カラム)。`extract_learning_samples.py` と `validate_next_move_db.py` を対応させる。メタデータが無い旧DBに対しては `extraction_key = "unknown"` でキーを算出する(フォールバック)。
+- 抽出時に **抽出実行メタデータ**を保存する: `extraction_runs` テーブル(`extraction_run_key`, `extractor_version`, `limit`, `per_opening_limit`, `seed`, `source_file_sha256`, `extracted_at`)を追加し、`learning_samples` から `extraction_run_key` を参照する。`extract_learning_samples.py` と `validate_next_move_db.py` を対応させる。
+- `problem_key` の構成要素(`stable_source_key`・`normalized_sfen`・candidate fingerprint)は既存の `book_sources` / `book_moves` から backend が算出できるため、**メタデータの無い旧DBでも problem_key は完全に算出可能**。旧DBでは監査用の `extraction_run_key` のみ `"unknown"` にフォールバックする(キーには影響しない)。
 
 ### API(新規ルーター `backend/app/routers/next_move.py` を想定)
 
@@ -293,6 +337,7 @@ next_move.db 側(抽出ツールが生成。実行時は読み取り専用のま
 ### ドキュメント
 
 - `README.md` — 使い方・API一覧・「既知の制限」の更新(ランダム/進捗対応後に制限記述を削除)
+- `README.md` の**安定キー方針の更新**: 現在は「出典、正規化SFEN、対象手、生成条件から作る安定キー」と記載されているが、次の一手は単一の対象手ではなく複数候補と順位を持ち、また抽出実行条件をキーに含めると件数・seed変更だけで履歴が失われる。本計画に合わせて「**出典・正規化SFEN・候補手定義(または対象手)・問題定義バージョン**から作り、**抽出実行条件は問題キーとは分離**して監査メタデータとする」方針へ更新する(PR-Aに含める)。
 
 ---
 
@@ -301,8 +346,16 @@ next_move.db 側(抽出ツールが生成。実行時は読み取り専用のま
 ### バックエンド(pytest)
 
 - `next_move_results` の記録: `sample_id`+`move_usi` から backend が候補手を参照して verdict・candidate_rank を算出すること(top/strong/listed/unlisted の各ケース。フロント `judgeNextMove` と同一の順位付け規則であることを共通fixtureで担保)、同一問題への複数記録、存在しない `sample_id` は404。
-- `problem_key` の導出: (a) 同一の出典・生成条件での再生成後もキーが一致する(手数フィールドや表記ゆれの正規化を含む)、(b) **異なる出典に同一SFENが含まれる場合はキーが異なる**、(c) `extraction_key` や `opening_key` が変わればキーが変わる、(d) メタデータ無しの旧DBでは `unknown` フォールバックで一貫したキーになる。
-- `progress` / `status`: 記録なし→全て未挑戦、記録後の集計、next_move.db 差し替え(同一出典・生成条件)後も `problem_key` 経由で進捗が残ること。
+- `problem_key` の導出:
+  - (a) `limit`・`per_opening_limit`・`seed` を変更して再抽出しても、同じ問題(同一出典・同一正規化局面・同一候補手定義)の `problem_key` が一致する。
+  - (b) ソースファイルの**無関係な局面だけ**が変更(追加・削除・修正)されても、対象問題の `problem_key` は一致する(`file_sha256` がキーに影響しないこと)。
+  - (c) 対象局面の**候補手または候補順位が変わる**と `problem_key` が変わる(fingerprint 検出)。score・PV のみの変更ではキーが変わらない。
+  - (d) **異なる出典に同一SFENが含まれる場合はキーが異なる**(`stable_source_key` の分離)。
+  - (e) 手数フィールドの違いや持ち駒順・空白などの表記ゆれは正規化され、キーが一致する。
+  - (f) `problem_definition_version` を変えるとキーが変わる。
+  - (g) `extraction_run_key` は抽出条件(limit/seed 等)の変更で変わる(監査メタデータとしての検証。problem_key には影響しない)。
+  - (h) `extraction_runs` メタデータの無い旧DBでも `problem_key` は算出でき、`extraction_run_key` のみ `"unknown"` にフォールバックする。
+- `progress` / `status`: 記録なし→全て未挑戦、記録後の集計、next_move.db 差し替え(同一の問題定義)後も `problem_key` 経由で進捗が残ること。`next_move_problem_refs` が POST 時に upsert されること。
 - `next?policy=`: seeded RNG を注入した決定的テスト。分離した戦型選択関数の単体テストで各戦型の均等重みと `exclude_id` の除外動作を検証する(確率的な閾値判定は用いない。§5 P1-3 参照)。unattempted(全問挑戦済み時の挙動)、weak(unlisted/listedのみ)も同様に決定的に検証。
 - **next_move.db 不在時**: 出題系・`POST /api/next-move/results` は503を返し(verdict算出に候補手参照が必要なため)、shogi.db のみで完結する集計系(`history` 等)は動作すること。既存の `test_next_move_database.py` の検証(欠落テーブル・カラム・0件)を維持。
 
@@ -327,8 +380,9 @@ next_move.db 側(抽出ツールが生成。実行時は読み取り専用のま
 依存関係順。各PRは単独でテスト green を維持する。
 
 1. **PR-A: 解答記録の基盤**(P0-1)
-   - `problem_key` の定義・算出(正規化SFEN・source_key・extraction_key)と、抽出ツール側の `extraction_key` メタデータ保存(`extract_learning_samples.py` / `validate_next_move_db.py` 対応)。
-   - shogi.db スキーマ追加、`POST /api/next-move/results`(backend での verdict・candidate_rank 算出)、learning-samples レスポンスへの `problem_key` 追加、セッションでの自動記録(UI変更は最小)。
+   - `problem_key` の定義・算出(stable_source_key・normalized_sfen・candidate_definition_fingerprint・problem_definition_version)と、抽出ツール側の `extraction_runs` メタデータ保存(`extract_learning_samples.py` / `validate_next_move_db.py` 対応)。
+   - shogi.db スキーマ追加(`next_move_problem_refs` + `next_move_results`)、`POST /api/next-move/results`(backend での verdict・candidate_rank 算出)、learning-samples レスポンスへの `problem_key` 追加、セッションでの自動記録(UI変更は最小)。
+   - README の安定キー方針の更新(下記ドキュメント欄参照)。
    - backend/frontend/E2E テスト。ここが全ての土台。
 2. **PR-B: 進捗表示と一覧の改善**(P0-2、P1-5の見出し階層)
    - `progress`/`status` API、一覧バッジ・サマリー・件数注記、挑戦画面の「X / Y」修正。
