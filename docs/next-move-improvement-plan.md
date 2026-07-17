@@ -257,9 +257,11 @@ extracted_at         -- 抽出日時
 
 ### P0-2 進捗表示
 
-- 一覧の各戦型に「挑戦済み n / 全N問」が表示される(Nは `learning_samples` の実数、nは `problem_key` 単位のユニーク挑戦数)。戦型のグルーピングは**現在の next_move.db の分類**に基づく(解答時スナップショットでは集計しない。§6の参照方針)。
+- 一覧の各戦型に「挑戦済み n / 全N問」が表示される。**分子・分母とも distinct `problem_key` 基準**とする: N は現在の next_move.db から算出した **distinct `problem_key` 数**、n は解答済み distinct `problem_key` 数。`learning_samples` の行数は使わない(同じ name/version/source_url のソースを別 `file_sha256` で再取り込みした場合や、手数フィールドだけ異なるSFENなど、複数行が同一 `problem_key` に正規化され得るため。行数を分母にすると全問解いても100%に届かない)。
+- 進捗率・最有力率・未挑戦判定・完了判定はすべて `problem_key` 単位で行う。
+- 一覧に同一 `problem_key` の問題が重複表示されない(resolver の重複排除。§6)。戦型のグルーピングは**現在の next_move.db の分類**に基づく(解答時スナップショットでは集計しない)。
 - 各カードに最新解答に基づくバッジ(未挑戦/◎最有力/○有力/△登録候補/?未登録)が表示され、`aria-label` で読み上げ可能。
-- 挑戦画面の「問題 X / Y」が戦型の実件数と一致する(100件超でも正しい)。
+- 挑戦画面の「問題 X / Y」が戦型の distinct `problem_key` 数と一致する(100件超でも正しい)。
 - 一覧が30件で切れる場合、「全N問中30問を表示」の注記が出る。
 
 ### P0-3 ランダム出題・未挑戦優先
@@ -318,9 +320,17 @@ extracted_at         -- 抽出日時
 
 ## 6. 想定変更ファイル
 
-### DBスキーマ(shogi.db のみ。next_move.db は変更しない)
+### DBスキーマ
 
-- `backend/app/database.py` — 追加テーブル:
+変更対象は **shogi.db と next_move.db の両方**である。next_move.db は「変更しない」のではなく、**アプリ実行時に書き込まない**(`mode=ro` を維持)だけであり、**抽出・再生成時には抽出ツールがスキーマとメタデータを更新する**。この区別を実装時のスコープ漏れなく扱うため、以下を分けて記載する。
+
+#### shogi.db(ユーザーデータ・実行時書き込み対象)
+
+- `next_move_problem_refs`(問題参照)
+- `next_move_results`(解答記録)
+- 将来: `next_move_favorites`(P2-1)
+
+`backend/app/database.py` — 追加テーブル:
 
 キー構成要素を解答のたびに全カラム重複保存するのは冗長なため、**問題参照テーブル(problem_key ごとに1行)+スリムな結果テーブル**の2表構成とする。
 
@@ -358,7 +368,15 @@ CREATE INDEX IF NOT EXISTS idx_next_move_results_answered ON next_move_results(a
 -- P2-1 で追加: next_move_favorites(problem_key UNIQUE REFERENCES next_move_problem_refs, created_at)
 ```
 
-**戦型分類の参照方針(スナップショットと現在分類の分離)**: `next_move_results` の `opening_key_at_answer` / `opening_name_at_answer` は解答時点のスナップショットであり、**分類変更のたびに書き換えない**。進捗・状態・復習・履歴で戦型を表示・集計する際は、backend が現在の next_move.db の問題一覧から構築する **resolver(`problem_key` → 現在の `sample_id` / `opening_key` / `opening_name` のマッピング。リクエスト時に構築、必要ならプロセス内キャッシュ)** を参照する。
+**戦型分類の参照方針(スナップショットと現在分類の分離)**: `next_move_results` の `opening_key_at_answer` / `opening_name_at_answer` は解答時点のスナップショットであり、**分類変更のたびに書き換えない**。進捗・状態・復習・履歴で戦型を表示・集計する際は、backend が現在の next_move.db の問題一覧から構築する **resolver(`problem_key` → 現在の代表 `sample_id` / `opening_key` / `opening_name` のマッピング。リクエスト時に構築、必要ならプロセス内キャッシュ)** を参照する。
+
+**resolver の重複排除と代表 sample の選択**: 複数の `learning_samples` 行が同一 `problem_key` に正規化され得る(同じ name/version/source_url のソースを別 `file_sha256` で再取り込み、手数フィールドのみ異なるSFEN等)。resolver は構築時に **`problem_key` 単位で重複排除**し、進捗の分母(N)・status の対象・一覧・出題(ランダム/未挑戦/weak)・復習のすべてを distinct `problem_key` 基準にする(同一問題の重複表示・重複出題をしない)。同一 `problem_key` に複数 `sample_id` がある場合、画面表示・再挑戦に使う**代表 sample を決定的に1件選ぶ**:
+
+1. 最新の抽出実行を優先(`extraction_runs.extracted_at` 降順。メタデータの無い旧DBでは `book_sources.imported_at` 降順で代替)
+2. `sample_rank` 昇順
+3. `sample_id` 昇順(最終 tie-breaker。現在DB内での決定性のためだけに使い、永続識別には使わない)
+
+同一 `problem_key` の複数行で現在メタデータ(`opening_key` 等)が競合する場合は、**代表 sample の値を採用**して決定的にし、競合を検出したら backend ログで警告する。`validate_next_move_db.py` にも重複 `problem_key` とメタデータ不整合の検出を追加する。
 
 - progress: 現在の next_move.db の戦型分類で集計する(分類器改良で分類だけ変わった問題は新しい戦型の側に計上される)。
 - status: 現在利用可能な問題と `problem_key` で突合する。
@@ -366,19 +384,24 @@ CREATE INDEX IF NOT EXISTS idx_next_move_results_answered ON next_move_results(a
 - **next_move.db から問題が削除されている場合のみ**、解答時スナップショット(`*_at_answer`)へフォールバックして表示する。その際は「現在の問題データには存在しません」等の利用不可状態を付け、復習画面からの再挑戦導線は無効にする。
 - 過去の解答レコード自体は分類変更や問題削除で書き換えない。
 
-next_move.db 側(抽出ツールが生成。実行時は読み取り専用のまま):
+#### next_move.db(抽出・生成時に更新。アプリ実行時は読み取り専用)
 
-- 抽出時に **抽出実行メタデータ**を保存する: `extraction_runs` テーブル(`extraction_run_key`, `extractor_version`, `limit`, `per_opening_limit`, `seed`, `source_file_sha256`, `extracted_at`)を追加し、`learning_samples` から `extraction_run_key` を参照する。`extract_learning_samples.py` と `validate_next_move_db.py` を対応させる。
-- `problem_key` の構成要素(`stable_source_key`・`normalized_sfen`・candidate fingerprint)は既存の `book_sources` / `book_moves` から backend が算出できるため、**メタデータの無い旧DBでも problem_key は完全に算出可能**。旧DBでは監査用の `extraction_run_key` のみ `"unknown"` にフォールバックする(キーには影響しない)。
+- `extraction_runs` テーブルを追加する(`extraction_run_key`, `extractor_version`, `limit`, `per_opening_limit`, `seed`, `source_file_sha256`, `extracted_at`)。
+- `learning_samples` に `extraction_run_key` の参照を追加する。
+- 書き込みは**抽出ツールによる生成時のみ**(`extract_learning_samples.py` が新スキーマを生成する)。アプリ実行時の `mode=ro` 接続は維持し、実行時書き込みは一切行わない。
+- **旧DBの後方互換を維持**する: `extraction_runs` メタデータの無い旧DBでも、`problem_key` の構成要素(`stable_source_key`・`normalized_sfen`・candidate fingerprint)は既存の `book_sources` / `book_moves` から backend が算出できるため **problem_key は完全に算出可能**。旧DBでは監査用の `extraction_run_key` のみ `"unknown"` にフォールバックする(キーには影響しない)。
+- `validate_next_move_db.py` を新旧両形式に対応させる(新形式では `extraction_runs` の整合、旧形式では不在を許容。あわせて重複 `problem_key`・メタデータ不整合の検出を追加)。
+
+この shogi.db 側と next_move.db 生成側の両方を **PR-A に含める**(§8。片方だけ実装してスキーマ不整合になることを避ける)。
 
 ### API(新規ルーター `backend/app/routers/next_move.py` を想定)
 
 | メソッド | パス | 用途 | フェーズ |
 | --- | --- | --- | --- |
 | POST | `/api/next-move/results` | 解答記録。入力は `sample_id`(一時参照)+`problem_key`(表示中の問題の値)+`move_usi`+`hint_count`+`elapsed_ms` の5項目。backend が problem_key を再算出して照合(不一致は 409 `NEXT_MOVE_PROBLEM_CHANGED`)→ SFENから局面を復元して合法性を検証(構文不正 422 `NEXT_MOVE_MOVE_FORMAT_INVALID` / 違法手 422 `NEXT_MOVE_ILLEGAL_MOVE`)→ 合法時のみ候補手から verdict・candidate_rank を算出・保存 | P0-1 |
-| GET | `/api/next-move/progress` | 戦型ごとの挑戦数・verdict内訳(shogi.db の結果 × next_move.db の件数を `problem_key` で突合。戦型は**現在の分類**で集計) | P0-2 |
-| GET | `/api/next-move/status?opening_key=` | `problem_key`→最新verdict のマップ(一覧バッジ用。現在利用可能な問題と突合) | P0-2 |
-| GET | `/api/learning-samples/next?policy=random\|unattempted\|weak&opening_key=&exclude_id=` | 出題ポリシー | P0-3 / P1-2 / P1-3 |
+| GET | `/api/next-move/progress` | 戦型ごとの挑戦数・verdict内訳(分子・分母とも **distinct `problem_key`** 基準。shogi.db の結果 × next_move.db を `problem_key` で突合し、戦型は**現在の分類**で集計) | P0-2 |
+| GET | `/api/next-move/status?opening_key=` | `problem_key`→最新verdict のマップ(一覧バッジ用。**distinct な現在の `problem_key`** と突合) | P0-2 |
+| GET | `/api/learning-samples/next?policy=random\|unattempted\|weak&opening_key=&exclude_id=` | 出題ポリシー(resolver の重複排除後の distinct `problem_key` から代表 sample を返す。同一問題の重複出題なし。未挑戦判定は `problem_key` 単位) | P0-3 / P1-2 / P1-3 |
 | GET | `/api/next-move/history` | 履歴用の集計+最近の解答(戦型は現在分類を resolver で解決。削除済み問題は解答時スナップショット+利用不可表示) | P1-1 |
 | GET | `/api/next-move/review` | 復習対象(最新が unlisted/listed のサンプル。現在分類で表示し、削除済み問題は再挑戦不可として除外または無効表示) | P1-2 |
 
@@ -455,6 +478,20 @@ next_move.db 側(抽出ツールが生成。実行時は読み取り専用のま
   - `next_move_results` の解答時スナップショット(`opening_key_at_answer` / `opening_name_at_answer`)は書き換えられない。
   - 現在の next_move.db から問題が削除された場合、history は解答時スナップショット+利用不可状態で表示する(フォールバック)。
   - 削除済み問題が復習画面から誤って挑戦可能にならない(除外または導線無効)。
+- 重複 `problem_key` の扱い(distinct 基準の担保):
+  - 複数の `learning_samples` 行が同一 `problem_key` に正規化される fixture を用意する(別 `file_sha256` での再取り込み・手数フィールドのみ異なるSFEN)。
+  - progress の N が行数ではなく **distinct `problem_key` 数**になる。
+  - 1つの `problem_key` を解答すると n がちょうど1増える。
+  - 重複行があっても進捗が **100% に到達できる**。
+  - 一覧・ランダム出題・未挑戦優先・復習で同一 `problem_key` が重複表示・重複出題されない。
+  - 代表 sample の選択が DB の行順・挿入順に依存せず決定的である(選択規則: 最新抽出実行 → `sample_rank` 昇順 → `sample_id` 昇順)。
+  - 同一 `problem_key` 内で現在メタデータ(`opening_key` 等)が競合する fixture で、表示が決定的(代表 sample の値)になり、`validate_next_move_db.py` が警告を出す。
+- next_move.db のスキーマ形式(新旧両対応):
+  - 新形式DBで `extraction_runs` と `learning_samples.extraction_run_key` の参照が機能する。
+  - 旧形式DB(メタデータ無し)では `extraction_run_key` が `"unknown"` にフォールバックする。
+  - アプリ実行中に next_move.db への書き込みが一切発生しない(`mode=ro` の担保)。
+  - 抽出ツール(`extract_learning_samples.py`)が新スキーマを生成する。
+  - `validate_next_move_db.py` が新旧形式を判定し、それぞれで検証が通る。
 - `move_usi` の合法性検証(422系):
   - USI 構文が不正な手は 422(`NEXT_MOVE_MOVE_FORMAT_INVALID`)となり、`next_move_results`・`next_move_problem_refs` のどちらにも書き込まれない。
   - 空きマスからの移動など局面上の違法手は 422(`NEXT_MOVE_ILLEGAL_MOVE`)となる。
@@ -492,11 +529,11 @@ next_move.db 側(抽出ツールが生成。実行時は読み取り専用のま
 
 1. **PR-A: 解答記録の基盤**(P0-1)
    - `problem_key` の定義・算出(stable_source_key・normalized_sfen・candidate_definition_fingerprint・problem_definition_version)、**canonical serialization 共通関数**(キー辞書順・UTF-8・NFC・null/空文字区別。golden test 付き)、判定用候補順序の共通関数 `canonicalize_candidates_for_judgment`(API返却順・frontend判定・backend判定・fingerprint で同一実装。APIの最終 tie-breaker を `bm.id`→`move_usi` に変更)、抽出ツール側の `extraction_runs` メタデータ保存(`extract_learning_samples.py` / `validate_next_move_db.py` 対応)。
-   - shogi.db スキーマ追加(`next_move_problem_refs` + `next_move_results`)、`POST /api/next-move/results`(`problem_key` 照合 409 → SFEN復元による `move_usi` 合法性検証 422 → 合法時のみ backend で verdict・candidate_rank を算出・保存)、learning-samples レスポンスへの `problem_key` 追加、セッションでの自動記録と409時の再読み込み案内(UI変更は最小)。
+   - **shogi.db 側と next_move.db 生成側の両方を本PRに含める**: shogi.db スキーマ追加(`next_move_problem_refs` + `next_move_results`)と、next_move.db 生成スキーマの更新(`extraction_runs` + `learning_samples.extraction_run_key`。旧DB後方互換・validate 新旧対応込み)。`POST /api/next-move/results`(`problem_key` 照合 409 → SFEN復元による `move_usi` 合法性検証 422 → 合法時のみ backend で verdict・candidate_rank を算出・保存)、learning-samples レスポンスへの `problem_key` 追加、セッションでの自動記録と409時の再読み込み案内(UI変更は最小)。
    - README の安定キー方針の更新(下記ドキュメント欄参照)。
    - backend/frontend/E2E テスト(problem_key 安定性・fingerprint 検出・DB差し替え409を含む)。ここが全ての土台。
 2. **PR-B: 進捗表示と一覧の改善**(P0-2、P1-5の見出し階層)
-   - `progress`/`status` API と分類 resolver(`problem_key`→現在の sample_id / opening_key / opening_name。現在分類での集計)、一覧バッジ・サマリー・件数注記、挑戦画面の「X / Y」修正。
+   - `progress`/`status` API と分類 resolver(`problem_key`→現在の代表 sample_id / opening_key / opening_name。**distinct `problem_key` 基準**の集計・重複排除・代表 sample の決定的選択)、一覧バッジ・サマリー・件数注記、挑戦画面の「X / Y」修正(distinct `problem_key` 数ベース)。
 3. **PR-C: 出題ポリシーとスキップ**(P0-3、P0-4)
    - `learning-samples/next` API、ランダム/未挑戦優先ボタン、スキップ、完了状態。READMEの「既知の制限」更新。
 4. **PR-D: DB異常案内と用語説明**(P0-5、P1-4)
