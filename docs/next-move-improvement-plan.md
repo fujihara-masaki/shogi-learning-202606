@@ -269,7 +269,13 @@ extracted_at         -- 抽出日時
 - 一覧に「ランダムに1問」「未挑戦から1問」ボタンがあり、押すと該当問題の挑戦画面へ遷移する。
 - 未挑戦問題が無い場合はその旨を表示し、ランダム出題へフォールバックできる。
 - 解答後の「次の問題」は現在の出題ポリシーを引き継ぐ(ランダムで来たら次もランダム。**一覧から普通に開いた場合の「次の問題」は従来どおりの順次移動を維持**する — P0-4参照)。
-- **通常の順次移動と新APIの役割分担**: 新しい `GET /api/next-move/problems/next` の policy は `random` / `unattempted` / `weak` のみで、順序上の現在位置を持たない。そのため**通常の「次の問題」(順次移動)は新APIへ統合せず**、当面は既存の同一戦型兄弟一覧(既存一覧API)を使ったクライアント側の順次移動を維持する。ただし兄弟一覧は **distinct `problem_key` 単位に重複排除**し、**現在の問題の `problem_key` の位置**を基準に次の distinct `problem_key` へ進む。最後の問題では先頭へループせず(従来の `(index + 1) % length` による無限巡回は廃止)、P0-4 の完了表示へ切り替える。順次移動をサーバーAPIへ移行する場合は別PRで行う(P2-3参照)。
+- **通常の順次移動と新APIの役割分担**: 新しい `GET /api/next-move/problems/next` の policy は `random` / `unattempted` / `weak` のみで、順序上の現在位置を持たない。そのため**通常の「次の問題」(順次移動)は新APIへ統合せず**、既存一覧APIを使ったクライアント側の順次移動を維持する。ただし**対象戦型の全 distinct `problem_key` を取得してから現在位置と完了条件を判定する**(全ページ取得方式):
+  - 現行実装は兄弟一覧を最大100件で1回取得するだけ(`fetchLearningSamples(openingKey, 100)`、一覧APIの上限も100件)のため、101問以上ある戦型では取得済み配列の100問目を「最後」と誤認して完了表示してしまう。**取得済み配列の末尾を完了条件にしない。**
+  - frontend は順次移動セッション開始時に、ページングAPI(§6: `offset`/`limit`/`total`)を `offset=0,100,200,...` と繰り返し取得し、`items` が空になるか `offset + items.length >= total` で終了する。各ページは backend 側で重複排除済みの distinct `problem_key` 一覧なので、そのまま統合する。
+  - 完成した distinct `problem_key` 一覧(全 `total` 件)上で、現在の `problem_key` の位置を基準に次へ進む。最後の distinct `problem_key` でのみ P0-4 の完了表示に切り替える(従来の `(index + 1) % length` による無限巡回は廃止)。
+  - **途中ページの取得に失敗した場合、取得済み配列の末尾を「最後の問題」と扱わない**。「次の問題一覧を最後まで取得できませんでした」等の表示+再試行ボタン+一覧へ戻る導線を出し、完了表示にはしない。
+  - 実装上の検討事項: 取得中のローディング表示、二重取得防止、戦型変更時の古い取得の AbortController 等によるキャンセル(古いページ結果が新しい戦型へ混入しないように)、同一戦型の取得結果のセッション内キャッシュ。P0では実装の単純さを優先し、戦型ごとの distinct 問題数が現実的な範囲(数百件程度)である前提で開始時の全ページ一括取得とする(先読み方式への変更は必要になってから)。
+  - 順次移動をサーバーAPIへ移行する場合は別PRで行う(P2-3参照)。
 - **同一問題が連続して出ない(直前問題の除外は `problem_key` 基準)**: frontend は表示中の問題の `problem_key` を `exclude_problem_key` として送り、backend は distinct `problem_key` 単位の候補集合からそのキーを除外してから選択する。`exclude_id`(sample_id基準)は正式な除外契約に**しない** — 同一 `problem_key` に複数 `sample_id` がある場合(例: 表示中が sample_id=10、代表が sample_id=20)や、DB差し替えで同じ問題の `sample_id` が変わった場合に、ID除外では同一問題が再出題されてしまうため。
   - 直前問題の `problem_key` が次回の候補集合から除外される。同一 `problem_key` に複数 `sample_id` があっても、またDB差し替えで `sample_id` が変わっても、同一問題は再出題されない。
   - distinct 候補が2件以上なら必ず別の `problem_key` が返る。
@@ -282,7 +288,8 @@ extracted_at         -- 抽出日時
 ### P0-4 スキップと完了
 
 - 着手前に「スキップして次へ」が表示され、押すと記録なしで次の問題へ遷移し、見出しへフォーカスが移る。
-- **完了条件**: 同一戦型の distinct `problem_key` 一覧において現在の問題が最後の場合、次へ進まず「この戦型の問題を最後まで学習しました」等の完了メッセージと、「一覧へ戻る」「もう一度取り組む」「ランダムに続ける」等の導線を表示する(先頭へループしない)。
+- **完了条件**: 同一戦型の**全ページ取得を完了した** distinct `problem_key` 一覧(P0-3の全ページ取得方式)において現在の問題が最後の場合、次へ進まず「この戦型の問題を最後まで学習しました」等の完了メッセージと、「一覧へ戻る」「もう一度取り組む」「ランダムに続ける」等の導線を表示する(先頭へループしない)。
+- 一覧の全ページ取得が完了していない(途中で失敗した)状態では完了表示にしない(P0-3のエラー時の扱い: 再試行導線を出す)。
 - distinct 候補が1件のみの戦型でも、解答後の「次の問題」は完了扱いとする。
 - キーボードのみでスキップ→次問題→完了表示まで操作できる。
 
@@ -438,15 +445,23 @@ ROW_NUMBER() OVER (PARTITION BY problem_key ORDER BY answered_at DESC, id DESC)
 - 既存の問題一覧 `GET /api/learning-samples` と問題詳細 `GET /api/learning-samples/{id}` は互換のため**当面現行URLに残す**。役割分担: 問題一覧・詳細の読み取りと **P0での通常の順次移動(クライアント側の distinct `problem_key` 巡回)** は `/api/learning-samples`、`random` / `unattempted` / `weak` の出題開始・継続(`exclude_problem_key` による直前問題除外を含む)は `/api/next-move/problems/next`、記録・集計は `/api/next-move/*`。通常の順次移動を新APIへ強制統合しない(順次移動のサーバーAPI化は P2-3 で再検討し、行う場合は別PR)。将来一覧・詳細を `/api/next-move/problems` 系へ移す場合も、互換期間を設けて別PRで行う(本計画のスコープ外)。
 - 既存 `GET /api/learning-samples` / `GET /api/learning-samples/{id}` のレスポンスに `problem_key` を追加する(backend が算出。一覧バッジ・status API との突合に使用)。
 - 候補手の返却順を `canonicalize_candidates_for_judgment` に統一する。既存の ORDER BY との差分は最終 tie-breaker のみ(`bm.id` → `move_usi`。行IDはDB再生成で変わるため安定キーの順序決定に使わない)。
-- 既存 `GET /api/learning-samples` に `total_count` 相当(または `X-Total-Count`)と `offset` を追加(P0-2 の注記/P2-2 のページング)。
+- **一覧APIのページング(PR-B)**: 既存 `GET /api/learning-samples` に `offset` / `limit` / `total` を追加し、レスポンスを次の形にする:
+
+  ```json
+  {"items": [...], "offset": 0, "limit": 100, "total": 250}
+  ```
+
+  - `total` は `learning_samples` の行数ではなく、**現在の resolver における distinct `problem_key` 数**。
+  - 各 item には順次移動に必要な `sample_id`・`problem_key`・`opening_key`・`sample_rank`(決定的な並び順情報)を含める。
+  - **backend 側の処理順序**: (1) resolver 構築 → (2) `problem_key` 単位で代表 sample へ重複排除 → (3) 決定的順序付け(`sample_rank` 昇順 → `problem_key` 昇順。全ページで一貫)→ (4) `offset` / `limit` 適用。DBの生行をページングしてからクライアントで重複排除する方式は**採らない**(同一 `problem_key` の重複行がページ境界をまたぐと、ページ件数と `total` の意味が崩れるため)。
 
 ### フロントエンド
 
 | ファイル | 変更 | フェーズ |
 | --- | --- | --- |
-| `src/api/client.ts` | 上記API関数・型(POSTに `problem_key` を含む。出題APIは `/api/next-move/problems/next` を使用し204を「次の問題なし」として返す)、503 detail・409(`NEXT_MOVE_PROBLEM_CHANGED`)の取り出し | P0 |
+| `src/api/client.ts` | 上記API関数・型(POSTに `problem_key` を含む。出題APIは `/api/next-move/problems/next` を使用し204を「次の問題なし」として返す)、一覧APIの `{items, offset, limit, total}` 型と全ページ取得ヘルパー(offsetループ・AbortSignal対応)、503 detail・409(`NEXT_MOVE_PROBLEM_CHANGED`)の取り出し | P0 |
 | `src/hooks/useNextMoveSession.ts` | 経過時間計測、着手時の記録コールバック(表示中サンプルの `problem_key` を添付) | P0-1 |
-| `src/pages/NextMoveStudyPage.tsx` | スキップ・完了状態(通常の順次移動は既存兄弟一覧を distinct `problem_key` に重複排除し、現在の `problem_key` の位置から次へ進む。最後はループせず完了表示。`(index+1) % length` 廃止)・random/unattempted/weak モードの「次の問題」は新APIを使用(表示中の `problem_key` を `exclude_problem_key` として送信し、204は完了表示)・進捗ラベル修正・DB異常詳細表示・409時の「問題データが更新されました。再読み込みしてください」表示(結果表示は維持) | P0-1〜P0-5 |
+| `src/pages/NextMoveStudyPage.tsx` | スキップ・完了状態(通常の順次移動は一覧APIの**全ページ取得**で対象戦型の全 distinct `problem_key` を統合してから、現在の `problem_key` の位置基準で次へ進む。最後の distinct キーでのみ完了表示。`(index+1) % length` と「取得済み配列末尾=最後」の判定を廃止。途中ページ取得失敗時は完了扱いにせず再試行導線。ローディング・二重取得防止・戦型変更時のキャンセル・セッション内キャッシュを考慮)・random/unattempted/weak モードの「次の問題」は新APIを使用(表示中の `problem_key` を `exclude_problem_key` として送信し、204は完了表示)・進捗ラベル修正・DB異常詳細表示・409時の「問題データが更新されました。再読み込みしてください」表示(結果表示は維持) | P0-1〜P0-5 |
 | `src/components/NextMoveProblemList.tsx` | 進捗サマリー・バッジ・出題ボタン・件数注記・h2、DB異常詳細表示 | P0-2/3/5 |
 | `src/components/NextMoveResultPanel.tsx` | 用語ヘルプ | P1-4 |
 | `src/pages/HistoryPage.tsx` | 次の一手セクション | P1-1 |
@@ -521,6 +536,10 @@ ROW_NUMBER() OVER (PARTITION BY problem_key ORDER BY answered_at DESC, id DESC)
   - 一覧・ランダム出題・未挑戦優先・復習で同一 `problem_key` が重複表示・重複出題されない。
   - 代表 sample の選択が DB の行順・挿入順に依存せず決定的である(選択規則: 最新抽出実行 → `sample_rank` 昇順 → `sample_id` 昇順)。
   - 同一 `problem_key` 内で現在メタデータ(`opening_key` 等)が競合する fixture で、表示が決定的(代表 sample の値)になり、`validate_next_move_db.py` が警告を出す。
+- 一覧APIのページング(backend):
+  - `total` が `learning_samples` 行数ではなく distinct `problem_key` 数になる。
+  - backend で「resolver構築→重複排除→決定的順序付け(`sample_rank` 昇順→`problem_key` 昇順)→offset/limit適用」の順で処理される(重複排除後にページングされることを、重複行がページ境界付近にある fixture で検証。ページ件数と `total` が整合し、全ページを通して `problem_key` の欠落・重複がない)。
+  - distinct `problem_key` が250件の場合、`offset=0/100/200` の3ページで全件取得でき、全ページで順序が一貫する。
 - next_move.db のスキーマ形式(新旧両対応):
   - 新形式DBで `extraction_runs` と `learning_samples.extraction_run_key` の参照が機能する。
   - 旧形式DB(メタデータ無し)では `extraction_run_key` が `"unknown"` にフォールバックする。
@@ -572,6 +591,12 @@ ROW_NUMBER() OVER (PARTITION BY problem_key ORDER BY answered_at DESC, id DESC)
   - distinct 候補が1件のみの戦型では解答後に完了表示となる。
   - 通常の順次移動では `/api/next-move/problems/next` を呼ばない(route capture で確認)。random / unattempted / weak の操作は新APIを経由する。
   - 既存のキーボード操作・見出しフォーカス移動のアサーションを維持する。
+- 100件超の順次移動(モックで distinct `problem_key` が101件の戦型を用意。ページサイズ100):
+  - 100件目で完了表示にならず、101件目へ進める(2ページ目が取得される)。
+  - 101件目でのみ完了表示になる(最終問題E2Eを101件fixtureでも確認)。
+  - 2ページ目の取得が失敗した場合、100件目を完了扱いにせず、「次の問題一覧を最後まで取得できませんでした」+再試行導線が表示される。再試行成功後は101件目へ進める。
+  - 戦型を切り替えた際、進行中だった古いページ取得の結果が新しい戦型の一覧に混入しない。
+  - 100件以下の既存ケース(1ページで完結)も従来どおり動作する。
 - 完了: 最終問題の解答後に完了メッセージ。
 - DB異常: 503 detail 別の文言表示(モック)。
 - 既存の維持対象: キーボード操作一式、360px横スクロールなし(バッジ・サマリー追加後に再確認)、答えの漏洩なし(着手前に候補手/評価値/PV非表示)、ナビの `aria-current`、旧URLリダイレクト。
@@ -588,9 +613,9 @@ ROW_NUMBER() OVER (PARTITION BY problem_key ORDER BY answered_at DESC, id DESC)
    - README の安定キー方針の更新(下記ドキュメント欄参照)。
    - backend/frontend/E2E テスト(problem_key 安定性・fingerprint 検出・DB差し替え409を含む)。ここが全ての土台。
 2. **PR-B: 進捗表示と一覧の改善**(P0-2、P1-5の見出し階層)
-   - `progress`/`status` API と分類 resolver(`problem_key`→現在の代表 sample_id / opening_key / opening_name。**distinct `problem_key` 基準**の集計・重複排除・代表 sample の決定的選択)、一覧バッジ・サマリー・件数注記、挑戦画面の「X / Y」修正(distinct `problem_key` 数ベース)。
+   - `progress`/`status` API と分類 resolver(`problem_key`→現在の代表 sample_id / opening_key / opening_name。**distinct `problem_key` 基準**の集計・重複排除・代表 sample の決定的選択)、**一覧APIのページング**(`offset`/`limit`/`total`。backend で重複排除→順序付け→ページング。`total` は distinct `problem_key` 数)、一覧バッジ・サマリー・件数注記、挑戦画面の「X / Y」修正(distinct `problem_key` 数ベース)。
 3. **PR-C: 出題ポリシーとスキップ**(P0-3、P0-4)
-   - 出題API `GET /api/next-move/problems/next`(次の一手専用 namespace。既存の動的ルート `/api/learning-samples/{sample_id}` と衝突せず登録順に非依存。distinct `problem_key` 候補集合+`exclude_problem_key` 除外+候補なし時の204)は **random / unattempted / weak の出題開始・継続に使用**。**通常の「次の問題」(順次移動)は既存兄弟一覧によるクライアント側巡回を維持**し、distinct `problem_key` への重複排除・現在キー位置基準の前進・最終問題での完了表示(`(index+1) % length` のループ廃止)に改める。ランダム/未挑戦優先ボタン、スキップ、完了状態(204時・最終問題到達時の表示)。frontend(`client.ts`)は random 系で新URLを使用し、表示中の `problem_key` を送る。E2Eは順次移動の完了到達と、random 系操作が新URLを経由することを確認。READMEの「既知の制限」更新。
+   - 出題API `GET /api/next-move/problems/next`(次の一手専用 namespace。既存の動的ルート `/api/learning-samples/{sample_id}` と衝突せず登録順に非依存。distinct `problem_key` 候補集合+`exclude_problem_key` 除外+候補なし時の204)は **random / unattempted / weak の出題開始・継続に使用**。**通常の「次の問題」(順次移動)はクライアント側巡回を維持**し、**PR-Bのページング(`offset`/`limit`/`total`)に依存して全ページ取得**で対象戦型の全 distinct `problem_key` を統合してから、現在キー位置基準の前進・最終 distinct キーでの完了表示に改める(`(index+1) % length` と「取得済み配列末尾=最後」の判定を廃止。途中失敗時は完了扱いにせず再試行導線)。ランダム/未挑戦優先ボタン、スキップ、完了状態(204時・最終問題到達時の表示)。frontend(`client.ts`)は random 系で新URLを使用し、表示中の `problem_key` を送る。E2Eは順次移動の完了到達(101件fixture含む)と、random 系操作が新URLを経由することを確認。READMEの「既知の制限」更新。
 4. **PR-D: DB異常案内と用語説明**(P0-5、P1-4)
    - 503 detail 表示+復旧手順、評価値/PVヘルプ。小さく独立しているためA〜Cと並行可能(P0-5のみ先行切り出しも可)。
 5. **PR-E: 履歴・復習統合**(P1-1、P1-2、P1-3)
