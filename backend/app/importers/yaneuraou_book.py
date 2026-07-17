@@ -11,7 +11,7 @@ import re
 from dataclasses import dataclass
 from pathlib import Path
 
-from app.database import get_connection, init_db
+from app.next_move_database import get_next_move_write_connection, init_next_move_db
 
 SFEN_RE = re.compile(r"^(?:sfen\s+)?(.+\s[bw]\s(?:-|[RBGSNLPrbgsnlp0-9+]+)\s\d+)$")
 USI_RE = re.compile(r"^(?:[1-9][a-i][1-9][a-i][+]?|[RBGSNLP]\*[1-9][a-i])$")
@@ -124,14 +124,14 @@ def parse_book(path: Path, *, limit: int | None = None) -> tuple[list[ParsedPosi
 
 
 def import_book(path: Path, *, name: str, version: str = "", source_url: str = "", license_name: str = "", license_text: str = "", copyright_notice: str = "", note: str = "", dry_run: bool = False, limit: int | None = None) -> ImportResult:
-    init_db()
+    init_next_move_db()
     file_hash = sha256_file(path)
     stats = ParseStats()
     if dry_run:
         for _ in iter_book_positions(path, limit=limit, stats=stats):
             pass
         return ImportResult(None, file_hash, stats.positions_read, stats.moves_read, stats.invalid_lines, stats.duplicate_positions, 0, 0, True)
-    conn = get_connection()
+    conn = get_next_move_write_connection()
     try:
         cur = conn.execute(
             """

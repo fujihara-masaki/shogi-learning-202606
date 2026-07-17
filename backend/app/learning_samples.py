@@ -5,7 +5,7 @@ import random
 from dataclasses import dataclass
 from typing import Any
 
-from .database import get_connection, init_db
+from .next_move_database import get_next_move_write_connection, init_next_move_db
 
 UNKNOWN_OPENING = "unclassified"
 
@@ -179,9 +179,9 @@ def validate_sample_limits(*, limit: int, per_opening_limit: int) -> None:
 
 def build_learning_sample_plan(source_id: int, *, limit: int, per_opening_limit: int, seed: int, dry_run: bool) -> LearningSamplePlan:
     validate_sample_limits(limit=limit, per_opening_limit=per_opening_limit)
-    init_db()
+    init_next_move_db()
     rng = random.Random(seed)
-    conn = get_connection()
+    conn = get_next_move_write_connection()
     try:
         if not conn.execute("SELECT 1 FROM book_sources WHERE id = ?", (source_id,)).fetchone():
             raise ValueError(f"book source not found: {source_id}")

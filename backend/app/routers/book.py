@@ -6,8 +6,16 @@ from typing import Any
 from fastapi import APIRouter, HTTPException, Query
 
 from ..database import get_connection
+from ..next_move_database import NextMoveDatabaseUnavailable, get_next_move_connection
 
 router = APIRouter(tags=["book"])
+
+
+def _next_move_connection():
+    try:
+        return get_next_move_connection()
+    except NextMoveDatabaseUnavailable as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
 
 
 def _source(row: Any, include_license_text: bool = False) -> dict[str, Any]:
@@ -111,7 +119,7 @@ def get_book_candidates(sfen: str = Query(..., min_length=1)) -> dict[str, Any]:
     if not normalized_sfen:
         raise HTTPException(status_code=422, detail="sfen must not be blank")
 
-    conn = get_connection()
+    conn = _next_move_connection()
     try:
         rows = conn.execute(
             """
@@ -155,7 +163,7 @@ def get_book_candidates(sfen: str = Query(..., min_length=1)) -> dict[str, Any]:
 
 @router.get("/api/book/sources")
 def list_book_sources() -> list[dict[str, Any]]:
-    conn = get_connection()
+    conn = _next_move_connection()
     try:
         rows = conn.execute("SELECT * FROM book_sources ORDER BY imported_at DESC, id DESC").fetchall()
         return [_source(row) for row in rows]
@@ -165,7 +173,7 @@ def list_book_sources() -> list[dict[str, Any]]:
 
 @router.get("/api/book/sources/{source_id}")
 def get_book_source(source_id: int) -> dict[str, Any]:
-    conn = get_connection()
+    conn = _next_move_connection()
     try:
         row = conn.execute("SELECT * FROM book_sources WHERE id = ?", (source_id,)).fetchone()
         if not row:
@@ -177,7 +185,7 @@ def get_book_source(source_id: int) -> dict[str, Any]:
 
 @router.get("/api/book/sources/{source_id}/learning-samples/summary")
 def get_learning_sample_summary(source_id: int) -> dict[str, Any]:
-    conn = get_connection()
+    conn = _next_move_connection()
     try:
         source = conn.execute("SELECT id, name, version, license_name, source_url, copyright_notice FROM book_sources WHERE id = ?", (source_id,)).fetchone()
         if not source:
@@ -204,7 +212,7 @@ def get_learning_sample_summary(source_id: int) -> dict[str, Any]:
 
 @router.get("/api/learning-samples/openings")
 def list_learning_sample_openings() -> list[dict[str, Any]]:
-    conn = get_connection()
+    conn = _next_move_connection()
     try:
         rows = conn.execute(
             """
@@ -221,7 +229,7 @@ def list_learning_sample_openings() -> list[dict[str, Any]]:
 
 @router.get("/api/learning-samples")
 def list_learning_samples(opening_key: str | None = Query(default=None), limit: int = Query(default=20, ge=1, le=100)) -> list[dict[str, Any]]:
-    conn = get_connection()
+    conn = _next_move_connection()
     try:
         params: list[Any] = []
         where = ""
@@ -248,7 +256,7 @@ def list_learning_samples(opening_key: str | None = Query(default=None), limit: 
 
 @router.get("/api/learning-samples/{sample_id}")
 def get_learning_sample(sample_id: int) -> dict[str, Any]:
-    conn = get_connection()
+    conn = _next_move_connection()
     try:
         row = conn.execute(
             """
@@ -271,7 +279,6 @@ def get_learning_sample(sample_id: int) -> dict[str, Any]:
 def list_licenses() -> dict[str, Any]:
     conn = get_connection()
     try:
-        rows = conn.execute("SELECT * FROM book_sources ORDER BY imported_at DESC, id DESC").fetchall()
         tsume_rows = conn.execute(
             """
             SELECT source_name, source_url, source_license, source_copyright, COUNT(*) AS problem_count
@@ -281,9 +288,7 @@ def list_licenses() -> dict[str, Any]:
             ORDER BY source_name
             """
         ).fetchall()
-        return {
-            "book_sources": [_source(row, include_license_text=True) for row in rows],
-            "tsume_sources": [
+        tsume_sources = [
                 {
                     "name": row["source_name"],
                     "source_url": row["source_url"],
@@ -292,7 +297,18 @@ def list_licenses() -> dict[str, Any]:
                     "problem_count": row["problem_count"],
                 }
                 for row in tsume_rows
-            ],
-        }
+            ]
     finally:
         conn.close()
+    try:
+        next_conn = get_next_move_connection()
+    except NextMoveDatabaseUnavailable:
+        return {"book_sources": [], "tsume_sources": tsume_sources}
+    try:
+        rows = next_conn.execute("SELECT * FROM book_sources ORDER BY imported_at DESC, id DESC").fetchall()
+        return {
+            "book_sources": [_source(row, include_license_text=True) for row in rows],
+            "tsume_sources": tsume_sources,
+        }
+    finally:
+        next_conn.close()

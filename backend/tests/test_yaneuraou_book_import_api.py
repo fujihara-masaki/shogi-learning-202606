@@ -1,8 +1,9 @@
 import os
 from pathlib import Path
 
-from app.database import get_connection, init_db
+from app.next_move_database import get_next_move_write_connection as get_connection, init_next_move_db as init_db
 from app.importers.yaneuraou_book import import_book
+from app.learning_samples import build_learning_sample_plan
 
 FIXTURE = Path(__file__).parent / "fixtures" / "yaneuraou_book_sample.db"
 MIT = "MIT License\n\nPermission is hereby granted, free of charge, to any person obtaining a copy."
@@ -17,7 +18,7 @@ def count_rows(table: str) -> int:
 
 
 def test_dry_run_does_not_write_db(tmp_path):
-    os.environ["SHOGI_DB_PATH"] = str(tmp_path / "dry.db")
+    os.environ["NEXT_MOVE_DB_PATH"] = str(tmp_path / "dry.db")
     init_db()
     result = import_book(FIXTURE, name="sample", license_name="MIT License", license_text=MIT, dry_run=True)
     assert result.dry_run is True
@@ -28,7 +29,7 @@ def test_dry_run_does_not_write_db(tmp_path):
 
 
 def test_limit_imports_small_subset_and_registers_source(tmp_path):
-    os.environ["SHOGI_DB_PATH"] = str(tmp_path / "limit.db")
+    os.environ["NEXT_MOVE_DB_PATH"] = str(tmp_path / "limit.db")
     result = import_book(FIXTURE, name="sample", version="test", license_name="MIT License", license_text=MIT, limit=2)
     assert result.imported_positions == 2
     assert result.imported_moves == 4
@@ -38,7 +39,7 @@ def test_limit_imports_small_subset_and_registers_source(tmp_path):
 
 
 def test_duplicate_sfen_is_counted_without_breaking_import(tmp_path):
-    os.environ["SHOGI_DB_PATH"] = str(tmp_path / "dup.db")
+    os.environ["NEXT_MOVE_DB_PATH"] = str(tmp_path / "dup.db")
     result = import_book(FIXTURE, name="sample", license_name="MIT License", license_text=MIT)
     assert result.duplicate_positions == 1
     assert result.invalid_lines == 1
@@ -46,7 +47,8 @@ def test_duplicate_sfen_is_counted_without_breaking_import(tmp_path):
 
 
 def test_book_source_and_license_api(client):
-    import_book(FIXTURE, name="Sample YaneuraOu Book", version="fixture", source_url="https://example.test/book", license_name="MIT License", license_text=MIT, limit=1)
+    result = import_book(FIXTURE, name="Sample YaneuraOu Book", version="fixture", source_url="https://example.test/book", license_name="MIT License", license_text=MIT, limit=1)
+    build_learning_sample_plan(result.source_id, limit=1, per_opening_limit=1, seed=1, dry_run=False)
     sources = client.get("/api/book/sources")
     assert sources.status_code == 200
     source = sources.json()[0]
@@ -60,7 +62,7 @@ def test_book_source_and_license_api(client):
 
 
 def test_lowercase_white_hand_sfen_imports(tmp_path):
-    os.environ["SHOGI_DB_PATH"] = str(tmp_path / "lowercase.db")
+    os.environ["NEXT_MOVE_DB_PATH"] = str(tmp_path / "lowercase.db")
     result = import_book(FIXTURE, name="sample", license_name="MIT License", license_text=MIT)
     assert result.imported_positions == 4
     conn = get_connection()
@@ -73,7 +75,7 @@ def test_lowercase_white_hand_sfen_imports(tmp_path):
 
 def test_book_candidates_api_returns_moves_with_source_info(client):
     sfen = "lnsgkgsnl/1r5b1/ppppppppp/9/9/9/PPPPPPPPP/1B5R1/LNSGKGSNL b - 1"
-    import_book(
+    result = import_book(
         FIXTURE,
         name="Sample YaneuraOu Book",
         version="fixture",
@@ -82,6 +84,7 @@ def test_book_candidates_api_returns_moves_with_source_info(client):
         license_text=MIT,
         limit=1,
     )
+    build_learning_sample_plan(result.source_id, limit=1, per_opening_limit=1, seed=1, dry_run=False)
 
     response = client.get("/api/book/candidates", params={"sfen": sfen})
 
@@ -100,7 +103,8 @@ def test_book_candidates_api_returns_moves_with_source_info(client):
 
 
 def test_book_candidates_api_returns_not_found_for_unknown_sfen(client):
-    import_book(FIXTURE, name="sample", license_name="MIT License", license_text=MIT, limit=1)
+    result = import_book(FIXTURE, name="sample", license_name="MIT License", license_text=MIT, limit=1)
+    build_learning_sample_plan(result.source_id, limit=1, per_opening_limit=1, seed=1, dry_run=False)
     sfen = "9/9/9/9/9/9/9/9/9 b - 1"
 
     response = client.get("/api/book/candidates", params={"sfen": sfen})
@@ -116,6 +120,7 @@ def test_book_candidates_api_rejects_blank_sfen(client):
 
 
 def test_book_candidates_api_allows_null_sort_order(client):
+    init_db()
     sfen = "lnsgkgsnl/1r5b1/ppppppppp/9/9/9/PPPPPPPPP/1B5R1/LNSGKGSNL b - 1"
     conn = get_connection()
     try:
@@ -154,6 +159,7 @@ def test_book_candidates_api_allows_null_sort_order(client):
             "INSERT INTO book_moves(position_id, usi, score, depth, sort_order) VALUES (?, ?, ?, ?, ?)",
             (position_id, "2g2f", 10, 1, None),
         )
+        conn.execute("INSERT INTO learning_samples(book_source_id, book_position_id, sfen, sample_rank) VALUES (?, ?, ?, 1)", (source_id, position_id, sfen))
         conn.commit()
     finally:
         conn.close()

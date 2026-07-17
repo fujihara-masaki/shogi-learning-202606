@@ -5,6 +5,7 @@ import { Link } from "react-router-dom";
 import {
   fetchLearningSampleOpenings,
   fetchLearningSamples,
+  isNextMoveUnavailable,
   type LearningSample,
   type LearningSampleOpeningSummary,
 } from "../api/client";
@@ -38,7 +39,9 @@ export default function NextMoveProblemList() {
         setSelectedOpening((prev) => prev || list[0]?.opening_key || "");
       })
       .catch((e) => {
-        if (!cancelled) setOpenings({ loaded: true, data: [], error: `戦型一覧の取得に失敗しました: ${e}` });
+        if (!cancelled) setOpenings({ loaded: true, data: [], error: isNextMoveUnavailable(e)
+          ? "次の一手データを利用できません。専用DBの設定を確認してください。"
+          : `戦型一覧の取得に失敗しました: ${e}` });
       });
     return () => {
       cancelled = true;
