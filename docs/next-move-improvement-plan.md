@@ -100,16 +100,42 @@
 
 記録のキーには **問題の意味(出典・局面・候補手定義)にのみ依存する安定キー `problem_key`** を用いる。SFEN + opening_key だけでは、複数の外部定跡ソースに同一局面が存在した場合に、候補手・順位・評価値が異なる**別問題を同一視してしまう**ため不可。一方で、抽出件数・seed などの**抽出実行条件はキーに含めない**。含めてしまうと、サンプルを10,000件→100,000件に増やす・seedを変えるといった問題の意味と無関係な操作だけで全履歴・進捗・復習状態・お気に入りが失われるため。抽出実行条件は後述の `extraction_run_key` として分離して保存する。
 
+ハッシュ入力は**単純な文字列連結にしない**。連結では `(name="ab", version="c")` と `(name="a", version="bc")` のように、SHA-256の衝突ではなく**入力表現の曖昧さによる衝突**が起こり得るため、境界が一意に判別できる canonical JSON をハッシュ入力とする:
+
 ```
-problem_key = "v1:" + sha256(
-    stable_source_key                  -- 出典の安定識別子
-  + normalized_sfen                    -- 正規化局面
-  + candidate_definition_fingerprint   -- 候補手定義のフィンガープリント
-  + problem_definition_version         -- 問題定義のバージョン
-)
+problem_key_payload = canonical_json({
+  "candidate_definition_fingerprint": candidate_definition_fingerprint,
+  "normalized_sfen": normalized_sfen,
+  "problem_definition_version": 1,
+  "stable_source_key": stable_source_key
+})
+
+problem_key = "v1:" + sha256(problem_key_payload)
 ```
 
-- `stable_source_key`: 定跡ソースを安定して識別する値(`book_sources` の name / version / source_url から構成)。同一局面でもソースが異なれば候補手・評価値が異なる別問題として扱う。**ファイル全体の `file_sha256` は含めない**(ファイルの一部が更新されただけで、変更のない全局面のキーが変わってしまうため)。`file_sha256` は監査用メタデータとして別途保存する。
+**canonical JSON(canonical serialization)の共通仕様**: `problem_key`・`stable_source_key`・`candidate_definition_fingerprint` の3箇所すべてで**同一の共通シリアライズ関数**を使う。
+
+- JSONオブジェクトのキーは辞書順に固定する
+- 余分な空白を含めない(セパレータ固定)
+- UTF-8 でエンコードし、その**バイト列**に対して SHA-256 を計算する
+- 文字列・`null`・空文字を区別する(欠損は `null`、空値は `""` として表現し、同一視しない)
+- Unicode 正規化は **NFC** に固定する(日本語のソース名等でも決定的になるように)
+- 数値(`problem_definition_version` 等)は整数として表現する(文字列化しない)
+- ハッシュ値の先頭に `"v1:"` の形式バージョンを付け、シリアライズ仕様を変更する場合はバージョンを上げる
+
+- `stable_source_key`: 定跡ソースを安定して識別する値。name / version / source_url の**単純連結ではなく**、同じ canonical JSON 仕様から生成する:
+
+  ```
+  stable_source_payload = canonical_json({
+    "name": source.name,
+    "source_url": source.source_url,
+    "version": source.version
+  })
+
+  stable_source_key = "v1:" + sha256(stable_source_payload)
+  ```
+
+  同一局面でもソースが異なれば候補手・評価値が異なる別問題として扱う。**ファイル全体の `file_sha256` は含めない**(ファイルの一部が更新されただけで、変更のない全局面のキーが変わってしまうため)。`file_sha256` は監査用メタデータとして別途保存する。
 - `normalized_sfen`: SFENの手数(ply)フィールドを除去し、盤面・手番・持ち駒を python-shogi / tsshogi の再シリアライズで正規化する。再生成時の表記ゆれ(持ち駒の並び・空白等)でキーが変わることを防ぐ。
 - `candidate_definition_fingerprint`: その局面に登録されている候補手と、**判定に実際に使う候補順序**を局面単位でハッシュ化した値。前提として、候補の順序決定を共通関数 **`canonicalize_candidates_for_judgment(candidates)`** に一元化し、(1) API の候補返却順、(2) frontend の `judgeNextMove`、(3) backend の verdict / candidate_rank 算出、(4) fingerprint、(5) テスト、のすべてで同一実装(同一規則)を使う。
 
@@ -122,7 +148,7 @@ problem_key = "v1:" + sha256(
 
   **DB の行ID・挿入順は順序決定に使わない**(行IDはDB再生成で変わるため、安定キーの意味を決める tie-breaker には不適。現行APIの最終 tie-breaker `bm.id` は PR-A で `move_usi` に置き換える)。
 
-  fingerprint の canonical 入力は、この共通関数の結果順に **`judgment_position`(判定後の位置=1始まりの連番)・`effective_rank`・`move_usi`** の組を並べた配列とし、canonical JSON(キー順・空白を固定)にしてハッシュ化する:
+  fingerprint の canonical 入力は、この共通関数の結果順に **`judgment_position`(判定後の位置=1始まりの連番)・`effective_rank`・`move_usi`** の組を並べた配列とし、上記の canonical serialization 共通仕様(同一のシリアライズ関数)で JSON 化してハッシュ化する:
 
   ```json
   [
@@ -135,7 +161,7 @@ problem_key = "v1:" + sha256(
   - 候補手・順位・判定順のいずれかが変われば fingerprint が変わり、別問題として扱われる。同順位候補は禁止しない(判定順で一意化する)。
 - `problem_definition_version`: problem_key の意味や fingerprint の計算方法を変更する場合に備えたバージョン(初期値 `1`)。先頭の `v1:` はキー文字列形式のバージョンで、これと合わせて管理する。
 
-`opening_key` はキーに**含めない**: 戦型分類は分類器の改良で変わり得る表示・集計用メタデータであり、分類が変わっても問題自体は同一だからである(記録側には集計用に非正規化して保存する)。
+`opening_key` はキーに**含めない**: 戦型分類は分類器の改良で変わり得る表示・集計用メタデータであり、分類が変わっても問題自体は同一だからである。この方針を集計側でも一貫させるため、**進捗・状態・復習・履歴の戦型グルーピングは「現在の next_move.db の分類」を `problem_key` 経由で参照**する。解答レコードに保存する戦型は「解答時点のスナップショット」であり、集計のグルーピングには直接使わない(詳細は §6)。
 
 `problem_key` は backend が `learning_samples` の各レコードに対して算出し、API レスポンスに含める。クライアントは解答POST時にこの `problem_key` を送り返し、backend の再算出値と照合することで、**表示中の問題と記録対象の問題が同一であること**を保証する(next_move.db 差し替えで同じ `sample_id` が別問題に再利用された場合の誤記録防止。詳細は P0-1)。
 
@@ -216,7 +242,14 @@ extracted_at         -- 抽出日時
   - 記録には `candidate_rank`(表示順位)と `judgment_position`(判定位置)の**両方**を保存し、意味の曖昧さを残さない。
 - **problem_key 不一致時は履歴を保存せず HTTP 409 を返す**(構造化エラーコード例: `NEXT_MOVE_PROBLEM_CHANGED`)。これは、問題表示後〜解答送信の間に next_move.db が再生成・差し替えされ、同じ `learning_samples.id` が**別問題に再利用された**ケースの検出である(この場合 `sample_id` は存在するため404にも503にもならず、照合なしでは差し替え後の別問題に誤って履歴が保存されてしまう)。`next_move_results` にも `next_move_problem_refs` にも書き込まない。
 - 409 を受けたフロントエンドは「問題データが更新されました。再読み込みしてください」等を表示する。**盤面上で算出済みの解答結果表示自体は妨げない**(記録されなかったことのみ控えめに伝える)。
-- `sample_id` が存在しない場合は404、next_move.db が利用不可の場合は503を返す(いずれも記録は行われない)。
+- **`move_usi` の合法性を backend で検証する**: APIを直接呼ぶと、USI構文としては正しくても局面上は不可能な手を送信でき、照合だけでは unlisted として記録されて進捗・弱点復習・履歴を汚染するため、保存前に問題のSFENから局面を復元して検証する。処理順序:
+  1. `sample_id` から現在の問題を取得する(存在しなければ404、next_move.db 利用不可なら503)
+  2. `problem_key` を再算出し、クライアント送信値と照合する(**不一致なら合法性検証より先に409**)
+  3. SFEN から盤面を復元する
+  4. `move_usi` を解析する(構文不正は422、エラーコード `NEXT_MOVE_MOVE_FORMAT_INVALID`)
+  5. 現在の手番・駒の移動・成り・駒打ちを含めて合法手か検証する(python-shogi を使用。違法手は422、エラーコード `NEXT_MOVE_ILLEGAL_MOVE`)
+  6. 合法な場合のみ候補手と照合して verdict・candidate_rank・judgment_position を算出・保存する
+- 判定の区別を明確にする: **合法だが候補一覧にない手 → `unlisted` として正常に記録**/**局面上の違法手 → 記録せず422**/**USI構文自体が不正 → 記録せず422**。422 のいずれの場合も `next_move_results`・`next_move_problem_refs` に書き込まない。通常のUI(盤面)からは合法手しか送信されない既存仕様は維持し、422 は主に直接API呼び出しへの防御である。
 - 「もう一度考える」→再着手でも新しいレコードとして記録される(上書きしない)。
 - 記録APIの失敗は挑戦フローを妨げない(結果表示は正常に出る。控えめなエラー表示のみ)。
 - next_move.db には実行時書き込みを行わない。§4冒頭の「履歴を引き継ぐケース」(抽出件数・seed変更、無関係な局面のみの変更等)で `problem_key` が一致して記録が引き継がれ、「別問題として扱うケース」(出典・局面・候補手定義・定義バージョンの変更)で区別されることをテストで担保する。
@@ -224,7 +257,7 @@ extracted_at         -- 抽出日時
 
 ### P0-2 進捗表示
 
-- 一覧の各戦型に「挑戦済み n / 全N問」が表示される(Nは `learning_samples` の実数、nは `problem_key` 単位のユニーク挑戦数)。
+- 一覧の各戦型に「挑戦済み n / 全N問」が表示される(Nは `learning_samples` の実数、nは `problem_key` 単位のユニーク挑戦数)。戦型のグルーピングは**現在の next_move.db の分類**に基づく(解答時スナップショットでは集計しない。§6の参照方針)。
 - 各カードに最新解答に基づくバッジ(未挑戦/◎最有力/○有力/△登録候補/?未登録)が表示され、`aria-label` で読み上げ可能。
 - 挑戦画面の「問題 X / Y」が戦型の実件数と一致する(100件超でも正しい)。
 - 一覧が30件で切れる場合、「全N問中30問を表示」の注記が出る。
@@ -251,12 +284,14 @@ extracted_at         -- 抽出日時
 ### P1-1 履歴統合
 
 - 履歴ページに「次の一手」セクションが追加され、総解答数・verdict別内訳・最有力率・最近の解答(日時/戦型/手/判定)が表示される。
+- 表示する戦型は resolver による**現在の分類**。現在の next_move.db に存在しない問題のみ解答時スナップショットで表示し、「現在の問題データには存在しません」等の状態を付ける。
 - 既存の詰め将棋・タイムアタックの表示に影響がない(既存E2Eが通る)。
 
 ### P1-2 復習統合(再出題)
 
-- 復習ページに「次の一手」タブが追加され、最新解答が unlisted または listed の問題が一覧表示される。
+- 復習ページに「次の一手」タブが追加され、最新解答が unlisted または listed の問題が一覧表示される。戦型は現在の分類で表示する。
 - 「再挑戦」で該当問題の挑戦画面へ遷移し、最有力候補(top)を指すと一覧から消える(次回ロード時)。
+- 現在の next_move.db から削除された問題は再挑戦できない(一覧から除外するか、利用不可として導線を無効化する。誤って挑戦画面へ遷移させない)。
 - 該当問題が0件のとき適切な空状態文言が出る。
 
 ### P1-3 均等出題
@@ -307,8 +342,9 @@ CREATE TABLE IF NOT EXISTS next_move_problem_refs (
 CREATE TABLE IF NOT EXISTS next_move_results (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     problem_key TEXT NOT NULL REFERENCES next_move_problem_refs(problem_key),
-    opening_key TEXT NOT NULL DEFAULT '',   -- 集計用の非正規化(分類変更時は表示上のグルーピングのみ変わる)
-    opening_name TEXT NOT NULL DEFAULT '',
+    opening_key_at_answer TEXT NOT NULL DEFAULT '',   -- 解答時点のスナップショット(集計のグルーピングには使わない)
+    opening_name_at_answer TEXT NOT NULL DEFAULT '',  -- 同上。分類変更のたびに書き換えない
+
     move_usi TEXT NOT NULL,
     verdict TEXT NOT NULL,              -- top / strong / listed / unlisted(backend算出)
     candidate_rank INTEGER,             -- effective_rank(表示順位)。候補外は NULL(backend算出)
@@ -318,9 +354,17 @@ CREATE TABLE IF NOT EXISTS next_move_results (
     answered_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 CREATE INDEX IF NOT EXISTS idx_next_move_results_key ON next_move_results(problem_key);
-CREATE INDEX IF NOT EXISTS idx_next_move_results_opening ON next_move_results(opening_key, answered_at);
+CREATE INDEX IF NOT EXISTS idx_next_move_results_answered ON next_move_results(answered_at);
 -- P2-1 で追加: next_move_favorites(problem_key UNIQUE REFERENCES next_move_problem_refs, created_at)
 ```
+
+**戦型分類の参照方針(スナップショットと現在分類の分離)**: `next_move_results` の `opening_key_at_answer` / `opening_name_at_answer` は解答時点のスナップショットであり、**分類変更のたびに書き換えない**。進捗・状態・復習・履歴で戦型を表示・集計する際は、backend が現在の next_move.db の問題一覧から構築する **resolver(`problem_key` → 現在の `sample_id` / `opening_key` / `opening_name` のマッピング。リクエスト時に構築、必要ならプロセス内キャッシュ)** を参照する。
+
+- progress: 現在の next_move.db の戦型分類で集計する(分類器改良で分類だけ変わった問題は新しい戦型の側に計上される)。
+- status: 現在利用可能な問題と `problem_key` で突合する。
+- review / history: 現在の問題が存在する場合は現在の戦型分類で表示する。
+- **next_move.db から問題が削除されている場合のみ**、解答時スナップショット(`*_at_answer`)へフォールバックして表示する。その際は「現在の問題データには存在しません」等の利用不可状態を付け、復習画面からの再挑戦導線は無効にする。
+- 過去の解答レコード自体は分類変更や問題削除で書き換えない。
 
 next_move.db 側(抽出ツールが生成。実行時は読み取り専用のまま):
 
@@ -331,12 +375,12 @@ next_move.db 側(抽出ツールが生成。実行時は読み取り専用のま
 
 | メソッド | パス | 用途 | フェーズ |
 | --- | --- | --- | --- |
-| POST | `/api/next-move/results` | 解答記録。入力は `sample_id`(一時参照)+`problem_key`(表示中の問題の値)+`move_usi`+`hint_count`+`elapsed_ms` の5項目。backend が problem_key を再算出して照合し、一致時のみ候補手から verdict・candidate_rank を算出・保存。不一致は 409(`NEXT_MOVE_PROBLEM_CHANGED`)で保存しない | P0-1 |
-| GET | `/api/next-move/progress` | 戦型ごとの挑戦数・verdict内訳(shogi.db の結果 × next_move.db の件数を `problem_key` で突合) | P0-2 |
-| GET | `/api/next-move/status?opening_key=` | `problem_key`→最新verdict のマップ(一覧バッジ用) | P0-2 |
+| POST | `/api/next-move/results` | 解答記録。入力は `sample_id`(一時参照)+`problem_key`(表示中の問題の値)+`move_usi`+`hint_count`+`elapsed_ms` の5項目。backend が problem_key を再算出して照合(不一致は 409 `NEXT_MOVE_PROBLEM_CHANGED`)→ SFENから局面を復元して合法性を検証(構文不正 422 `NEXT_MOVE_MOVE_FORMAT_INVALID` / 違法手 422 `NEXT_MOVE_ILLEGAL_MOVE`)→ 合法時のみ候補手から verdict・candidate_rank を算出・保存 | P0-1 |
+| GET | `/api/next-move/progress` | 戦型ごとの挑戦数・verdict内訳(shogi.db の結果 × next_move.db の件数を `problem_key` で突合。戦型は**現在の分類**で集計) | P0-2 |
+| GET | `/api/next-move/status?opening_key=` | `problem_key`→最新verdict のマップ(一覧バッジ用。現在利用可能な問題と突合) | P0-2 |
 | GET | `/api/learning-samples/next?policy=random\|unattempted\|weak&opening_key=&exclude_id=` | 出題ポリシー | P0-3 / P1-2 / P1-3 |
-| GET | `/api/next-move/history` | 履歴用の集計+最近の解答 | P1-1 |
-| GET | `/api/next-move/review` | 復習対象(最新が unlisted/listed のサンプル) | P1-2 |
+| GET | `/api/next-move/history` | 履歴用の集計+最近の解答(戦型は現在分類を resolver で解決。削除済み問題は解答時スナップショット+利用不可表示) | P1-1 |
+| GET | `/api/next-move/review` | 復習対象(最新が unlisted/listed のサンプル。現在分類で表示し、削除済み問題は再挑戦不可として除外または無効表示) | P1-2 |
 
 補足:
 
@@ -397,7 +441,29 @@ next_move.db 側(抽出ツールが生成。実行時は読み取り専用のま
   - (f) `problem_definition_version` を変えるとキーが変わる。
   - (g) `extraction_run_key` は抽出条件(limit/seed 等)の変更で変わる(監査メタデータとしての検証。problem_key には影響しない)。
   - (h) `extraction_runs` メタデータの無い旧DBでも `problem_key` は算出でき、`extraction_run_key` のみ `"unknown"` にフォールバックする。
+- canonical serialization(共通シリアライズ関数):
+  - `(name="ab", version="c")` と `(name="a", version="bc")` で `stable_source_key` が異なる(連結曖昧性の排除)。
+  - `null` と空文字で生成されるキーが異なる。
+  - JSONオブジェクトへの値の挿入順が異なっても同じキーになる(キー辞書順の固定)。
+  - 日本語などの Unicode 文字を含んでも決定的なキーになる(NFC 正規化の固定)。
+  - Python プロセスの実行を繰り返しても同じ `problem_key` になる(ハッシュランダム化等に非依存)。
+  - 固定入力に対する **golden test**(期待する `problem_key` 文字列そのものを検証)を設け、シリアライズ仕様の意図しない変更を検出する。
 - `progress` / `status`: 記録なし→全て未挑戦、記録後の集計、next_move.db 差し替え(同一の問題定義)後も `problem_key` 経由で進捗が残ること。`next_move_problem_refs` が POST 時に upsert されること。
+- 戦型分類の参照(スナップショットと現在分類の分離):
+  - 同一 `problem_key` の `opening_key` だけを変更した next_move.db に差し替えても、過去の解答履歴は保持される。
+  - その差し替え後、progress と history の表示グループは**新しい `opening_key`** の側へ移る。
+  - `next_move_results` の解答時スナップショット(`opening_key_at_answer` / `opening_name_at_answer`)は書き換えられない。
+  - 現在の next_move.db から問題が削除された場合、history は解答時スナップショット+利用不可状態で表示する(フォールバック)。
+  - 削除済み問題が復習画面から誤って挑戦可能にならない(除外または導線無効)。
+- `move_usi` の合法性検証(422系):
+  - USI 構文が不正な手は 422(`NEXT_MOVE_MOVE_FORMAT_INVALID`)となり、`next_move_results`・`next_move_problem_refs` のどちらにも書き込まれない。
+  - 空きマスからの移動など局面上の違法手は 422(`NEXT_MOVE_ILLEGAL_MOVE`)となる。
+  - 手番と異なる側の駒を動かす手は 422 となる。
+  - 不正な駒打ち(持っていない駒・打てないマス)は 422 となる。
+  - 成り規則に反する手(成れない位置での成り・強制成りの無視)は 422 となる。
+  - 合法だが候補一覧にない手は従来どおり `unlisted` として保存される。
+  - 合法な候補手は従来どおり保存される。
+  - `problem_key` 不一致の場合は**合法性検証より先に** 409 となる。
 - `next?policy=`: seeded RNG を注入した決定的テスト。分離した戦型選択関数の単体テストで各戦型の均等重みと `exclude_id` の除外動作を検証する(確率的な閾値判定は用いない。§5 P1-3 参照)。unattempted(全問挑戦済み時の挙動)、weak(unlisted/listedのみ)も同様に決定的に検証。
 - **next_move.db 不在時**: 出題系・`POST /api/next-move/results` は503を返し(verdict算出に候補手参照が必要なため)、shogi.db のみで完結する集計系(`history` 等)は動作すること。既存の `test_next_move_database.py` の検証(欠落テーブル・カラム・0件)を維持。
 
@@ -411,6 +477,7 @@ next_move.db 側(抽出ツールが生成。実行時は読み取り専用のま
 
 - 着手→ `POST /api/next-move/results` が期待ペイロード(`sample_id`・`problem_key`・`move_usi`・`hint_count`・`elapsed_ms`)で発火(route captureで検証)。
 - 記録APIが409(`NEXT_MOVE_PROBLEM_CHANGED`)を返すケース(モック): 「問題データが更新されました。再読み込みしてください」等の案内が表示され、かつ盤面上の解答結果表示は維持されること。
+- 通常UI(盤面)からは合法手しか送信されない既存仕様の維持(盤面は合法手のみ着手可能という既存E2Eのアサーションを保持。422系は backend APIテストで担保し、E2Eでは通常フローに422が現れないことを前提とする)。
 - 一覧: バッジ表示・進捗サマリー・「ランダムに1問」で挑戦画面へ遷移。
 - スキップ: 着手前スキップ→次問題→見出しフォーカス(キーボードのみでも)。
 - 完了: 最終問題の解答後に完了メッセージ。
@@ -424,18 +491,18 @@ next_move.db 側(抽出ツールが生成。実行時は読み取り専用のま
 依存関係順。各PRは単独でテスト green を維持する。
 
 1. **PR-A: 解答記録の基盤**(P0-1)
-   - `problem_key` の定義・算出(stable_source_key・normalized_sfen・candidate_definition_fingerprint・problem_definition_version)と、判定用候補順序の共通関数 `canonicalize_candidates_for_judgment`(API返却順・frontend判定・backend判定・fingerprint で同一実装。APIの最終 tie-breaker を `bm.id`→`move_usi` に変更)、抽出ツール側の `extraction_runs` メタデータ保存(`extract_learning_samples.py` / `validate_next_move_db.py` 対応)。
-   - shogi.db スキーマ追加(`next_move_problem_refs` + `next_move_results`)、`POST /api/next-move/results`(`problem_key` 照合→一致時のみ backend で verdict・candidate_rank を算出・保存、不一致は 409 `NEXT_MOVE_PROBLEM_CHANGED`)、learning-samples レスポンスへの `problem_key` 追加、セッションでの自動記録と409時の再読み込み案内(UI変更は最小)。
+   - `problem_key` の定義・算出(stable_source_key・normalized_sfen・candidate_definition_fingerprint・problem_definition_version)、**canonical serialization 共通関数**(キー辞書順・UTF-8・NFC・null/空文字区別。golden test 付き)、判定用候補順序の共通関数 `canonicalize_candidates_for_judgment`(API返却順・frontend判定・backend判定・fingerprint で同一実装。APIの最終 tie-breaker を `bm.id`→`move_usi` に変更)、抽出ツール側の `extraction_runs` メタデータ保存(`extract_learning_samples.py` / `validate_next_move_db.py` 対応)。
+   - shogi.db スキーマ追加(`next_move_problem_refs` + `next_move_results`)、`POST /api/next-move/results`(`problem_key` 照合 409 → SFEN復元による `move_usi` 合法性検証 422 → 合法時のみ backend で verdict・candidate_rank を算出・保存)、learning-samples レスポンスへの `problem_key` 追加、セッションでの自動記録と409時の再読み込み案内(UI変更は最小)。
    - README の安定キー方針の更新(下記ドキュメント欄参照)。
    - backend/frontend/E2E テスト(problem_key 安定性・fingerprint 検出・DB差し替え409を含む)。ここが全ての土台。
 2. **PR-B: 進捗表示と一覧の改善**(P0-2、P1-5の見出し階層)
-   - `progress`/`status` API、一覧バッジ・サマリー・件数注記、挑戦画面の「X / Y」修正。
+   - `progress`/`status` API と分類 resolver(`problem_key`→現在の sample_id / opening_key / opening_name。現在分類での集計)、一覧バッジ・サマリー・件数注記、挑戦画面の「X / Y」修正。
 3. **PR-C: 出題ポリシーとスキップ**(P0-3、P0-4)
    - `learning-samples/next` API、ランダム/未挑戦優先ボタン、スキップ、完了状態。READMEの「既知の制限」更新。
 4. **PR-D: DB異常案内と用語説明**(P0-5、P1-4)
    - 503 detail 表示+復旧手順、評価値/PVヘルプ。小さく独立しているためA〜Cと並行可能(P0-5のみ先行切り出しも可)。
 5. **PR-E: 履歴・復習統合**(P1-1、P1-2、P1-3)
-   - 履歴セクション、復習タブ、weak/均等ポリシー。PR-A〜Cに依存。
+   - 履歴セクション、復習タブ(現在分類での表示、削除済み問題のフォールバック表示と再挑戦無効化)、weak/均等ポリシー。PR-A〜Cに依存。
 6. **PR-F以降(P2)**: お気に入り → ページング/絞り込み → PV再生 → ミニ盤プレビュー。それぞれ独立PR。
 
 ---
