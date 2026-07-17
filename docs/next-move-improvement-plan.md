@@ -218,7 +218,7 @@ extracted_at         -- 抽出日時
 | --- | --- | --- |
 | P2-1 | お気に入り | `next_move_favorites`(`problem_key` キー)+一覧絞り込み+復習タブ統合 |
 | P2-2 | 問題一覧の検索・絞り込み・ページング | 一覧の「さらに表示」(offset)、状態(未挑戦のみ等)での絞り込み。テキスト検索は問題にテキスト属性がほぼ無いため保留 |
-| P2-3 | 戦型内の順次出題の明示化 | P0-3のポリシーに `sequential` を追加し、一覧に出題モード切替UI(順番/ランダム/未挑戦優先)を明示 |
+| P2-3 | サーバー側 sequential 出題の検討 | 出題APIに `sequential` policy(サーバー側 cursor)を追加し、一覧に出題モード切替UI(順番/ランダム/未挑戦優先)を明示する案。**P0ではクライアント側の順次移動(既存兄弟一覧の distinct problem_key 巡回)を維持する**ため、これは「順次移動のサーバーAPI化」を意味し、P0の方針と矛盾しない。必要性を後続PRで再検討 |
 | P2-4 | 候補手比較の強化 | 比較テーブル行クリックでPVを盤面再生(ミニ盤 or 既存盤の閲覧モード) |
 | P2-5 | 一覧カードの局面プレビュー | ミニ盤サムネイル(答えは漏れない=局面自体が問題)。件数が多いと描画コストがあるため遅延描画前提 |
 
@@ -260,7 +260,7 @@ extracted_at         -- 抽出日時
 - 一覧の各戦型に「挑戦済み n / 全N問」が表示される。**分子・分母とも distinct `problem_key` 基準**とする: N は現在の next_move.db から算出した **distinct `problem_key` 数**、n は解答済み distinct `problem_key` 数。`learning_samples` の行数は使わない(同じ name/version/source_url のソースを別 `file_sha256` で再取り込みした場合や、手数フィールドだけ異なるSFENなど、複数行が同一 `problem_key` に正規化され得るため。行数を分母にすると全問解いても100%に届かない)。
 - 進捗率・最有力率・未挑戦判定・完了判定はすべて `problem_key` 単位で行う。
 - 一覧に同一 `problem_key` の問題が重複表示されない(resolver の重複排除。§6)。戦型のグルーピングは**現在の next_move.db の分類**に基づく(解答時スナップショットでは集計しない)。
-- 各カードに最新解答に基づくバッジ(未挑戦/◎最有力/○有力/△登録候補/?未登録)が表示され、`aria-label` で読み上げ可能。
+- 各カードに最新解答に基づくバッジ(未挑戦/◎最有力/○有力/△登録候補/?未登録)が表示され、`aria-label` で読み上げ可能。「最新解答」の定義は `answered_at DESC, id DESC`(§6「最新解答の決定的順序」)。
 - 挑戦画面の「問題 X / Y」が戦型の distinct `problem_key` 数と一致する(100件超でも正しい)。
 - 一覧が30件で切れる場合、「全N問中30問を表示」の注記が出る。
 
@@ -268,7 +268,8 @@ extracted_at         -- 抽出日時
 
 - 一覧に「ランダムに1問」「未挑戦から1問」ボタンがあり、押すと該当問題の挑戦画面へ遷移する。
 - 未挑戦問題が無い場合はその旨を表示し、ランダム出題へフォールバックできる。
-- 解答後の「次の問題」は現在の出題ポリシーを引き継ぐ(ランダムで来たら次もランダム)。
+- 解答後の「次の問題」は現在の出題ポリシーを引き継ぐ(ランダムで来たら次もランダム。**一覧から普通に開いた場合の「次の問題」は従来どおりの順次移動を維持**する — P0-4参照)。
+- **通常の順次移動と新APIの役割分担**: 新しい `GET /api/next-move/problems/next` の policy は `random` / `unattempted` / `weak` のみで、順序上の現在位置を持たない。そのため**通常の「次の問題」(順次移動)は新APIへ統合せず**、当面は既存の同一戦型兄弟一覧(既存一覧API)を使ったクライアント側の順次移動を維持する。ただし兄弟一覧は **distinct `problem_key` 単位に重複排除**し、**現在の問題の `problem_key` の位置**を基準に次の distinct `problem_key` へ進む。最後の問題では先頭へループせず(従来の `(index + 1) % length` による無限巡回は廃止)、P0-4 の完了表示へ切り替える。順次移動をサーバーAPIへ移行する場合は別PRで行う(P2-3参照)。
 - **同一問題が連続して出ない(直前問題の除外は `problem_key` 基準)**: frontend は表示中の問題の `problem_key` を `exclude_problem_key` として送り、backend は distinct `problem_key` 単位の候補集合からそのキーを除外してから選択する。`exclude_id`(sample_id基準)は正式な除外契約に**しない** — 同一 `problem_key` に複数 `sample_id` がある場合(例: 表示中が sample_id=10、代表が sample_id=20)や、DB差し替えで同じ問題の `sample_id` が変わった場合に、ID除外では同一問題が再出題されてしまうため。
   - 直前問題の `problem_key` が次回の候補集合から除外される。同一 `problem_key` に複数 `sample_id` があっても、またDB差し替えで `sample_id` が変わっても、同一問題は再出題されない。
   - distinct 候補が2件以上なら必ず別の `problem_key` が返る。
@@ -281,8 +282,9 @@ extracted_at         -- 抽出日時
 ### P0-4 スキップと完了
 
 - 着手前に「スキップして次へ」が表示され、押すと記録なしで次の問題へ遷移し、見出しへフォーカスが移る。
-- 順次モードで最後の問題を終えると「この戦型を一巡しました」メッセージと、他戦型・復習・一覧への導線が表示される(無限巡回しない)。
-- キーボードのみでスキップ→次問題まで操作できる。
+- **完了条件**: 同一戦型の distinct `problem_key` 一覧において現在の問題が最後の場合、次へ進まず「この戦型の問題を最後まで学習しました」等の完了メッセージと、「一覧へ戻る」「もう一度取り組む」「ランダムに続ける」等の導線を表示する(先頭へループしない)。
+- distinct 候補が1件のみの戦型でも、解答後の「次の問題」は完了扱いとする。
+- キーボードのみでスキップ→次問題→完了表示まで操作できる。
 
 ### P0-5 DB異常時の案内
 
@@ -298,7 +300,7 @@ extracted_at         -- 抽出日時
 
 ### P1-2 復習統合(再出題)
 
-- 復習ページに「次の一手」タブが追加され、最新解答が unlisted または listed の問題が一覧表示される。戦型は現在の分類で表示する。
+- 復習ページに「次の一手」タブが追加され、最新解答が unlisted または listed の問題が一覧表示される(「最新」は `answered_at DESC, id DESC`。§6)。戦型は現在の分類で表示する。
 - 「再挑戦」で該当問題の挑戦画面へ遷移し、最有力候補(top)を指すと一覧から消える(次回ロード時)。
 - 現在の next_move.db から削除された問題は再挑戦できない(一覧から除外するか、利用不可として導線を無効化する。誤って挑戦画面へ遷移させない)。
 - 該当問題が0件のとき適切な空状態文言が出る。
@@ -371,10 +373,27 @@ CREATE TABLE IF NOT EXISTS next_move_results (
     elapsed_ms INTEGER,
     answered_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
-CREATE INDEX IF NOT EXISTS idx_next_move_results_key ON next_move_results(problem_key);
+-- 「最新解答」検索用(problem_key ごとの latest 1件を answered_at DESC, id DESC で引く)
+CREATE INDEX IF NOT EXISTS idx_next_move_results_latest ON next_move_results(problem_key, answered_at DESC, id DESC);
+-- 履歴の新しい順表示用
 CREATE INDEX IF NOT EXISTS idx_next_move_results_answered ON next_move_results(answered_at);
 -- P2-1 で追加: next_move_favorites(problem_key UNIQUE REFERENCES next_move_problem_refs, created_at)
 ```
+
+上記2本で latest 検索と履歴表示をカバーする(SQLiteの実際のクエリプランを確認し、これ以上のインデックスは追加しない)。
+
+**最新解答の決定的順序**: `answered_at` は SQLite の `datetime('now')` による**秒単位**の時刻であり、再挑戦や直接POSTが同一秒内に複数回行われると複数行が同じ `answered_at` を持ち得る。`answered_at DESC` だけで「最新解答」を選ぶと結果がクエリプラン依存になるため、**最新解答を選ぶすべてのクエリで次を正式な順序とする**:
+
+```sql
+ORDER BY answered_at DESC, id DESC
+-- ウィンドウ関数の場合:
+ROW_NUMBER() OVER (PARTITION BY problem_key ORDER BY answered_at DESC, id DESC)
+```
+
+- `answered_at` が新しい行を優先し、同一時刻なら `id` が大きい行を「後の解答」として扱う。
+- `id` は**結果テーブル内の解答順 tie-breaker としてのみ**使用する(`problem_key` の構成には使わない。§4の「行IDを安定キーに使わない」方針と両立する)。
+- 適用箇所: weak review 判定(review対象の出入り。listed→top で外れ、top→listed で入る)、`problem_key` ごとの latest status(一覧バッジ)、progress の最新verdict集計、history の最新状態表示、その他「最新結果」に依存するすべての表示。実装では latest 選択を共通クエリ/ヘルパーに集約し、status / progress / review が**同じ latest 行**を参照するようにする。
+- `answered_at` のミリ秒精度化は任意の改善案とするが、ミリ秒でも衝突は理論上可能なため **`id DESC` の tie-breaker は必須**とする。
 
 **戦型分類の参照方針(スナップショットと現在分類の分離)**: `next_move_results` の `opening_key_at_answer` / `opening_name_at_answer` は解答時点のスナップショットであり、**分類変更のたびに書き換えない**。進捗・状態・復習・履歴で戦型を表示・集計する際は、backend が現在の next_move.db の問題一覧から構築する **resolver(`problem_key` → 現在の代表 `sample_id` / `opening_key` / `opening_name` のマッピング。リクエスト時に構築、必要ならプロセス内キャッシュ)** を参照する。
 
@@ -416,7 +435,7 @@ CREATE INDEX IF NOT EXISTS idx_next_move_results_answered ON next_move_results(a
 補足:
 
 - **URL namespace の方針**: 出題APIは `/api/learning-samples/next` に**しない**。既存の動的ルート `GET /api/learning-samples/{sample_id}` が先にマッチし、ルーター登録順によっては `"next"` を整数として解析しようとして 422 になり、static route に到達できないため。新規の次の一手専用APIは `results` / `progress` / `status` / `review` / `history` と同じ **`/api/next-move/*` namespace に統一**し(`/api/next-move/problems/next`)、動的ルートと衝突せず**ルーター登録順に依存しない**構成にする(OpenAPI 上も動的/静的ルートが曖昧にならない)。
-- 既存の問題一覧 `GET /api/learning-samples` と問題詳細 `GET /api/learning-samples/{id}` は互換のため**当面現行URLに残す**(役割: 一覧・詳細の読み取りは `/api/learning-samples`、次の一手固有の出題・記録・集計は `/api/next-move/*`)。将来これらを `/api/next-move/problems` / `/api/next-move/problems/{id}` へ移す場合は、リダイレクトまたは並行提供による互換期間を設けて別PRで行う(本計画のスコープ外)。
+- 既存の問題一覧 `GET /api/learning-samples` と問題詳細 `GET /api/learning-samples/{id}` は互換のため**当面現行URLに残す**。役割分担: 問題一覧・詳細の読み取りと **P0での通常の順次移動(クライアント側の distinct `problem_key` 巡回)** は `/api/learning-samples`、`random` / `unattempted` / `weak` の出題開始・継続(`exclude_problem_key` による直前問題除外を含む)は `/api/next-move/problems/next`、記録・集計は `/api/next-move/*`。通常の順次移動を新APIへ強制統合しない(順次移動のサーバーAPI化は P2-3 で再検討し、行う場合は別PR)。将来一覧・詳細を `/api/next-move/problems` 系へ移す場合も、互換期間を設けて別PRで行う(本計画のスコープ外)。
 - 既存 `GET /api/learning-samples` / `GET /api/learning-samples/{id}` のレスポンスに `problem_key` を追加する(backend が算出。一覧バッジ・status API との突合に使用)。
 - 候補手の返却順を `canonicalize_candidates_for_judgment` に統一する。既存の ORDER BY との差分は最終 tie-breaker のみ(`bm.id` → `move_usi`。行IDはDB再生成で変わるため安定キーの順序決定に使わない)。
 - 既存 `GET /api/learning-samples` に `total_count` 相当(または `X-Total-Count`)と `offset` を追加(P0-2 の注記/P2-2 のページング)。
@@ -427,7 +446,7 @@ CREATE INDEX IF NOT EXISTS idx_next_move_results_answered ON next_move_results(a
 | --- | --- | --- |
 | `src/api/client.ts` | 上記API関数・型(POSTに `problem_key` を含む。出題APIは `/api/next-move/problems/next` を使用し204を「次の問題なし」として返す)、503 detail・409(`NEXT_MOVE_PROBLEM_CHANGED`)の取り出し | P0 |
 | `src/hooks/useNextMoveSession.ts` | 経過時間計測、着手時の記録コールバック(表示中サンプルの `problem_key` を添付) | P0-1 |
-| `src/pages/NextMoveStudyPage.tsx` | スキップ・完了状態・ポリシー付き「次の問題」(表示中の `problem_key` を `exclude_problem_key` として送信し、204は「次の問題がありません」=完了表示にする)・進捗ラベル修正・DB異常詳細表示・409時の「問題データが更新されました。再読み込みしてください」表示(結果表示は維持) | P0-1〜P0-5 |
+| `src/pages/NextMoveStudyPage.tsx` | スキップ・完了状態(通常の順次移動は既存兄弟一覧を distinct `problem_key` に重複排除し、現在の `problem_key` の位置から次へ進む。最後はループせず完了表示。`(index+1) % length` 廃止)・random/unattempted/weak モードの「次の問題」は新APIを使用(表示中の `problem_key` を `exclude_problem_key` として送信し、204は完了表示)・進捗ラベル修正・DB異常詳細表示・409時の「問題データが更新されました。再読み込みしてください」表示(結果表示は維持) | P0-1〜P0-5 |
 | `src/components/NextMoveProblemList.tsx` | 進捗サマリー・バッジ・出題ボタン・件数注記・h2、DB異常詳細表示 | P0-2/3/5 |
 | `src/components/NextMoveResultPanel.tsx` | 用語ヘルプ | P1-4 |
 | `src/pages/HistoryPage.tsx` | 次の一手セクション | P1-1 |
@@ -482,6 +501,12 @@ CREATE INDEX IF NOT EXISTS idx_next_move_results_answered ON next_move_results(a
   - Python プロセスの実行を繰り返しても同じ `problem_key` になる(ハッシュランダム化等に非依存)。
   - 固定入力に対する **golden test**(期待する `problem_key` 文字列そのものを検証)を設け、シリアライズ仕様の意図しない変更を検出する。
 - `progress` / `status`: 記録なし→全て未挑戦、記録後の集計、next_move.db 差し替え(同一の問題定義)後も `problem_key` 経由で進捗が残ること。`next_move_problem_refs` が POST 時に upsert されること。
+- 最新解答の決定的順序(`answered_at DESC, id DESC`):
+  - 同じ `problem_key` に**同一 `answered_at`** の `top` と `listed` を保存する fixture を用意し、`id` が大きい方が latest として選ばれる。
+  - 同一秒内に listed→top の順で保存すると review 対象から外れ、top→listed の順なら review 対象に入る。
+  - 結果が DB の行順・クエリプランに依存しない(挿入順を変えた fixture でも同一の latest になる)。
+  - status / progress / review が**同じ latest 行**を参照する(共通ヘルパー経由。3つのAPIで latest verdict が一致することを同一fixtureで確認)。
+  - `answered_at` が異なる場合は時刻順が優先される。
 - 戦型分類の参照(スナップショットと現在分類の分離):
   - 同一 `problem_key` の `opening_key` だけを変更した next_move.db に差し替えても、過去の解答履歴は保持される。
   - その差し替え後、progress と history の表示グループは**新しい `opening_key`** の側へ移る。
@@ -541,6 +566,12 @@ CREATE INDEX IF NOT EXISTS idx_next_move_results_answered ON next_move_results(a
 - 通常UI(盤面)からは合法手しか送信されない既存仕様の維持(盤面は合法手のみ着手可能という既存E2Eのアサーションを保持。422系は backend APIテストで担保し、E2Eでは通常フローに422が現れないことを前提とする)。
 - 一覧: バッジ表示・進捗サマリー・「ランダムに1問」で挑戦画面へ遷移。
 - スキップ: 着手前スキップ→次問題→見出しフォーカス(キーボードのみでも)。
+- 通常の順次移動(モックで distinct `problem_key` が3件の戦型を用意):
+  - 1→2→3 の順に移動し、同じ `problem_key` を2回通らない(重複 sample 行があっても)。
+  - 最後の3件目では先頭へループせず、決定的に完了表示(「この戦型の問題を最後まで学習しました」+導線)になる(最終問題E2Eとして固定的に検証)。
+  - distinct 候補が1件のみの戦型では解答後に完了表示となる。
+  - 通常の順次移動では `/api/next-move/problems/next` を呼ばない(route capture で確認)。random / unattempted / weak の操作は新APIを経由する。
+  - 既存のキーボード操作・見出しフォーカス移動のアサーションを維持する。
 - 完了: 最終問題の解答後に完了メッセージ。
 - DB異常: 503 detail 別の文言表示(モック)。
 - 既存の維持対象: キーボード操作一式、360px横スクロールなし(バッジ・サマリー追加後に再確認)、答えの漏洩なし(着手前に候補手/評価値/PV非表示)、ナビの `aria-current`、旧URLリダイレクト。
@@ -553,13 +584,13 @@ CREATE INDEX IF NOT EXISTS idx_next_move_results_answered ON next_move_results(a
 
 1. **PR-A: 解答記録の基盤**(P0-1)
    - `problem_key` の定義・算出(stable_source_key・normalized_sfen・candidate_definition_fingerprint・problem_definition_version)、**canonical serialization 共通関数**(キー辞書順・UTF-8・NFC・null/空文字区別。golden test 付き)、判定用候補順序の共通関数 `canonicalize_candidates_for_judgment`(API返却順・frontend判定・backend判定・fingerprint で同一実装。APIの最終 tie-breaker を `bm.id`→`move_usi` に変更)、抽出ツール側の `extraction_runs` メタデータ保存(`extract_learning_samples.py` / `validate_next_move_db.py` 対応)。
-   - **shogi.db 側と next_move.db 生成側の両方を本PRに含める**: shogi.db スキーマ追加(`next_move_problem_refs` + `next_move_results`)と、next_move.db 生成スキーマの更新(`extraction_runs` + `learning_samples.extraction_run_key`。旧DB後方互換・validate 新旧対応込み)。`POST /api/next-move/results`(`problem_key` 照合 409 → SFEN復元による `move_usi` 合法性検証 422 → 合法時のみ backend で verdict・candidate_rank を算出・保存)、learning-samples レスポンスへの `problem_key` 追加、セッションでの自動記録と409時の再読み込み案内(UI変更は最小)。
+   - **shogi.db 側と next_move.db 生成側の両方を本PRに含める**: shogi.db スキーマ追加(`next_move_problem_refs` + `next_move_results` + latest検索用インデックス)と、next_move.db 生成スキーマの更新(`extraction_runs` + `learning_samples.extraction_run_key`。旧DB後方互換・validate 新旧対応込み)。最新解答選択(`answered_at DESC, id DESC`)の共通クエリ/ヘルパーもここで定義し、後続PR(B/E)の status・progress・review はこれを使う。`POST /api/next-move/results`(`problem_key` 照合 409 → SFEN復元による `move_usi` 合法性検証 422 → 合法時のみ backend で verdict・candidate_rank を算出・保存)、learning-samples レスポンスへの `problem_key` 追加、セッションでの自動記録と409時の再読み込み案内(UI変更は最小)。
    - README の安定キー方針の更新(下記ドキュメント欄参照)。
    - backend/frontend/E2E テスト(problem_key 安定性・fingerprint 検出・DB差し替え409を含む)。ここが全ての土台。
 2. **PR-B: 進捗表示と一覧の改善**(P0-2、P1-5の見出し階層)
    - `progress`/`status` API と分類 resolver(`problem_key`→現在の代表 sample_id / opening_key / opening_name。**distinct `problem_key` 基準**の集計・重複排除・代表 sample の決定的選択)、一覧バッジ・サマリー・件数注記、挑戦画面の「X / Y」修正(distinct `problem_key` 数ベース)。
 3. **PR-C: 出題ポリシーとスキップ**(P0-3、P0-4)
-   - 出題API `GET /api/next-move/problems/next`(次の一手専用 namespace。既存の動的ルート `/api/learning-samples/{sample_id}` と衝突せず登録順に非依存。distinct `problem_key` 候補集合+`exclude_problem_key` 除外+候補なし時の204)、ランダム/未挑戦優先ボタン、スキップ、完了状態(204時の「次の問題がありません」表示を含む)。frontend(`client.ts`)は新URLを使用し、表示中の `problem_key` を送る。E2Eは「次の問題」操作が新URLを経由することを確認。READMEの「既知の制限」更新。
+   - 出題API `GET /api/next-move/problems/next`(次の一手専用 namespace。既存の動的ルート `/api/learning-samples/{sample_id}` と衝突せず登録順に非依存。distinct `problem_key` 候補集合+`exclude_problem_key` 除外+候補なし時の204)は **random / unattempted / weak の出題開始・継続に使用**。**通常の「次の問題」(順次移動)は既存兄弟一覧によるクライアント側巡回を維持**し、distinct `problem_key` への重複排除・現在キー位置基準の前進・最終問題での完了表示(`(index+1) % length` のループ廃止)に改める。ランダム/未挑戦優先ボタン、スキップ、完了状態(204時・最終問題到達時の表示)。frontend(`client.ts`)は random 系で新URLを使用し、表示中の `problem_key` を送る。E2Eは順次移動の完了到達と、random 系操作が新URLを経由することを確認。READMEの「既知の制限」更新。
 4. **PR-D: DB異常案内と用語説明**(P0-5、P1-4)
    - 503 detail 表示+復旧手順、評価値/PVヘルプ。小さく独立しているためA〜Cと並行可能(P0-5のみ先行切り出しも可)。
 5. **PR-E: 履歴・復習統合**(P1-1、P1-2、P1-3)
