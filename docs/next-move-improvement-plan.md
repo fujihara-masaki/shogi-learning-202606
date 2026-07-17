@@ -276,6 +276,7 @@ extracted_at         -- 抽出日時
   - `exclude_problem_key` が現在DBに存在しないキーの場合は、除外対象なしとして通常どおり選択する。
   - 形式が不正な `problem_key`(`v1:` プレフィックス無し等)も「存在しないキー」と同じ扱いで通常選択し、backend ログに警告を残す(GETの利便性を優先し、エラーにはしない)。
   - `policy=random`(戦型指定あり/全戦型)・`unattempted`・`weak` のすべてで共通して `problem_key` 単位の除外を行う。
+- **出題APIのURLは `/api/next-move/problems/next`**(次の一手専用 namespace): 既存の動的ルート `GET /api/learning-samples/{sample_id}` に捕捉されず、ルーターの include 順を変更しても正常に到達できる。正常時は代表 sample と `problem_key` を返し、候補なしは204を返す。
 
 ### P0-4 スキップと完了
 
@@ -408,12 +409,14 @@ CREATE INDEX IF NOT EXISTS idx_next_move_results_answered ON next_move_results(a
 | POST | `/api/next-move/results` | 解答記録。入力は `sample_id`(一時参照)+`problem_key`(表示中の問題の値)+`move_usi`+`hint_count`+`elapsed_ms` の5項目。backend が problem_key を再算出して照合(不一致は 409 `NEXT_MOVE_PROBLEM_CHANGED`)→ SFENから局面を復元して合法性を検証(構文不正 422 `NEXT_MOVE_MOVE_FORMAT_INVALID` / 違法手 422 `NEXT_MOVE_ILLEGAL_MOVE`)→ 合法時のみ候補手から verdict・candidate_rank を算出・保存 | P0-1 |
 | GET | `/api/next-move/progress` | 戦型ごとの挑戦数・verdict内訳(分子・分母とも **distinct `problem_key`** 基準。shogi.db の結果 × next_move.db を `problem_key` で突合し、戦型は**現在の分類**で集計) | P0-2 |
 | GET | `/api/next-move/status?opening_key=` | `problem_key`→最新verdict のマップ(一覧バッジ用。**distinct な現在の `problem_key`** と突合) | P0-2 |
-| GET | `/api/learning-samples/next?policy=random\|unattempted\|weak&opening_key=&exclude_problem_key=` | 出題ポリシー。処理順: (1) resolver から distinct `problem_key` 単位の候補集合を構築 → (2) `exclude_problem_key` と一致する問題を候補集合から除外 → (3) policy に応じて戦型・問題を選択 → (4) 選択された `problem_key` の代表 sample を返す(レスポンスに `sample_id` と `problem_key` の両方を含む)。直前問題の除外キーは **`problem_key`**(`sample_id` は画面遷移・解答POSTの一時参照専用で、除外の正式なキーには使わない) | P0-3 / P1-2 / P1-3 |
+| GET | `/api/next-move/problems/next?policy=random\|unattempted\|weak&opening_key=&exclude_problem_key=` | 出題ポリシー。処理順: (1) resolver から distinct `problem_key` 単位の候補集合を構築 → (2) `exclude_problem_key` と一致する問題を候補集合から除外 → (3) policy に応じて戦型・問題を選択 → (4) 選択された `problem_key` の代表 sample を返す(レスポンスに `sample_id` と `problem_key` の両方を含む。候補なしは204)。直前問題の除外キーは **`problem_key`**(`sample_id` は画面遷移・解答POSTの一時参照専用で、除外の正式なキーには使わない) | P0-3 / P1-2 / P1-3 |
 | GET | `/api/next-move/history` | 履歴用の集計+最近の解答(戦型は現在分類を resolver で解決。削除済み問題は解答時スナップショット+利用不可表示) | P1-1 |
 | GET | `/api/next-move/review` | 復習対象(最新が unlisted/listed のサンプル。現在分類で表示し、削除済み問題は再挑戦不可として除外または無効表示) | P1-2 |
 
 補足:
 
+- **URL namespace の方針**: 出題APIは `/api/learning-samples/next` に**しない**。既存の動的ルート `GET /api/learning-samples/{sample_id}` が先にマッチし、ルーター登録順によっては `"next"` を整数として解析しようとして 422 になり、static route に到達できないため。新規の次の一手専用APIは `results` / `progress` / `status` / `review` / `history` と同じ **`/api/next-move/*` namespace に統一**し(`/api/next-move/problems/next`)、動的ルートと衝突せず**ルーター登録順に依存しない**構成にする(OpenAPI 上も動的/静的ルートが曖昧にならない)。
+- 既存の問題一覧 `GET /api/learning-samples` と問題詳細 `GET /api/learning-samples/{id}` は互換のため**当面現行URLに残す**(役割: 一覧・詳細の読み取りは `/api/learning-samples`、次の一手固有の出題・記録・集計は `/api/next-move/*`)。将来これらを `/api/next-move/problems` / `/api/next-move/problems/{id}` へ移す場合は、リダイレクトまたは並行提供による互換期間を設けて別PRで行う(本計画のスコープ外)。
 - 既存 `GET /api/learning-samples` / `GET /api/learning-samples/{id}` のレスポンスに `problem_key` を追加する(backend が算出。一覧バッジ・status API との突合に使用)。
 - 候補手の返却順を `canonicalize_candidates_for_judgment` に統一する。既存の ORDER BY との差分は最終 tie-breaker のみ(`bm.id` → `move_usi`。行IDはDB再生成で変わるため安定キーの順序決定に使わない)。
 - 既存 `GET /api/learning-samples` に `total_count` 相当(または `X-Total-Count`)と `offset` を追加(P0-2 の注記/P2-2 のページング)。
@@ -422,7 +425,7 @@ CREATE INDEX IF NOT EXISTS idx_next_move_results_answered ON next_move_results(a
 
 | ファイル | 変更 | フェーズ |
 | --- | --- | --- |
-| `src/api/client.ts` | 上記API関数・型(POSTに `problem_key` を含む)、503 detail・409(`NEXT_MOVE_PROBLEM_CHANGED`)の取り出し | P0 |
+| `src/api/client.ts` | 上記API関数・型(POSTに `problem_key` を含む。出題APIは `/api/next-move/problems/next` を使用し204を「次の問題なし」として返す)、503 detail・409(`NEXT_MOVE_PROBLEM_CHANGED`)の取り出し | P0 |
 | `src/hooks/useNextMoveSession.ts` | 経過時間計測、着手時の記録コールバック(表示中サンプルの `problem_key` を添付) | P0-1 |
 | `src/pages/NextMoveStudyPage.tsx` | スキップ・完了状態・ポリシー付き「次の問題」(表示中の `problem_key` を `exclude_problem_key` として送信し、204は「次の問題がありません」=完了表示にする)・進捗ラベル修正・DB異常詳細表示・409時の「問題データが更新されました。再読み込みしてください」表示(結果表示は維持) | P0-1〜P0-5 |
 | `src/components/NextMoveProblemList.tsx` | 進捗サマリー・バッジ・出題ボタン・件数注記・h2、DB異常詳細表示 | P0-2/3/5 |
@@ -508,6 +511,12 @@ CREATE INDEX IF NOT EXISTS idx_next_move_results_answered ON next_move_results(a
   - 合法だが候補一覧にない手は従来どおり `unlisted` として保存される。
   - 合法な候補手は従来どおり保存される。
   - `problem_key` 不一致の場合は**合法性検証より先に** 409 となる。
+- 出題APIのルーティング(`/api/next-move/problems/next`):
+  - 新しい static endpoint への GET が 200(正常)または 204(候補なし)になる。
+  - `/api/learning-samples/next` へ誤ってアクセスしても新APIとして扱われない(既存の動的ルートの解釈のまま=422等。新エンドポイントに転送しない)。
+  - 既存の `GET /api/learning-samples/{sample_id}`(問題詳細)が壊れない。
+  - `main.py` のルーター登録順(include順)を入れ替えても、専用 namespace の出題APIが正常に動作する。
+  - OpenAPI schema に新しい next-move エンドポイントが期待どおり登録され、動的ルートと曖昧にならない。
 - `next?policy=`: seeded RNG を注入した決定的テスト。分離した選択関数(`choose_opening` / `choose_problem`)の単体テストで各戦型の均等重みを検証する(確率的な閾値判定は用いない。§5 P1-3 参照)。unattempted(全問挑戦済み時の挙動)、weak(unlisted/listedのみ)も同様に決定的に検証。seeded RNG テストも **distinct `problem_key` 単位・除外後の候補集合**の上で行う。
 - `exclude_problem_key` の除外(problem_key 基準):
   - 同一 `problem_key` に異なる `sample_id` が複数ある fixture を用意する。
@@ -550,7 +559,7 @@ CREATE INDEX IF NOT EXISTS idx_next_move_results_answered ON next_move_results(a
 2. **PR-B: 進捗表示と一覧の改善**(P0-2、P1-5の見出し階層)
    - `progress`/`status` API と分類 resolver(`problem_key`→現在の代表 sample_id / opening_key / opening_name。**distinct `problem_key` 基準**の集計・重複排除・代表 sample の決定的選択)、一覧バッジ・サマリー・件数注記、挑戦画面の「X / Y」修正(distinct `problem_key` 数ベース)。
 3. **PR-C: 出題ポリシーとスキップ**(P0-3、P0-4)
-   - `learning-samples/next` API(distinct `problem_key` 候補集合+`exclude_problem_key` 除外+候補1件時の204)、ランダム/未挑戦優先ボタン、スキップ、完了状態(204時の「次の問題がありません」表示を含む)。frontend は表示中の `problem_key` を送る。READMEの「既知の制限」更新。
+   - 出題API `GET /api/next-move/problems/next`(次の一手専用 namespace。既存の動的ルート `/api/learning-samples/{sample_id}` と衝突せず登録順に非依存。distinct `problem_key` 候補集合+`exclude_problem_key` 除外+候補なし時の204)、ランダム/未挑戦優先ボタン、スキップ、完了状態(204時の「次の問題がありません」表示を含む)。frontend(`client.ts`)は新URLを使用し、表示中の `problem_key` を送る。E2Eは「次の問題」操作が新URLを経由することを確認。READMEの「既知の制限」更新。
 4. **PR-D: DB異常案内と用語説明**(P0-5、P1-4)
    - 503 detail 表示+復旧手順、評価値/PVヘルプ。小さく独立しているためA〜Cと並行可能(P0-5のみ先行切り出しも可)。
 5. **PR-E: 履歴・復習統合**(P1-1、P1-2、P1-3)
