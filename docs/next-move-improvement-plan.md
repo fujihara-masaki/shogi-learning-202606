@@ -271,9 +271,14 @@ extracted_at         -- 抽出日時
 - 解答後の「次の問題」は現在の出題ポリシーを引き継ぐ(ランダムで来たら次もランダム。**一覧から普通に開いた場合の「次の問題」は従来どおりの順次移動を維持**する — P0-4参照)。
 - **通常の順次移動と新APIの役割分担**: 新しい `GET /api/next-move/problems/next` の policy は `random` / `unattempted` / `weak` のみで、順序上の現在位置を持たない。そのため**通常の「次の問題」(順次移動)は新APIへ統合せず**、既存一覧APIを使ったクライアント側の順次移動を維持する。ただし**対象戦型の全 distinct `problem_key` を取得してから現在位置と完了条件を判定する**(全ページ取得方式):
   - 現行実装は兄弟一覧を最大100件で1回取得するだけ(`fetchLearningSamples(openingKey, 100)`、一覧APIの上限も100件)のため、101問以上ある戦型では取得済み配列の100問目を「最後」と誤認して完了表示してしまう。**取得済み配列の末尾を完了条件にしない。**
-  - frontend は順次移動セッション開始時に、ページングAPI(§6: `offset`/`limit`/`total`)を `offset=0,100,200,...` と繰り返し取得し、`items` が空になるか `offset + items.length >= total` で終了する。各ページは backend 側で重複排除済みの distinct `problem_key` 一覧なので、そのまま統合する。
-  - 完成した distinct `problem_key` 一覧(全 `total` 件)上で、現在の `problem_key` の位置を基準に次へ進む。最後の distinct `problem_key` でのみ P0-4 の完了表示に切り替える(従来の `(index + 1) % length` による無限巡回は廃止)。
-  - **途中ページの取得に失敗した場合、取得済み配列の末尾を「最後の問題」と扱わない**。「次の問題一覧を最後まで取得できませんでした」等の表示+再試行ボタン+一覧へ戻る導線を出し、完了表示にはしない。
+  - frontend は順次移動セッション開始時に、ページングAPI(§6: `offset`/`limit`/`total`)を `offset=0,100,200,...` と繰り返し取得して統合する。**複数リクエスト間で next_move.db が差し替わる可能性があるため、「`items` が空」だけを正常終了条件にしない**(例: 1ページ目が `total=101` で100件→差し替え発生→2ページ目が空、を成功扱いすると100/101件のまま100件目を最終問題と誤判定する)。取得の成功は**取得済み distinct `problem_key` 件数と期待 total の一致**で判定する:
+    - 最初の正常レスポンスで `expected_total` を確定し、以降の各ページの `total` が `expected_total` と一致することを確認する。
+    - 統合済み distinct `problem_key` 件数を `loaded_count` として管理し、**`loaded_count == expected_total` の場合のみ取得完了**とする(offset ではなくこれを最終条件にする)。
+    - 異常(不整合)として扱うケース: `items` が空なのに `loaded_count < expected_total`/ページの `total` が `expected_total` と異なる(増減どちらも)/新しいページを取得しても `loaded_count` が増えない(無限ループさせず停止)。
+    - 不整合時は取得済み配列の末尾を最終問題扱いせず、「問題データが更新されたため、一覧を再取得してください」等の表示+再試行(**`offset=0` から取得し直す**)+一覧へ戻る導線を出し、完了表示にはしない。
+  - 完成した distinct `problem_key` 一覧(全 `expected_total` 件)上で、現在の `problem_key` の位置を基準に次へ進む。最後の distinct `problem_key` でのみ P0-4 の完了表示に切り替える(従来の `(index + 1) % length` による無限巡回は廃止)。
+  - **途中ページの取得に失敗した場合も、取得済み配列の末尾を「最後の問題」と扱わない**。「次の問題一覧を最後まで取得できませんでした」等の表示+再試行ボタン+一覧へ戻る導線を出し、完了表示にはしない。
+  - **DB世代識別子(強化案・P0では見送り)**: 一覧レスポンスに `dataset_version`(next_move.db 生成時の世代ID。`extraction_run_key` やDBファイルの監査用ハッシュ、生成日時+ソースメタデータから作る安定識別子が候補)を含め、全ページで一致しなければ最初から再取得する設計も可能。**P0では実装の簡潔さを優先し、上記の total 一貫性+`loaded_count` 到達確認を採用**する(取りこぼしは検出できるため)。`dataset_version` は後続PRでの必要性判断とする。
   - 実装上の検討事項: 取得中のローディング表示、二重取得防止、戦型変更時の古い取得の AbortController 等によるキャンセル(古いページ結果が新しい戦型へ混入しないように)、同一戦型の取得結果のセッション内キャッシュ。P0では実装の単純さを優先し、戦型ごとの distinct 問題数が現実的な範囲(数百件程度)である前提で開始時の全ページ一括取得とする(先読み方式への変更は必要になってから)。
   - 順次移動をサーバーAPIへ移行する場合は別PRで行う(P2-3参照)。
 - **同一問題が連続して出ない(直前問題の除外は `problem_key` 基準)**: frontend は表示中の問題の `problem_key` を `exclude_problem_key` として送り、backend は distinct `problem_key` 単位の候補集合からそのキーを除外してから選択する。`exclude_id`(sample_id基準)は正式な除外契約に**しない** — 同一 `problem_key` に複数 `sample_id` がある場合(例: 表示中が sample_id=10、代表が sample_id=20)や、DB差し替えで同じ問題の `sample_id` が変わった場合に、ID除外では同一問題が再出題されてしまうため。
@@ -288,8 +293,8 @@ extracted_at         -- 抽出日時
 ### P0-4 スキップと完了
 
 - 着手前に「スキップして次へ」が表示され、押すと記録なしで次の問題へ遷移し、見出しへフォーカスが移る。
-- **完了条件**: 同一戦型の**全ページ取得を完了した** distinct `problem_key` 一覧(P0-3の全ページ取得方式)において現在の問題が最後の場合、次へ進まず「この戦型の問題を最後まで学習しました」等の完了メッセージと、「一覧へ戻る」「もう一度取り組む」「ランダムに続ける」等の導線を表示する(先頭へループしない)。
-- 一覧の全ページ取得が完了していない(途中で失敗した)状態では完了表示にしない(P0-3のエラー時の扱い: 再試行導線を出す)。
+- **完了条件**: 同一戦型の**全ページ取得を完了した**(= `loaded_count == expected_total` が成立した)distinct `problem_key` 一覧(P0-3の全ページ取得方式)において現在の問題が最後の場合、次へ進まず「この戦型の問題を最後まで学習しました」等の完了メッセージと、「一覧へ戻る」「もう一度取り組む」「ランダムに続ける」等の導線を表示する(先頭へループしない)。
+- 一覧の全ページ取得が完了していない(途中失敗・total不整合・空ページ未達などの)状態では完了表示にしない(P0-3のエラー時の扱い: 再試行導線を出す)。
 - distinct 候補が1件のみの戦型でも、解答後の「次の問題」は完了扱いとする。
 - キーボードのみでスキップ→次問題→完了表示まで操作できる。
 
@@ -459,7 +464,7 @@ ROW_NUMBER() OVER (PARTITION BY problem_key ORDER BY answered_at DESC, id DESC)
 
 | ファイル | 変更 | フェーズ |
 | --- | --- | --- |
-| `src/api/client.ts` | 上記API関数・型(POSTに `problem_key` を含む。出題APIは `/api/next-move/problems/next` を使用し204を「次の問題なし」として返す)、一覧APIの `{items, offset, limit, total}` 型と全ページ取得ヘルパー(offsetループ・AbortSignal対応)、503 detail・409(`NEXT_MOVE_PROBLEM_CHANGED`)の取り出し | P0 |
+| `src/api/client.ts` | 上記API関数・型(POSTに `problem_key` を含む。出題APIは `/api/next-move/problems/next` を使用し204を「次の問題なし」として返す)、一覧APIの `{items, offset, limit, total}` 型と全ページ取得ヘルパー(offsetループ・AbortSignal対応。`expected_total` の固定・各ページの `total` 一致確認・`loaded_count == expected_total` を最終の完了条件とし、空ページ未達・total変化・進捗なしを不整合として返す)、503 detail・409(`NEXT_MOVE_PROBLEM_CHANGED`)の取り出し | P0 |
 | `src/hooks/useNextMoveSession.ts` | 経過時間計測、着手時の記録コールバック(表示中サンプルの `problem_key` を添付) | P0-1 |
 | `src/pages/NextMoveStudyPage.tsx` | スキップ・完了状態(通常の順次移動は一覧APIの**全ページ取得**で対象戦型の全 distinct `problem_key` を統合してから、現在の `problem_key` の位置基準で次へ進む。最後の distinct キーでのみ完了表示。`(index+1) % length` と「取得済み配列末尾=最後」の判定を廃止。途中ページ取得失敗時は完了扱いにせず再試行導線。ローディング・二重取得防止・戦型変更時のキャンセル・セッション内キャッシュを考慮)・random/unattempted/weak モードの「次の問題」は新APIを使用(表示中の `problem_key` を `exclude_problem_key` として送信し、204は完了表示)・進捗ラベル修正・DB異常詳細表示・409時の「問題データが更新されました。再読み込みしてください」表示(結果表示は維持) | P0-1〜P0-5 |
 | `src/components/NextMoveProblemList.tsx` | 進捗サマリー・バッジ・出題ボタン・件数注記・h2、DB異常詳細表示 | P0-2/3/5 |
@@ -516,11 +521,16 @@ ROW_NUMBER() OVER (PARTITION BY problem_key ORDER BY answered_at DESC, id DESC)
   - Python プロセスの実行を繰り返しても同じ `problem_key` になる(ハッシュランダム化等に非依存)。
   - 固定入力に対する **golden test**(期待する `problem_key` 文字列そのものを検証)を設け、シリアライズ仕様の意図しない変更を検出する。
 - `progress` / `status`: 記録なし→全て未挑戦、記録後の集計、next_move.db 差し替え(同一の問題定義)後も `problem_key` 経由で進捗が残ること。`next_move_problem_refs` が POST 時に upsert されること。
-- 最新解答の決定的順序(`answered_at DESC, id DESC`):
-  - 同じ `problem_key` に**同一 `answered_at`** の `top` と `listed` を保存する fixture を用意し、`id` が大きい方が latest として選ばれる。
-  - 同一秒内に listed→top の順で保存すると review 対象から外れ、top→listed の順なら review 対象に入る。
-  - 結果が DB の行順・クエリプランに依存しない(挿入順を変えた fixture でも同一の latest になる)。
-  - status / progress / review が**同じ latest 行**を参照する(共通ヘルパー経由。3つのAPIで latest verdict が一致することを同一fixtureで確認)。
+- 最新解答の決定的順序(`answered_at DESC, id DESC`)。**「解答の挿入順による正しい結果の変化」と「SELECT返却順・クエリプランへの非依存」を別テストとして分離**する(挿入順を変えれば id の大小も変わり latest が変わるのが正しい仕様なので、「挿入順を変えても同じ latest」という検証はしない):
+  - 解答の挿入順を検証するテスト(挿入順が変われば結果も正しく変わる):
+    - 同一 `answered_at` で **listed→top の順に INSERT** すると top の `id` が大きくなり、top が latest となって review 対象から外れる。
+    - 別テストとして、同一 `answered_at` で **top→listed の順に INSERT** すると listed の `id` が大きくなり、listed が latest となって review 対象に入る。
+    - この2ケースで latest が異なることが正しい仕様である。
+  - SQL返却順・クエリプラン非依存のテスト(**解答の挿入順と id は固定したまま**検証する):
+    - fixture 作成後の物理的な取得順に依存しない。明示的な ORDER BY を持たない内部取得順を信用しない。
+    - インデックスの有無や別のクエリ形(サブクエリ/ウィンドウ関数)に変えても、正式な latest ヘルパーは**同じ result id** を返す。
+    - status / progress / review が**同じ latest result id** を参照する(共通ヘルパー経由。3つのAPIで一致することを同一fixtureで確認)。
+    - Python 側の入力配列順を変えても、DBクエリの正式順序による結果は変わらない。
   - `answered_at` が異なる場合は時刻順が優先される。
 - 戦型分類の参照(スナップショットと現在分類の分離):
   - 同一 `problem_key` の `opening_key` だけを変更した next_move.db に差し替えても、過去の解答履歴は保持される。
@@ -577,6 +587,14 @@ ROW_NUMBER() OVER (PARTITION BY problem_key ORDER BY answered_at DESC, id DESC)
 - バッジ/進捗表示の純関数、ポリシー付き「次の問題」選択ロジック、経過時間の丸め。
 - `judgeNextMove` が判定用候補順序の共通規則(同順位は score降順→depth降順→move_usi昇順、NULLは後)に従うこと(backend側テストと同一の共通fixtureを使用)。
 - `client.ts`: 503 detail の抽出、409(`NEXT_MOVE_PROBLEM_CHANGED`)の構造化エラーの取り出し、記録API失敗時に例外を伝播させないこと。
+- 全ページ取得ヘルパーの終了条件(モックレスポンスで決定的に検証):
+  - `total=101`、1ページ目100件+2ページ目1件 → 正常完了(`loaded_count == expected_total`)。
+  - `total=101`、1ページ目100件+2ページ目が**空配列** → 失敗扱い(空ページを正常終了にしない。100件目を完了扱いしない)。
+  - 途中ページの `total` が 101→100 に変わった場合、および 101→102 に変わった場合 → どちらも不整合として再取得要求。
+  - 新しいページを取得しても新規 `problem_key` が増えない場合 → 無限ループせず失敗として停止。
+  - 再試行時は `offset=0` から取得し直し、成功後に101件目へ進める。
+  - 取得完了判定が offset ではなく `loaded_count == expected_total` を最終条件としていること。
+  - (`dataset_version` を採用する場合)途中でのバージョン変化を検出して最初から再取得すること。
 
 ### E2E(Playwright)— 既存アサーションは全て維持
 
@@ -594,7 +612,8 @@ ROW_NUMBER() OVER (PARTITION BY problem_key ORDER BY answered_at DESC, id DESC)
 - 100件超の順次移動(モックで distinct `problem_key` が101件の戦型を用意。ページサイズ100):
   - 100件目で完了表示にならず、101件目へ進める(2ページ目が取得される)。
   - 101件目でのみ完了表示になる(最終問題E2Eを101件fixtureでも確認)。
-  - 2ページ目の取得が失敗した場合、100件目を完了扱いにせず、「次の問題一覧を最後まで取得できませんでした」+再試行導線が表示される。再試行成功後は101件目へ進める。
+  - 2ページ目の取得が失敗した場合、100件目を完了扱いにせず、「次の問題一覧を最後まで取得できませんでした」+再試行導線が表示される。再試行(`offset=0` から)成功後は101件目へ進める。
+  - 2ページ目が**空配列**を返した場合(DB差し替え相当のモック)も、100件目を完了扱いにせず、「問題データが更新されたため、一覧を再取得してください」等の再取得導線が表示される。
   - 戦型を切り替えた際、進行中だった古いページ取得の結果が新しい戦型の一覧に混入しない。
   - 100件以下の既存ケース(1ページで完結)も従来どおり動作する。
 - 完了: 最終問題の解答後に完了メッセージ。
