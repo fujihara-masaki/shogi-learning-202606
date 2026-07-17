@@ -1,6 +1,10 @@
 import os
 import sqlite3
+import subprocess
+import sys
 from pathlib import Path
+
+import pytest
 
 from app.database import get_connection
 from app.importers.yaneuraou_book import import_book
@@ -40,8 +44,42 @@ def test_missing_required_table_returns_503(client, tmp_path):
     assert response.status_code == 503
     assert "必須テーブル" in response.json()["detail"]
 
+@pytest.mark.parametrize("column", ["imported_at", "file_name"])
+def test_missing_book_source_api_column_returns_503(client, column):
+    seed_next_move()
+    conn = sqlite3.connect(os.environ["NEXT_MOVE_DB_PATH"])
+    try:
+        conn.execute(f"ALTER TABLE book_sources DROP COLUMN {column}")
+        conn.commit()
+    finally:
+        conn.close()
+    response = client.get("/api/book/sources")
+    assert response.status_code == 503
+    assert "book_sources" in response.json()["detail"]
+    assert column in response.json()["detail"]
+
 def test_licenses_combine_main_and_next_move_databases(client):
     seed_next_move()
     response = client.get("/api/licenses")
     assert response.status_code == 200
     assert response.json()["book_sources"][0]["name"] == "Test fixture"
+
+def test_validator_checks_expected_learning_sample_count(client):
+    seed_next_move()
+    script = Path(__file__).parents[1] / "scripts" / "validate_next_move_db.py"
+    path = os.environ["NEXT_MOVE_DB_PATH"]
+    success = subprocess.run(
+        [sys.executable, str(script), path, "--expected-learning-samples", "1"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    mismatch = subprocess.run(
+        [sys.executable, str(script), path, "--expected-learning-samples", "10000"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert success.returncode == 0
+    assert mismatch.returncode == 1
+    assert "expected 10000, actual 1" in mismatch.stdout

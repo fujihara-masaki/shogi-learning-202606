@@ -9,6 +9,7 @@ REQUIRED = {"book_sources", "book_positions", "book_moves", "learning_samples"}
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("path", type=Path)
+    parser.add_argument("--expected-learning-samples", type=int)
     args = parser.parse_args()
     if not args.path.is_file():
         parser.error(f"database does not exist: {args.path}")
@@ -29,6 +30,12 @@ def main() -> int:
             for label, count in [("orphan source", orphan_sources),("orphan position",orphan_positions),("duplicate sample",duplicates),("source missing license/url",missing_license)]:
                 if count: errors.append(f"{label}: {count}")
             for table in sorted(REQUIRED): print(f"{table}={conn.execute(f'SELECT COUNT(*) FROM {table}').fetchone()[0]}")
+            learning_sample_count = conn.execute("SELECT COUNT(*) FROM learning_samples").fetchone()[0]
+            if args.expected_learning_samples is not None and learning_sample_count != args.expected_learning_samples:
+                errors.append(
+                    "learning_samples count: "
+                    f"expected {args.expected_learning_samples}, actual {learning_sample_count}"
+                )
         if errors:
             for error in errors: print(f"ERROR: {error}")
             return 1

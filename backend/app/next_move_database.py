@@ -39,8 +39,12 @@ CREATE INDEX IF NOT EXISTS idx_learning_samples_position ON learning_samples(boo
 """
 
 REQUIRED_COLUMNS = {
-    "book_sources": {"id", "name", "version", "source_url", "license_name", "license_text", "copyright_notice"},
-    "book_positions": {"id", "source_id", "sfen"},
+    "book_sources": {
+        "id", "name", "version", "source_url", "license_name", "license_text",
+        "copyright_notice", "file_name", "file_sha256", "imported_at",
+        "position_count", "move_count", "note",
+    },
+    "book_positions": {"id", "source_id", "sfen", "line_no"},
     "book_moves": {"id", "position_id", "usi", "score", "depth", "pv", "raw", "sort_order"},
     "learning_samples": {"id", "book_source_id", "book_position_id", "opening_key", "opening_name", "sfen", "sample_rank", "sample_reason", "created_at"},
 }
