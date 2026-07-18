@@ -271,14 +271,14 @@ extracted_at         -- 抽出日時
 - 解答後の「次の問題」は現在の出題ポリシーを引き継ぐ(ランダムで来たら次もランダム。**一覧から普通に開いた場合の「次の問題」は従来どおりの順次移動を維持**する — P0-4参照)。
 - **通常の順次移動と新APIの役割分担**: 新しい `GET /api/next-move/problems/next` の policy は `random` / `unattempted` / `weak` のみで、順序上の現在位置を持たない。そのため**通常の「次の問題」(順次移動)は新APIへ統合せず**、既存一覧APIを使ったクライアント側の順次移動を維持する。ただし**対象戦型の全 distinct `problem_key` を取得してから現在位置と完了条件を判定する**(全ページ取得方式):
   - 現行実装は兄弟一覧を最大100件で1回取得するだけ(`fetchLearningSamples(openingKey, 100)`、一覧APIの上限も100件)のため、101問以上ある戦型では取得済み配列の100問目を「最後」と誤認して完了表示してしまう。**取得済み配列の末尾を完了条件にしない。**
-  - frontend は順次移動セッション開始時に、ページングAPI(§6: `offset`/`limit`/`total`)を `offset=0,100,200,...` と繰り返し取得して統合する。**複数リクエスト間で next_move.db が差し替わる可能性があるため、「`items` が空」だけを正常終了条件にしない**(例: 1ページ目が `total=101` で100件→差し替え発生→2ページ目が空、を成功扱いすると100/101件のまま100件目を最終問題と誤判定する)。取得の成功は**取得済み distinct `problem_key` 件数と期待 total の一致**で判定する:
-    - 最初の正常レスポンスで `expected_total` を確定し、以降の各ページの `total` が `expected_total` と一致することを確認する。
-    - 統合済み distinct `problem_key` 件数を `loaded_count` として管理し、**`loaded_count == expected_total` の場合のみ取得完了**とする(offset ではなくこれを最終条件にする)。
-    - 異常(不整合)として扱うケース: `items` が空なのに `loaded_count < expected_total`/ページの `total` が `expected_total` と異なる(増減どちらも)/新しいページを取得しても `loaded_count` が増えない(無限ループさせず停止)。
-    - 不整合時は取得済み配列の末尾を最終問題扱いせず、「問題データが更新されたため、一覧を再取得してください」等の表示+再試行(**`offset=0` から取得し直す**)+一覧へ戻る導線を出し、完了表示にはしない。
+  - frontend は順次移動セッション開始時に、ページングAPI(§6: `offset`/`limit`/`total`/`dataset_version`)を `offset=0,100,200,...` と繰り返し取得して統合する。**複数リクエスト間で next_move.db が差し替わる可能性があるため、「`items` が空」だけを正常終了条件にしない**(例: 1ページ目が `total=101` で100件→差し替え発生→2ページ目が空、を成功扱いすると100/101件のまま100件目を最終問題と誤判定する)。取得の成功は**取得済み distinct `problem_key` 件数と期待 total の一致、かつ全ページの `dataset_version` 一致**で判定する:
+    - 最初の正常レスポンスで `expected_total` と `expected_dataset_version` を確定し、以降の各ページの `total` が `expected_total`、`dataset_version` が `expected_dataset_version` と一致することを確認する。
+    - 統合済み distinct `problem_key` 件数を `loaded_count` として管理し、**`loaded_count == expected_total` かつ全ページの `dataset_version` が一致した場合のみ取得完了**とする(offset ではなくこれを最終条件にする)。
+    - 異常(不整合)として扱うケース: `items` が空なのに `loaded_count < expected_total`/ページの `total` が `expected_total` と異なる(増減どちらも)/ページの `dataset_version` が `expected_dataset_version` と異なる/新しいページを取得しても `loaded_count` が増えない(無限ループさせず停止)。
+    - 不整合時は取得済み一覧を破棄し、取得済み配列の末尾を最終問題扱いせず、「問題データが更新されたため、一覧を再取得してください」等の表示+再試行(**`offset=0` から取得し直す**)+一覧へ戻る導線を出し、完了表示にはしない。世代不一致も同じ再取得経路で扱い、混在した世代A/Bの一覧を保持しない。
   - 完成した distinct `problem_key` 一覧(全 `expected_total` 件)上で、現在の `problem_key` の位置を基準に次へ進む。最後の distinct `problem_key` でのみ P0-4 の完了表示に切り替える(従来の `(index + 1) % length` による無限巡回は廃止)。
   - **途中ページの取得に失敗した場合も、取得済み配列の末尾を「最後の問題」と扱わない**。「次の問題一覧を最後まで取得できませんでした」等の表示+再試行ボタン+一覧へ戻る導線を出し、完了表示にはしない。
-  - **DB世代識別子(強化案・P0では見送り)**: 一覧レスポンスに `dataset_version`(next_move.db 生成時の世代ID。`extraction_run_key` やDBファイルの監査用ハッシュ、生成日時+ソースメタデータから作る安定識別子が候補)を含め、全ページで一致しなければ最初から再取得する設計も可能。**P0では実装の簡潔さを優先し、上記の total 一貫性+`loaded_count` 到達確認を採用**する(取りこぼしは検出できるため)。`dataset_version` は後続PRでの必要性判断とする。
+  - **DB世代識別子(`dataset_version`)はP0必須**: 一覧レスポンスに `dataset_version`(next_move.db 生成物全体を表す世代ID。`problem_key` とは別目的で、ページング中のスナップショット混在を検出するための識別子)を含め、全ページで一致しなければ取得済み一覧を破棄して `offset=0` から再取得する。`total` が同じ別DBへページ途中で差し替わった場合でも、世代Aの1ページ目と世代Bの2ページ目を成功扱いしない。
   - 実装上の検討事項: 取得中のローディング表示、二重取得防止、戦型変更時の古い取得の AbortController 等によるキャンセル(古いページ結果が新しい戦型へ混入しないように)、同一戦型の取得結果のセッション内キャッシュ。P0では実装の単純さを優先し、戦型ごとの distinct 問題数が現実的な範囲(数百件程度)である前提で開始時の全ページ一括取得とする(先読み方式への変更は必要になってから)。
   - 順次移動をサーバーAPIへ移行する場合は別PRで行う(P2-3参照)。
 - **同一問題が連続して出ない(直前問題の除外は `problem_key` 基準)**: frontend は表示中の問題の `problem_key` を `exclude_problem_key` として送り、backend は distinct `problem_key` 単位の候補集合からそのキーを除外してから選択する。`exclude_id`(sample_id基準)は正式な除外契約に**しない** — 同一 `problem_key` に複数 `sample_id` がある場合(例: 表示中が sample_id=10、代表が sample_id=20)や、DB差し替えで同じ問題の `sample_id` が変わった場合に、ID除外では同一問題が再出題されてしまうため。
@@ -293,8 +293,8 @@ extracted_at         -- 抽出日時
 ### P0-4 スキップと完了
 
 - 着手前に「スキップして次へ」が表示され、押すと記録なしで次の問題へ遷移し、見出しへフォーカスが移る。
-- **完了条件**: 同一戦型の**全ページ取得を完了した**(= `loaded_count == expected_total` が成立した)distinct `problem_key` 一覧(P0-3の全ページ取得方式)において現在の問題が最後の場合、次へ進まず「この戦型の問題を最後まで学習しました」等の完了メッセージと、「一覧へ戻る」「もう一度取り組む」「ランダムに続ける」等の導線を表示する(先頭へループしない)。
-- 一覧の全ページ取得が完了していない(途中失敗・total不整合・空ページ未達などの)状態では完了表示にしない(P0-3のエラー時の扱い: 再試行導線を出す)。
+- **完了条件**: 同一戦型の**全ページ取得を完了した**(= `loaded_count == expected_total` かつ `dataset_version` 一致が成立した)distinct `problem_key` 一覧(P0-3の全ページ取得方式)において現在の問題が最後の場合、次へ進まず「この戦型の問題を最後まで学習しました」等の完了メッセージと、「一覧へ戻る」「もう一度取り組む」「ランダムに続ける」等の導線を表示する(先頭へループしない)。
+- 一覧の全ページ取得が完了していない(途中失敗・total不整合・dataset_version不一致・空ページ未達などの)状態では完了表示にしない(P0-3のエラー時の扱い: 再試行導線を出す)。
 - distinct 候補が1件のみの戦型でも、解答後の「次の問題」は完了扱いとする。
 - キーボードのみでスキップ→次問題→完了表示まで操作できる。
 
@@ -431,6 +431,11 @@ ROW_NUMBER() OVER (PARTITION BY problem_key ORDER BY answered_at DESC, id DESC)
 - **旧DBの後方互換を維持**する: `extraction_runs` メタデータの無い旧DBでも、`problem_key` の構成要素(`stable_source_key`・`normalized_sfen`・candidate fingerprint)は既存の `book_sources` / `book_moves` から backend が算出できるため **problem_key は完全に算出可能**。旧DBでは監査用の `extraction_run_key` のみ `"unknown"` にフォールバックする(キーには影響しない)。
 - `validate_next_move_db.py` を新旧両形式に対応させる(新形式では `extraction_runs` の整合、旧形式では不在を許容。あわせて重複 `problem_key`・メタデータ不整合の検出を追加)。
 
+- **`dataset_version` メタデータ**: 新形式 `next_move.db` では `database_metadata` テーブルを追加し、`key='dataset_version'` の単一レコードとしてDB生成物全体の世代IDを保存する。複数の `extraction_runs` が存在しても、アプリはこの単一値をページングレスポンスへ返す。
+  - 生成材料: DB生成完了時に canonical JSON `{schema_version, generated_at, extractor_version, extraction_run_keys, source_file_sha256_values, row_counts}` を作り、`v1:` + SHA-256(UTF-8 bytes) とする。これは `problem_key` とは別目的で、問題の同一性ではなく「現在の next_move.db ファイル全体の生成世代」を表す。
+  - アプリ実行時は引き続き `next_move.db` を `mode=ro` で開き、`dataset_version` を読み取るだけで書き込まない。抽出・再生成ツールだけが `database_metadata` を更新する。
+  - 旧形式DBに `database_metadata.dataset_version` が無い場合は、DBファイル全体のSHA-256から `v1:sha256-file:<hex>` を算出してフォールバックする。同一ファイルでは安定し、ファイル差し替え時には値が変わるため、ページ途中の旧DB差し替えも検出できる。
+
 この shogi.db 側と next_move.db 生成側の両方を **PR-A に含める**(§8。片方だけ実装してスキーマ不整合になることを避ける)。
 
 ### API(新規ルーター `backend/app/routers/next_move.py` を想定)
@@ -450,23 +455,23 @@ ROW_NUMBER() OVER (PARTITION BY problem_key ORDER BY answered_at DESC, id DESC)
 - 既存の問題一覧 `GET /api/learning-samples` と問題詳細 `GET /api/learning-samples/{id}` は互換のため**当面現行URLに残す**。役割分担: 問題一覧・詳細の読み取りと **P0での通常の順次移動(クライアント側の distinct `problem_key` 巡回)** は `/api/learning-samples`、`random` / `unattempted` / `weak` の出題開始・継続(`exclude_problem_key` による直前問題除外を含む)は `/api/next-move/problems/next`、記録・集計は `/api/next-move/*`。通常の順次移動を新APIへ強制統合しない(順次移動のサーバーAPI化は P2-3 で再検討し、行う場合は別PR)。将来一覧・詳細を `/api/next-move/problems` 系へ移す場合も、互換期間を設けて別PRで行う(本計画のスコープ外)。
 - 既存 `GET /api/learning-samples` / `GET /api/learning-samples/{id}` のレスポンスに `problem_key` を追加する(backend が算出。一覧バッジ・status API との突合に使用)。
 - 候補手の返却順を `canonicalize_candidates_for_judgment` に統一する。既存の ORDER BY との差分は最終 tie-breaker のみ(`bm.id` → `move_usi`。行IDはDB再生成で変わるため安定キーの順序決定に使わない)。
-- **一覧APIのページング(PR-B)**: 既存 `GET /api/learning-samples` に `offset` / `limit` / `total` を追加し、レスポンスを次の形にする:
+- **一覧APIのページング(PR-B)**: 既存 `GET /api/learning-samples` に `offset` / `limit` / `total` / `dataset_version` を追加し、レスポンスを次の形にする:
 
   ```json
-  {"items": [...], "offset": 0, "limit": 100, "total": 250}
+  {"items": [...], "offset": 0, "limit": 100, "total": 250, "dataset_version": "v1:..."}
   ```
 
   - `total` は `learning_samples` の行数ではなく、**現在の resolver における distinct `problem_key` 数**。
   - 各 item には順次移動に必要な `sample_id`・`problem_key`・`opening_key`・`sample_rank`(決定的な並び順情報)を含める。
-  - **backend 側の処理順序**: (1) resolver 構築 → (2) `problem_key` 単位で代表 sample へ重複排除 → (3) 決定的順序付け(`sample_rank` 昇順 → `problem_key` 昇順。全ページで一貫)→ (4) `offset` / `limit` 適用。DBの生行をページングしてからクライアントで重複排除する方式は**採らない**(同一 `problem_key` の重複行がページ境界をまたぐと、ページ件数と `total` の意味が崩れるため)。
+  - **backend 側の処理順序**: (1) resolver 構築 → (2) `problem_key` 単位で代表 sample へ重複排除 → (3) 決定的順序付け(`sample_rank` 昇順 → `problem_key` 昇順。全ページで一貫)→ (4) `offset` / `limit` 適用 → (5) 同一DB生成物全体の `dataset_version` を付与。DBの生行をページングしてからクライアントで重複排除する方式は**採らない**(同一 `problem_key` の重複行がページ境界をまたぐと、ページ件数と `total` の意味が崩れるため)。
 
 ### フロントエンド
 
 | ファイル | 変更 | フェーズ |
 | --- | --- | --- |
-| `src/api/client.ts` | 上記API関数・型(POSTに `problem_key` を含む。出題APIは `/api/next-move/problems/next` を使用し204を「次の問題なし」として返す)、一覧APIの `{items, offset, limit, total}` 型と全ページ取得ヘルパー(offsetループ・AbortSignal対応。`expected_total` の固定・各ページの `total` 一致確認・`loaded_count == expected_total` を最終の完了条件とし、空ページ未達・total変化・進捗なしを不整合として返す)、503 detail・409(`NEXT_MOVE_PROBLEM_CHANGED`)の取り出し | P0 |
+| `src/api/client.ts` | 上記API関数・型(POSTに `problem_key` を含む。出題APIは `/api/next-move/problems/next` を使用し204を「次の問題なし」として返す)、一覧APIの `{items, offset, limit, total, dataset_version}` 型と全ページ取得ヘルパー(offsetループ・AbortSignal対応。`expected_total` / `expected_dataset_version` の固定・各ページの `total` / `dataset_version` 一致確認・`loaded_count == expected_total` かつ世代一致を最終の完了条件とし、空ページ未達・total変化・dataset_version変化・進捗なしを不整合として返す。不整合時は取得済み一覧を破棄し `offset=0` から再取得する)、503 detail・409(`NEXT_MOVE_PROBLEM_CHANGED`)の取り出し | P0 |
 | `src/hooks/useNextMoveSession.ts` | 経過時間計測、着手時の記録コールバック(表示中サンプルの `problem_key` を添付) | P0-1 |
-| `src/pages/NextMoveStudyPage.tsx` | スキップ・完了状態(通常の順次移動は一覧APIの**全ページ取得**で対象戦型の全 distinct `problem_key` を統合してから、現在の `problem_key` の位置基準で次へ進む。最後の distinct キーでのみ完了表示。`(index+1) % length` と「取得済み配列末尾=最後」の判定を廃止。途中ページ取得失敗時は完了扱いにせず再試行導線。ローディング・二重取得防止・戦型変更時のキャンセル・セッション内キャッシュを考慮)・random/unattempted/weak モードの「次の問題」は新APIを使用(表示中の `problem_key` を `exclude_problem_key` として送信し、204は完了表示)・進捗ラベル修正・DB異常詳細表示・409時の「問題データが更新されました。再読み込みしてください」表示(結果表示は維持) | P0-1〜P0-5 |
+| `src/pages/NextMoveStudyPage.tsx` | スキップ・完了状態(通常の順次移動は一覧APIの**全ページ取得**で対象戦型の全 distinct `problem_key` を統合してから、現在の `problem_key` の位置基準で次へ進む。最後の distinct キーでのみ完了表示。`(index+1) % length` と「取得済み配列末尾=最後」の判定を廃止。途中ページ取得失敗・`dataset_version` 不一致時は完了扱いにせず取得済み一覧を破棄して再試行導線。ローディング・二重取得防止・戦型変更時のキャンセル・セッション内キャッシュを考慮)・random/unattempted/weak モードの「次の問題」は新APIを使用(表示中の `problem_key` を `exclude_problem_key` として送信し、204は完了表示)・進捗ラベル修正・DB異常詳細表示・409時の「問題データが更新されました。再読み込みしてください」表示(結果表示は維持) | P0-1〜P0-5 |
 | `src/components/NextMoveProblemList.tsx` | 進捗サマリー・バッジ・出題ボタン・件数注記・h2、DB異常詳細表示 | P0-2/3/5 |
 | `src/components/NextMoveResultPanel.tsx` | 用語ヘルプ | P1-4 |
 | `src/pages/HistoryPage.tsx` | 次の一手セクション | P1-1 |
@@ -548,6 +553,9 @@ ROW_NUMBER() OVER (PARTITION BY problem_key ORDER BY answered_at DESC, id DESC)
   - 同一 `problem_key` 内で現在メタデータ(`opening_key` 等)が競合する fixture で、表示が決定的(代表 sample の値)になり、`validate_next_move_db.py` が警告を出す。
 - 一覧APIのページング(backend):
   - `total` が `learning_samples` 行数ではなく distinct `problem_key` 数になる。
+  - 同一DBの複数ページで `dataset_version` が一致し、DB再生成時には `database_metadata.dataset_version` が変わる。
+  - 旧形式DBではファイルSHA-256 fallbackが同一ファイルで安定し、旧DB差し替え時に変化する。
+  - アプリ実行時に `next_move.db` へ書き込まず、`mode=ro` のまま `dataset_version` を返す。
   - backend で「resolver構築→重複排除→決定的順序付け(`sample_rank` 昇順→`problem_key` 昇順)→offset/limit適用」の順で処理される(重複排除後にページングされることを、重複行がページ境界付近にある fixture で検証。ページ件数と `total` が整合し、全ページを通して `problem_key` の欠落・重複がない)。
   - distinct `problem_key` が250件の場合、`offset=0/100/200` の3ページで全件取得でき、全ページで順序が一貫する。
 - next_move.db のスキーマ形式(新旧両対応):
@@ -588,13 +596,15 @@ ROW_NUMBER() OVER (PARTITION BY problem_key ORDER BY answered_at DESC, id DESC)
 - `judgeNextMove` が判定用候補順序の共通規則(同順位は score降順→depth降順→move_usi昇順、NULLは後)に従うこと(backend側テストと同一の共通fixtureを使用)。
 - `client.ts`: 503 detail の抽出、409(`NEXT_MOVE_PROBLEM_CHANGED`)の構造化エラーの取り出し、記録API失敗時に例外を伝播させないこと。
 - 全ページ取得ヘルパーの終了条件(モックレスポンスで決定的に検証):
-  - `total=101`、1ページ目100件+2ページ目1件 → 正常完了(`loaded_count == expected_total`)。
+  - `total=101`、同一 `dataset_version` の1ページ目100件+2ページ目1件 → 正常完了(`loaded_count == expected_total` かつ世代一致)。
   - `total=101`、1ページ目100件+2ページ目が**空配列** → 失敗扱い(空ページを正常終了にしない。100件目を完了扱いしない)。
   - 途中ページの `total` が 101→100 に変わった場合、および 101→102 に変わった場合 → どちらも不整合として再取得要求。
+  - `total` が同じ別DBへページ途中で差し替えられた場合でも `dataset_version` 不一致で検出し、世代Aの1ページ目と世代Bの2ページ目を成功扱いしない。
+  - `loaded_count == total` に到達していても `dataset_version` が不一致なら失敗扱いにする。
+  - 不一致時は取得済み一覧を破棄し、再試行は `offset=0` から開始する。再取得後は単一世代のページだけで完了する。
   - 新しいページを取得しても新規 `problem_key` が増えない場合 → 無限ループせず失敗として停止。
   - 再試行時は `offset=0` から取得し直し、成功後に101件目へ進める。
-  - 取得完了判定が offset ではなく `loaded_count == expected_total` を最終条件としていること。
-  - (`dataset_version` を採用する場合)途中でのバージョン変化を検出して最初から再取得すること。
+  - 取得完了判定が offset ではなく `loaded_count == expected_total` と `dataset_version` 一致を最終条件としていること。
 
 ### E2E(Playwright)— 既存アサーションは全て維持
 
@@ -628,13 +638,13 @@ ROW_NUMBER() OVER (PARTITION BY problem_key ORDER BY answered_at DESC, id DESC)
 
 1. **PR-A: 解答記録の基盤**(P0-1)
    - `problem_key` の定義・算出(stable_source_key・normalized_sfen・candidate_definition_fingerprint・problem_definition_version)、**canonical serialization 共通関数**(キー辞書順・UTF-8・NFC・null/空文字区別。golden test 付き)、判定用候補順序の共通関数 `canonicalize_candidates_for_judgment`(API返却順・frontend判定・backend判定・fingerprint で同一実装。APIの最終 tie-breaker を `bm.id`→`move_usi` に変更)、抽出ツール側の `extraction_runs` メタデータ保存(`extract_learning_samples.py` / `validate_next_move_db.py` 対応)。
-   - **shogi.db 側と next_move.db 生成側の両方を本PRに含める**: shogi.db スキーマ追加(`next_move_problem_refs` + `next_move_results` + latest検索用インデックス)と、next_move.db 生成スキーマの更新(`extraction_runs` + `learning_samples.extraction_run_key`。旧DB後方互換・validate 新旧対応込み)。最新解答選択(`answered_at DESC, id DESC`)の共通クエリ/ヘルパーもここで定義し、後続PR(B/E)の status・progress・review はこれを使う。`POST /api/next-move/results`(`problem_key` 照合 409 → SFEN復元による `move_usi` 合法性検証 422 → 合法時のみ backend で verdict・candidate_rank を算出・保存)、learning-samples レスポンスへの `problem_key` 追加、セッションでの自動記録と409時の再読み込み案内(UI変更は最小)。
+   - **shogi.db 側と next_move.db 生成側の両方を本PRに含める**: shogi.db スキーマ追加(`next_move_problem_refs` + `next_move_results` + latest検索用インデックス)と、next_move.db 生成スキーマの更新(`extraction_runs` + `learning_samples.extraction_run_key` + `database_metadata.dataset_version`。旧DB後方互換・旧形式DBのファイルSHA-256 fallback・validate 新旧対応込み)。最新解答選択(`answered_at DESC, id DESC`)の共通クエリ/ヘルパーもここで定義し、後続PR(B/E)の status・progress・review はこれを使う。`POST /api/next-move/results`(`problem_key` 照合 409 → SFEN復元による `move_usi` 合法性検証 422 → 合法時のみ backend で verdict・candidate_rank を算出・保存)、learning-samples レスポンスへの `problem_key` 追加、セッションでの自動記録と409時の再読み込み案内(UI変更は最小)。
    - README の安定キー方針の更新(下記ドキュメント欄参照)。
    - backend/frontend/E2E テスト(problem_key 安定性・fingerprint 検出・DB差し替え409を含む)。ここが全ての土台。
 2. **PR-B: 進捗表示と一覧の改善**(P0-2、P1-5の見出し階層)
-   - `progress`/`status` API と分類 resolver(`problem_key`→現在の代表 sample_id / opening_key / opening_name。**distinct `problem_key` 基準**の集計・重複排除・代表 sample の決定的選択)、**一覧APIのページング**(`offset`/`limit`/`total`。backend で重複排除→順序付け→ページング。`total` は distinct `problem_key` 数)、一覧バッジ・サマリー・件数注記、挑戦画面の「X / Y」修正(distinct `problem_key` 数ベース)。
+   - `progress`/`status` API と分類 resolver(`problem_key`→現在の代表 sample_id / opening_key / opening_name。**distinct `problem_key` 基準**の集計・重複排除・代表 sample の決定的選択)、**一覧APIのページング**(`offset`/`limit`/`total`/`dataset_version`。backend で重複排除→順序付け→ページング。`total` は distinct `problem_key` 数、`dataset_version` は同一DB生成物全体の世代ID)、一覧バッジ・サマリー・件数注記、挑戦画面の「X / Y」修正(distinct `problem_key` 数ベース)。
 3. **PR-C: 出題ポリシーとスキップ**(P0-3、P0-4)
-   - 出題API `GET /api/next-move/problems/next`(次の一手専用 namespace。既存の動的ルート `/api/learning-samples/{sample_id}` と衝突せず登録順に非依存。distinct `problem_key` 候補集合+`exclude_problem_key` 除外+候補なし時の204)は **random / unattempted / weak の出題開始・継続に使用**。**通常の「次の問題」(順次移動)はクライアント側巡回を維持**し、**PR-Bのページング(`offset`/`limit`/`total`)に依存して全ページ取得**で対象戦型の全 distinct `problem_key` を統合してから、現在キー位置基準の前進・最終 distinct キーでの完了表示に改める(`(index+1) % length` と「取得済み配列末尾=最後」の判定を廃止。途中失敗時は完了扱いにせず再試行導線)。ランダム/未挑戦優先ボタン、スキップ、完了状態(204時・最終問題到達時の表示)。frontend(`client.ts`)は random 系で新URLを使用し、表示中の `problem_key` を送る。E2Eは順次移動の完了到達(101件fixture含む)と、random 系操作が新URLを経由することを確認。READMEの「既知の制限」更新。
+   - 出題API `GET /api/next-move/problems/next`(次の一手専用 namespace。既存の動的ルート `/api/learning-samples/{sample_id}` と衝突せず登録順に非依存。distinct `problem_key` 候補集合+`exclude_problem_key` 除外+候補なし時の204)は **random / unattempted / weak の出題開始・継続に使用**。**通常の「次の問題」(順次移動)はクライアント側巡回を維持**し、**PR-Bのページング(`offset`/`limit`/`total`/`dataset_version`)に依存して全ページ取得**で対象戦型の全 distinct `problem_key` を統合してから、現在キー位置基準の前進・最終 distinct キーでの完了表示に改める(`(index+1) % length` と「取得済み配列末尾=最後」の判定を廃止。途中失敗・世代不一致時は完了扱いにせず取得済み一覧を破棄して再試行導線)。ランダム/未挑戦優先ボタン、スキップ、完了状態(204時・最終問題到達時の表示)。frontend(`client.ts`)は random 系で新URLを使用し、表示中の `problem_key` を送る。E2Eは順次移動の完了到達(101件fixture含む)と、random 系操作が新URLを経由することを確認。READMEの「既知の制限」更新。
 4. **PR-D: DB異常案内と用語説明**(P0-5、P1-4)
    - 503 detail 表示+復旧手順、評価値/PVヘルプ。小さく独立しているためA〜Cと並行可能(P0-5のみ先行切り出しも可)。
 5. **PR-E: 履歴・復習統合**(P1-1、P1-2、P1-3)
