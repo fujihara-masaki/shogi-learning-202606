@@ -2,8 +2,8 @@ import { ApiError } from "../api/client";
 
 export function NextMoveDatabaseError({ error }: { error: ApiError }) {
   return (
-    <aside className="next-move-db-error" role="alert" data-testid="next-move-db-recovery">
-      <div className="banner banner-error">
+    <aside className="next-move-db-error" data-testid="next-move-db-recovery">
+      <div className="banner banner-error" role="alert">
         <strong>次の一手データを利用できません</strong>
         <p>{error.detail}</p>
       </div>

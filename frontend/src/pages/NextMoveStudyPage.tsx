@@ -203,9 +203,9 @@ function NextMoveStudyContent({ id }: { id: string | undefined }) {
       <p className="muted" data-testid="next-move-progress">
         {progressLabel}(戦型: {sample.opening_name})
       </p>
+      {unavailableError && <NextMoveDatabaseError error={unavailableError} />}
       {completed ? <div className="banner banner-success" role="status" aria-live="polite" data-testid="next-move-complete">
         <p>この戦型の問題を最後まで学習しました</p>
-        {unavailableError && <NextMoveDatabaseError error={unavailableError} />}
         {Boolean(nextError) && !isNextMoveUnavailable(nextError) && <p role="alert">{errorMessage(nextError, "次の問題を取得できませんでした")}</p>}
         <div className="post-clear-actions">
           <Link to="/next-move">一覧へ戻る</Link>
@@ -224,7 +224,6 @@ function NextMoveStudyContent({ id }: { id: string | undefined }) {
               : `${sideLabel}番です。この局面で、あなたなら次の一手をどう指しますか?盤面で1手指してください。`}
           </div>
           {session.saveMessage && <p role="alert" className="muted" data-testid="next-move-save-message">{session.saveMessage}</p>}
-          {unavailableError && <NextMoveDatabaseError error={unavailableError} />}
           {Boolean(nextError) && !isNextMoveUnavailable(nextError) && <div className="banner banner-error" role="alert">{errorMessage(nextError, "次の問題を取得できませんでした")}</div>}
           {Boolean(siblingError) && !isNextMoveUnavailable(siblingError) && <div className="banner banner-error" role="alert" data-testid="next-move-page-error">
             {errorMessage(siblingError, "問題一覧を最後まで取得できませんでした")} <button type="button" onClick={() => setSiblingsRetry((value) => value + 1)}>offset 0から再試行</button>

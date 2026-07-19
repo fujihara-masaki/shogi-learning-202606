@@ -163,6 +163,8 @@ test("戦型取得が503の場合は原因と復旧手順を表示する", async
   await expect(recovery).toContainText("app.importers.yaneuraou_book");
   await expect(recovery).toContainText("extract_learning_samples");
   await expect(recovery).toContainText("validate_next_move_db.py");
+  await expect(recovery.getByRole("alert")).toContainText(detail);
+  await expect(recovery.getByRole("alert")).not.toContainText("validate_next_move_db.py");
   await expect(page.getByTestId("next-move-opening-filter")).toHaveCount(0);
   await expect(page.getByTestId("next-move-empty-state")).toHaveCount(0);
 });
@@ -395,6 +397,20 @@ test.describe("次の一手", () => {
     expect(requestedUrls.some((url) => url.includes("opening_key=shikenbisha"))).toBeTruthy();
     // 戦型を選ばない全件取得は行わない(取得の偏り対策)
     expect(requestedUrls.every((url) => !url.match(/\/api\/learning-samples\?(?!.*opening_key=)/))).toBeTruthy();
+  });
+
+  test("出題開始の古い503案内は戦型変更時にクリアする", async ({ page }) => {
+    await page.route("**/api/next-move/problems/next**", (route) => route.fulfill({
+      status: 503,
+      json: { detail: "ランダム出題用DBを開けません" },
+    }));
+    await page.goto("/next-move");
+    await page.getByRole("button", { name: "ランダムに1問" }).click();
+    await expect(page.getByTestId("next-move-db-recovery")).toContainText("ランダム出題用DBを開けません");
+
+    await page.getByTestId("next-move-opening-filter").selectOption("shikenbisha");
+    await expect(page.getByTestId("next-move-problem-list")).toContainText("四間飛車");
+    await expect(page.getByTestId("next-move-db-recovery")).toHaveCount(0);
   });
 
   test("着手前は候補手・評価値・PVを表示しない", async ({ page }) => {
@@ -631,6 +647,21 @@ test.describe("次の一手", () => {
     await page.getByRole("button", { name: "ランダムに続ける" }).click();
     await expect(page.getByTestId("shogi-board")).toBeVisible();
     expect(excludes).toEqual(["v1:problem-102", "v1:problem-102"]);
+  });
+
+  test("完了後のランダム継続503は成功バナーの外に復旧案内を表示する", async ({ page }) => {
+    const detail = "次の一手専用DBのlearning_samplesが0件です";
+    await page.route("**/api/next-move/problems/next**", (route) => route.fulfill({ status: 503, json: { detail } }));
+    await page.goto("/next-move/201");
+    await page.getByTestId("next-move-skip-button").click();
+    const complete = page.getByTestId("next-move-complete");
+    await expect(complete).toBeVisible();
+
+    await page.getByRole("button", { name: "ランダムに続ける" }).click();
+    const recovery = page.getByTestId("next-move-db-recovery");
+    await expect(recovery).toContainText(detail);
+    await expect(recovery).toContainText("次の一手専用DBの復旧手順");
+    await expect(complete.getByTestId("next-move-db-recovery")).toHaveCount(0);
   });
 
   test("通常順次移動は1→2→3で進み、APIを使わず3問目だけで完了する", async ({ page }) => {

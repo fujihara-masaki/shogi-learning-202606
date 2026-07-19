@@ -118,7 +118,11 @@ export default function NextMoveProblemList() {
         <div className="filter-bar">
           <select
             value={selectedOpening}
-            onChange={(e) => setSelectedOpening(e.target.value)}
+            onChange={(e) => {
+              setSelectionError(null);
+              setSelectionMessage(null);
+              setSelectedOpening(e.target.value);
+            }}
             aria-label="戦型を選ぶ"
             data-testid="next-move-opening-filter"
           >
