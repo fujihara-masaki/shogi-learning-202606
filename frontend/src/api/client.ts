@@ -460,6 +460,19 @@ export async function fetchAllLearningSamples(openingKey?: string, signal?: Abor
   return items;
 }
 
+const allSamplesCache = new Map<string, Promise<LearningSample[]>>();
+export function fetchAllLearningSamplesCached(openingKey: string, force = false): Promise<LearningSample[]> {
+  if (force) allSamplesCache.delete(openingKey);
+  const existing = allSamplesCache.get(openingKey);
+  if (existing) return existing;
+  const request = fetchAllLearningSamples(openingKey).catch((error) => {
+    allSamplesCache.delete(openingKey);
+    throw error;
+  });
+  allSamplesCache.set(openingKey, request);
+  return request;
+}
+
 export function fetchLearningSample(id: number): Promise<LearningSample> {
   return request<LearningSample>(`/api/learning-samples/${id}`);
 }

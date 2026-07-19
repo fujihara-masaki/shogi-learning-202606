@@ -9,7 +9,7 @@ from ..database import get_connection
 from ..next_move_database import NextMoveDatabaseUnavailable, get_next_move_connection
 from ..next_move_identity import get_dataset_version, normalize_candidates, problem_key
 from ..next_move_database import next_move_db_path
-from ..next_move_resolver import resolve_problems, serialize_problem
+from ..next_move_resolver import cached_resolve_problems, serialize_problem
 
 router = APIRouter(tags=["book"])
 
@@ -220,7 +220,8 @@ def list_learning_sample_openings() -> list[dict[str, Any]]:
     conn = _next_move_connection()
     try:
         summaries: dict[str, dict[str, Any]] = {}
-        for row in resolve_problems(conn):
+        version = get_dataset_version(conn, next_move_db_path())
+        for row in cached_resolve_problems(conn, dataset_version=version, database_path=str(next_move_db_path())):
             item = summaries.setdefault(row["opening_key"], {"opening_key": row["opening_key"],
                 "opening_name": row["opening_name"], "sample_count": 0, "first_rank": row["sample_rank"]})
             item["sample_count"] += 1
@@ -235,12 +236,11 @@ def list_learning_samples(opening_key: str | None = Query(default=None), offset:
                           limit: int = Query(default=100, ge=1, le=100)) -> dict[str, Any]:
     conn = _next_move_connection()
     try:
-        rows = resolve_problems(conn)
-        if opening_key:
-            rows = [row for row in rows if row["opening_key"] == opening_key]
+        version = get_dataset_version(conn, next_move_db_path())
+        rows = cached_resolve_problems(conn, dataset_version=version, database_path=str(next_move_db_path()), opening_key=opening_key)
         total = len(rows)
         return {"items": [serialize_problem(row) for row in rows[offset:offset + limit]], "offset": offset,
-                "limit": limit, "total": total, "dataset_version": get_dataset_version(conn, next_move_db_path())}
+                "limit": limit, "total": total, "dataset_version": version}
     finally:
         conn.close()
 

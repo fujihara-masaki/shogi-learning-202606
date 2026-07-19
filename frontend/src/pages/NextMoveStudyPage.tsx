@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { Color } from "tsshogi";
-import { fetchAllLearningSamples, fetchLearningSample, isNextMoveUnavailable, type LearningSample } from "../api/client";
+import { fetchAllLearningSamplesCached, fetchLearningSample, isNextMoveUnavailable, type LearningSample } from "../api/client";
 import { NextMoveCandidateComparison, NextMoveResultPanel } from "../components/NextMoveResultPanel";
 import ShogiBoard from "../components/ShogiBoard";
 import { useNextMoveSession } from "../hooks/useNextMoveSession";
@@ -25,13 +25,15 @@ interface SiblingsState {
   /** どの戦型に対する結果か */
   key: string | null;
   samples: LearningSample[];
+  error: string | null;
 }
 
 function NextMoveStudyContent({ id }: { id: string | undefined }) {
   const sampleId = id && /^\d+$/.test(id) ? Number(id) : null;
   const [sampleState, setSampleState] = useState<SampleState>({ id: null, sample: null, error: null });
   // 同じ戦型の問題一覧(進捗表示と「次の問題」用)。取得に失敗しても出題自体は続行できる。
-  const [siblings, setSiblings] = useState<SiblingsState>({ key: null, samples: [] });
+  const [siblings, setSiblings] = useState<SiblingsState>({ key: null, samples: [], error: null });
+  const [siblingsRetry, setSiblingsRetry] = useState(0);
   const [comparisonVisible, setComparisonVisible] = useState(false);
   const headingRef = useRef<HTMLHeadingElement | null>(null);
   const navigate = useNavigate();
@@ -63,18 +65,17 @@ function NextMoveStudyContent({ id }: { id: string | undefined }) {
   useEffect(() => {
     if (!openingKey) return;
     let cancelled = false;
-    const controller = new AbortController();
-    fetchAllLearningSamples(openingKey, controller.signal)
+    fetchAllLearningSamplesCached(openingKey, siblingsRetry > 0)
       .then((samples) => {
-        if (!cancelled) setSiblings({ key: openingKey, samples });
+        if (!cancelled) setSiblings({ key: openingKey, samples, error: null });
       })
       .catch(() => {
-        if (!cancelled) setSiblings({ key: openingKey, samples: [] });
+        if (!cancelled) setSiblings({ key: openingKey, samples: [], error: "問題一覧を最後まで取得できませんでした。先頭から再試行してください。" });
       });
     return () => {
-      cancelled = true; controller.abort();
+      cancelled = true;
     };
-  }, [openingKey]);
+  }, [openingKey, siblingsRetry]);
 
   // 「次の問題」で遷移してきた場合は見出しへフォーカスを移す(直接アクセス時は動かさない)。
   const autoFocusHeading = Boolean((location.state as { autoFocusHeading?: boolean } | null)?.autoFocusHeading);
@@ -86,6 +87,7 @@ function NextMoveStudyContent({ id }: { id: string | undefined }) {
 
   const basePosition = useMemo(() => (sample ? positionFromSfen(sample.sfen) : null), [sample]);
   const siblingSamples = siblings.key === openingKey ? siblings.samples : [];
+  const siblingError = siblings.key === openingKey ? siblings.error : null;
   const currentIndex = sample ? siblingSamples.findIndex((s) => s.problem_key === sample.problem_key) : -1;
   const nextSample =
     currentIndex >= 0 && siblingSamples.length > 1
@@ -157,6 +159,9 @@ function NextMoveStudyContent({ id }: { id: string | undefined }) {
               : `${sideLabel}番です。この局面で、あなたなら次の一手をどう指しますか?盤面で1手指してください。`}
           </div>
           {session.saveMessage && <p role="alert" className="muted" data-testid="next-move-save-message">{session.saveMessage}</p>}
+          {siblingError && <div className="banner banner-error" role="alert" data-testid="next-move-page-error">
+            {siblingError} <button type="button" onClick={() => setSiblingsRetry((value) => value + 1)}>offset 0から再試行</button>
+          </div>}
           <ShogiBoard
             position={session.position}
             flipped={basePosition?.color === Color.WHITE}

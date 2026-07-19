@@ -2,12 +2,15 @@
 from __future__ import annotations
 
 import logging
+import threading
 from collections import defaultdict
 from typing import Any
 
 from .next_move_identity import normalize_candidates, problem_key
 
 logger = logging.getLogger(__name__)
+_cache_lock = threading.Lock()
+_cache: dict[tuple[str, str], tuple[dict[str, Any], ...]] = {}
 
 
 def resolve_problems(conn) -> list[dict[str, Any]]:
@@ -23,21 +26,24 @@ def resolve_problems(conn) -> list[dict[str, Any]]:
                bs.version source_version, bs.license_name, bs.source_url, bs.copyright_notice
         FROM learning_samples ls JOIN book_sources bs ON bs.id=ls.book_source_id {run_join}
     """)]
-    position_ids = [row["book_position_id"] for row in rows]
+    position_ids = sorted({row["book_position_id"] for row in rows})
     moves: dict[int, list[dict[str, Any]]] = defaultdict(list)
     if position_ids:
-        marks = ",".join("?" for _ in position_ids)
-        for move in conn.execute(f"""
+        # Stay comfortably below SQLite's host-parameter limit on old builds.
+        for start in range(0, len(position_ids), 500):
+            chunk = position_ids[start:start + 500]
+            marks = ",".join("?" for _ in chunk)
+            for move in conn.execute(f"""
             SELECT bm.position_id,bm.usi move_usi,bm.score,bm.depth,bm.pv,bm.raw,bm.sort_order,
               bs.id source_id,bs.name source_name,bs.version source_version,bs.license_name,
               bs.source_url,bs.copyright_notice
             FROM book_moves bm JOIN book_positions bp ON bp.id=bm.position_id
             JOIN book_sources bs ON bs.id=bp.source_id WHERE bm.position_id IN ({marks})
-        """, position_ids):
-            item = dict(move)
-            item.update(rank=item["sort_order"] + 1 if item["sort_order"] is not None else None,
-                        license=item["license_name"])
-            moves[item["position_id"]].append(item)
+            """, chunk):
+                item = dict(move)
+                item.update(rank=item["sort_order"] + 1 if item["sort_order"] is not None else None,
+                            license=item["license_name"])
+                moves[item["position_id"]].append(item)
     groups: dict[str, list[dict[str, Any]]] = defaultdict(list)
     for row in rows:
         candidates = normalize_candidates(moves[row["book_position_id"]])
@@ -55,6 +61,29 @@ def resolve_problems(conn) -> list[dict[str, Any]]:
         representatives.append(representative)
     representatives.sort(key=lambda r: (r["sample_rank"], r["problem_key"]))
     return representatives
+
+
+def cached_resolve_problems(conn, *, dataset_version: str, database_path: str,
+                            opening_key: str | None = None) -> list[dict[str, Any]]:
+    """Reuse the expensive immutable classification for a dataset generation."""
+    cache_key = (database_path, dataset_version)
+    with _cache_lock:
+        cached = _cache.get(cache_key)
+    if cached is None:
+        resolved = tuple(resolve_problems(conn))
+        with _cache_lock:
+            # Retain only the current generation of a database path.
+            for old_key in [key for key in _cache if key[0] == database_path and key != cache_key]:
+                del _cache[old_key]
+            cached = _cache.setdefault(cache_key, resolved)
+    values = list(cached)
+    return values if opening_key is None else [row for row in values if row["opening_key"] == opening_key]
+
+
+def clear_resolver_cache() -> None:
+    """Test/import hook; runtime generations normally evict automatically."""
+    with _cache_lock:
+        _cache.clear()
 
 
 def serialize_problem(row: dict[str, Any]) -> dict[str, Any]:

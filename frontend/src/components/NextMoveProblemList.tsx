@@ -62,9 +62,16 @@ export default function NextMoveProblemList() {
   useEffect(() => {
     if (!selectedOpening) return;
     let cancelled = false;
-    Promise.all([fetchLearningSamples(selectedOpening, 30), fetchNextMoveStatus(selectedOpening)])
-      .then(([page, status]) => {
-        if (!cancelled) { setSamples({ key: selectedOpening, data: page.items, total: page.total, error: null }); setStatuses(status.items); }
+    fetchLearningSamples(selectedOpening, 30)
+      .then(async (page) => {
+        if (!cancelled) setSamples({ key: selectedOpening, data: page.items, total: page.total, error: null });
+        try {
+          const status = await fetchNextMoveStatus(selectedOpening);
+          if (!cancelled) setStatuses(status.items);
+        } catch {
+          // Status is supplementary: keep the problem list usable and show unknown as unattempted.
+          if (!cancelled) setStatuses([]);
+        }
       })
       .catch((e) => {
         if (!cancelled) setSamples({ key: selectedOpening, data: [], total: 0, error: isNextMoveUnavailable(e)

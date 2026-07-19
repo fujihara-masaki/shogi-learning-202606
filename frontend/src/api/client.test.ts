@@ -49,12 +49,42 @@ describe("next move paging", () => {
     await expect(fetchLearningSamples("bogin", 20, 100)).resolves.toEqual(page);
     expect(fetchMock.mock.calls[0][0]).toContain("limit=20&offset=100&opening_key=bogin");
   });
-  test("loads all pages and rejects a changed dataset", async () => {
+  function mockPages(pages: unknown[]) {
+    vi.stubGlobal("fetch", vi.fn().mockImplementation(async () => ({ ok: true, status: 200, json: async () => pages.shift() })));
+  }
+  test("loads multiple pages completely", async () => {
+    mockPages([
+      { items: Array(100).fill({ id: 1 }), offset: 0, limit: 100, total: 101, dataset_version: "v1:a" },
+      { items: [{ id: 2 }], offset: 100, limit: 100, total: 101, dataset_version: "v1:a" },
+    ]);
+    await expect(fetchAllLearningSamples("bogin")).resolves.toHaveLength(101);
+  });
+  test("rejects a changed dataset version", async () => {
     const responses = [
       { items: Array(100).fill({}), offset: 0, limit: 100, total: 101, dataset_version: "v1:a" },
       { items: [{}], offset: 100, limit: 100, total: 101, dataset_version: "v1:b" },
     ];
-    vi.stubGlobal("fetch", vi.fn().mockImplementation(async () => ({ ok: true, status: 200, json: async () => responses.shift() })));
+    mockPages(responses);
     await expect(fetchAllLearningSamples("bogin")).rejects.toMatchObject({ code: "NEXT_MOVE_PAGE_INCONSISTENT" });
+  });
+  test.each([
+    ["total change", { items: [{}], offset: 100, limit: 100, total: 102, dataset_version: "v1:a" }],
+    ["empty incomplete page", { items: [], offset: 100, limit: 100, total: 101, dataset_version: "v1:a" }],
+    ["offset mismatch", { items: [{}], offset: 99, limit: 100, total: 101, dataset_version: "v1:a" }],
+    ["no offset progress", { items: [{}], offset: 0, limit: 100, total: 101, dataset_version: "v1:a" }],
+  ])("rejects %s", async (_name, second) => {
+    mockPages([{ items: Array(100).fill({}), offset: 0, limit: 100, total: 101, dataset_version: "v1:a" }, second]);
+    await expect(fetchAllLearningSamples("bogin")).rejects.toMatchObject({ code: "NEXT_MOVE_PAGE_INCONSISTENT" });
+  });
+  test("forwards AbortSignal", async () => {
+    const controller = new AbortController();
+    const fetchMock = vi.fn().mockImplementation((_url, init: RequestInit) => new Promise((_resolve, reject) => {
+      init.signal?.addEventListener("abort", () => reject(new DOMException("aborted", "AbortError")));
+    }));
+    vi.stubGlobal("fetch", fetchMock);
+    const pending = fetchAllLearningSamples("bogin", controller.signal);
+    controller.abort();
+    await expect(pending).rejects.toMatchObject({ name: "AbortError" });
+    expect(fetchMock.mock.calls[0][1].signal).toBe(controller.signal);
   });
 });

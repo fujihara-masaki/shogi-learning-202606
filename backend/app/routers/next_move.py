@@ -10,9 +10,10 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from ..database import get_connection, latest_next_move_results
 from ..next_move_database import NextMoveDatabaseUnavailable, get_next_move_connection
-from ..next_move_identity import (PROBLEM_DEFINITION_VERSION, candidate_definition_fingerprint,
+from ..next_move_identity import (PROBLEM_DEFINITION_VERSION, candidate_definition_fingerprint, get_dataset_version,
     normalize_candidates, normalize_sfen, problem_key, stable_source_key)
-from ..next_move_resolver import resolve_problems
+from ..next_move_resolver import cached_resolve_problems
+from ..next_move_database import next_move_db_path
 
 router = APIRouter(prefix="/api/next-move", tags=["next-move"])
 
@@ -104,8 +105,8 @@ def _current_problems(opening_key: str | None = None):
     except NextMoveDatabaseUnavailable as exc:
         raise error(503, str(exc), "NEXT_MOVE_DATABASE_UNAVAILABLE") from exc
     try:
-        problems = resolve_problems(conn)
-        return [p for p in problems if opening_key is None or p["opening_key"] == opening_key]
+        version = get_dataset_version(conn, next_move_db_path())
+        return cached_resolve_problems(conn, dataset_version=version, database_path=str(next_move_db_path()), opening_key=opening_key)
     finally:
         conn.close()
 
