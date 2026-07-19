@@ -8,10 +8,11 @@ import shogi
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, ConfigDict, Field
 
-from ..database import get_connection
+from ..database import get_connection, latest_next_move_results
 from ..next_move_database import NextMoveDatabaseUnavailable, get_next_move_connection
 from ..next_move_identity import (PROBLEM_DEFINITION_VERSION, candidate_definition_fingerprint,
     normalize_candidates, normalize_sfen, problem_key, stable_source_key)
+from ..next_move_resolver import resolve_problems
 
 router = APIRouter(prefix="/api/next-move", tags=["next-move"])
 
@@ -95,3 +96,51 @@ def record_result(body: ResultInput):
         raise error(500, "解答記録を保存できませんでした", "NEXT_MOVE_RESULT_SAVE_FAILED") from exc
     finally:
         conn.close()
+
+
+def _current_problems(opening_key: str | None = None):
+    try:
+        conn = get_next_move_connection()
+    except NextMoveDatabaseUnavailable as exc:
+        raise error(503, str(exc), "NEXT_MOVE_DATABASE_UNAVAILABLE") from exc
+    try:
+        problems = resolve_problems(conn)
+        return [p for p in problems if opening_key is None or p["opening_key"] == opening_key]
+    finally:
+        conn.close()
+
+
+@router.get("/progress")
+def progress():
+    problems = _current_problems()
+    history = get_connection()
+    try:
+        latest = latest_next_move_results(history, [p["problem_key"] for p in problems])
+    finally:
+        history.close()
+    openings: dict[str, dict] = {}
+    for problem in problems:
+        item = openings.setdefault(problem["opening_key"], {"opening_key": problem["opening_key"],
+            "opening_name": problem["opening_name"], "total": 0, "answered": 0,
+            "verdict_counts": {v: 0 for v in ("top", "strong", "listed", "unlisted")}})
+        item["total"] += 1
+        result = latest.get(problem["problem_key"])
+        if result:
+            item["answered"] += 1
+            item["verdict_counts"][result["verdict"]] += 1
+    for item in openings.values():
+        item["top_rate"] = item["verdict_counts"]["top"] / item["answered"] if item["answered"] else 0
+    return {"openings": sorted(openings.values(), key=lambda x: x["opening_key"])}
+
+
+@router.get("/status")
+def status(opening_key: str):
+    problems = _current_problems(opening_key)
+    history = get_connection()
+    try:
+        latest = latest_next_move_results(history, [p["problem_key"] for p in problems])
+    finally:
+        history.close()
+    return {"opening_key": opening_key, "items": [{"problem_key": p["problem_key"],
+        "verdict": latest[p["problem_key"]]["verdict"] if p["problem_key"] in latest else None,
+        "result_id": latest[p["problem_key"]]["id"] if p["problem_key"] in latest else None} for p in problems]}

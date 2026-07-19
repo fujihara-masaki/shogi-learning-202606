@@ -102,6 +102,15 @@ async function mockNextMoveApi(
     if (response === "abort") await route.abort("connectionfailed");
     else await route.fulfill({status: response.status ?? 200, json: response.json ?? {}});
   });
+  await page.route("**/api/next-move/progress", (route) => route.fulfill({ json: { openings: OPENINGS.map((o) => ({
+    opening_key: o.opening_key, opening_name: o.opening_name, total: o.sample_count, answered: o.opening_key === "bogin" ? 1 : 0,
+    verdict_counts: { top: o.opening_key === "bogin" ? 1 : 0, strong: 0, listed: 0, unlisted: 0 }, top_rate: o.opening_key === "bogin" ? 1 : 0,
+  })) } }));
+  await page.route("**/api/next-move/status**", (route) => {
+    const opening = new URL(route.request().url()).searchParams.get("opening_key");
+    const items = SAMPLES.filter((s) => s.opening_key === opening).map((s, index) => ({ problem_key: s.problem_key, verdict: index ? null : "top", result_id: index ? null : 1 }));
+    return route.fulfill({ json: { opening_key: opening, items } });
+  });
   await page.route("**/api/learning-samples**", async (route) => {
     const url = new URL(route.request().url());
     requestedUrls?.push(url.pathname + url.search);
@@ -117,7 +126,9 @@ async function mockNextMoveApi(
     }
     const openingKey = url.searchParams.get("opening_key");
     const list = openingKey ? SAMPLES.filter((s) => s.opening_key === openingKey) : SAMPLES;
-    await route.fulfill({ json: list });
+    const offset = Number(url.searchParams.get("offset") ?? 0);
+    const limit = Number(url.searchParams.get("limit") ?? 100);
+    await route.fulfill({ json: { items: list.slice(offset, offset + limit), offset, limit, total: list.length, dataset_version: "v1:e2e" } });
   });
 }
 

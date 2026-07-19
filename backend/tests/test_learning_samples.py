@@ -156,8 +156,10 @@ def test_learning_samples_can_be_listed_by_opening_with_candidates(client, tmp_p
     opening_key = openings[0]["opening_key"]
     samples_response = client.get(f"/api/learning-samples?opening_key={opening_key}")
     assert samples_response.status_code == 200
-    samples = samples_response.json()
-    assert samples
+    page = samples_response.json()
+    assert set(page) == {"items", "offset", "limit", "total", "dataset_version"}
+    samples = page["items"]
+    assert page["total"] == len(samples)
     assert all(sample["opening_key"] == opening_key for sample in samples)
     assert samples[0]["sfen"]
     assert samples[0]["candidates"]

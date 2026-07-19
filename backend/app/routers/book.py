@@ -7,7 +7,9 @@ from fastapi import APIRouter, HTTPException, Query
 
 from ..database import get_connection
 from ..next_move_database import NextMoveDatabaseUnavailable, get_next_move_connection
-from ..next_move_identity import normalize_candidates, problem_key
+from ..next_move_identity import get_dataset_version, normalize_candidates, problem_key
+from ..next_move_database import next_move_db_path
+from ..next_move_resolver import resolve_problems, serialize_problem
 
 router = APIRouter(tags=["book"])
 
@@ -217,42 +219,28 @@ def get_learning_sample_summary(source_id: int) -> dict[str, Any]:
 def list_learning_sample_openings() -> list[dict[str, Any]]:
     conn = _next_move_connection()
     try:
-        rows = conn.execute(
-            """
-            SELECT opening_key, opening_name, COUNT(*) AS sample_count, MIN(sample_rank) AS first_rank
-            FROM learning_samples
-            GROUP BY opening_key, opening_name
-            ORDER BY sample_count DESC, first_rank ASC, opening_key ASC
-            """
-        ).fetchall()
-        return [dict(row) for row in rows]
+        summaries: dict[str, dict[str, Any]] = {}
+        for row in resolve_problems(conn):
+            item = summaries.setdefault(row["opening_key"], {"opening_key": row["opening_key"],
+                "opening_name": row["opening_name"], "sample_count": 0, "first_rank": row["sample_rank"]})
+            item["sample_count"] += 1
+            item["first_rank"] = min(item["first_rank"], row["sample_rank"])
+        return sorted(summaries.values(), key=lambda x: (-x["sample_count"], x["first_rank"], x["opening_key"]))
     finally:
         conn.close()
 
 
 @router.get("/api/learning-samples")
-def list_learning_samples(opening_key: str | None = Query(default=None), limit: int = Query(default=20, ge=1, le=100)) -> list[dict[str, Any]]:
+def list_learning_samples(opening_key: str | None = Query(default=None), offset: int = Query(default=0, ge=0),
+                          limit: int = Query(default=100, ge=1, le=100)) -> dict[str, Any]:
     conn = _next_move_connection()
     try:
-        params: list[Any] = []
-        where = ""
+        rows = resolve_problems(conn)
         if opening_key:
-            where = "WHERE ls.opening_key = ?"
-            params.append(opening_key)
-        params.append(limit)
-        rows = conn.execute(
-            f"""
-            SELECT ls.*, bs.id AS source_id, bs.name AS source_name, bs.version AS source_version,
-                   bs.license_name, bs.source_url, bs.copyright_notice
-            FROM learning_samples ls
-            JOIN book_sources bs ON bs.id = ls.book_source_id
-            {where}
-            ORDER BY ls.opening_key ASC, ls.sample_rank ASC, ls.id ASC
-            LIMIT ?
-            """,
-            params,
-        ).fetchall()
-        return [_learning_sample(row, _candidate_rows_for_position(conn, row["book_position_id"])) for row in rows]
+            rows = [row for row in rows if row["opening_key"] == opening_key]
+        total = len(rows)
+        return {"items": [serialize_problem(row) for row in rows[offset:offset + limit]], "offset": offset,
+                "limit": limit, "total": total, "dataset_version": get_dataset_version(conn, next_move_db_path())}
     finally:
         conn.close()
 

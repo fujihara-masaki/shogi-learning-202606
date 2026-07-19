@@ -815,6 +815,10 @@ select {
   justify-content: space-between;
   gap: 12px;
 }
+.next-move-summary { display:flex; flex-wrap:wrap; gap:8px 20px; margin:16px 0; padding:12px; background:#eef6f1; border-radius:8px; }
+.next-move-status { display:inline-block; padding:3px 9px; border:1px solid currentColor; border-radius:999px; font-weight:700; }
+.status-top { color:#176b3a; }.status-strong { color:#315ca8; }.status-listed { color:#765b00; }.status-unlisted { color:#8b3030; }.status-unattempted { color:#555; }
+.count-note { margin-bottom:8px; }
 
 .opening-card h2,
 .opening-current h2,

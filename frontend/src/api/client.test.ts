@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test, vi } from "vitest";
-import { fetchProblems, fetchTsumeTags } from "./client";
+import { fetchAllLearningSamples, fetchLearningSamples, fetchProblems, fetchTsumeTags } from "./client";
 
 describe("tsume API client", () => {
   afterEach(() => {
@@ -37,5 +37,24 @@ describe("tsume API client", () => {
       "http://localhost:8000/api/tsume-problems?mate_length=1&tag=%E7%AB%AF%E7%8E%89&limit=50&offset=50",
       expect.objectContaining({ headers: { "Content-Type": "application/json" } }),
     );
+  });
+});
+
+describe("next move paging", () => {
+  afterEach(() => vi.restoreAllMocks());
+  test("uses a page object and offset query", async () => {
+    const page = { items: [], offset: 100, limit: 20, total: 100, dataset_version: "v1:x" };
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => page });
+    vi.stubGlobal("fetch", fetchMock);
+    await expect(fetchLearningSamples("bogin", 20, 100)).resolves.toEqual(page);
+    expect(fetchMock.mock.calls[0][0]).toContain("limit=20&offset=100&opening_key=bogin");
+  });
+  test("loads all pages and rejects a changed dataset", async () => {
+    const responses = [
+      { items: Array(100).fill({}), offset: 0, limit: 100, total: 101, dataset_version: "v1:a" },
+      { items: [{}], offset: 100, limit: 100, total: 101, dataset_version: "v1:b" },
+    ];
+    vi.stubGlobal("fetch", vi.fn().mockImplementation(async () => ({ ok: true, status: 200, json: async () => responses.shift() })));
+    await expect(fetchAllLearningSamples("bogin")).rejects.toMatchObject({ code: "NEXT_MOVE_PAGE_INCONSISTENT" });
   });
 });

@@ -138,3 +138,22 @@ def test_latest_result_uses_id_for_same_second(client):
         conn.execute("UPDATE next_move_results SET answered_at='2026-01-01 00:00:00'"); conn.commit()
         assert latest_next_move_result(conn, sample["problem_key"])["move_usi"] == "5g5f"
     finally: conn.close()
+
+
+def test_progress_and_status_share_latest_distinct_result(client):
+    seed()
+    sample = client.get("/api/learning-samples/1").json()
+    initial = client.get("/api/next-move/progress").json()["openings"][0]
+    assert initial["total"] == 1 and initial["answered"] == 0
+    assert client.get(f"/api/next-move/status?opening_key={sample['opening_key']}").json()["items"][0]["verdict"] is None
+    for move in (sample["candidates"][0]["move_usi"], "5g5f"):
+        client.post("/api/next-move/results", json={"sample_id": 1, "problem_key": sample["problem_key"],
+            "move_usi": move, "hint_count": 0, "elapsed_ms": 1})
+    conn = get_connection()
+    conn.execute("UPDATE next_move_results SET answered_at='2026-01-01 00:00:00'")
+    conn.commit(); conn.close()
+    progress = client.get("/api/next-move/progress").json()["openings"][0]
+    status = client.get(f"/api/next-move/status?opening_key={sample['opening_key']}").json()["items"][0]
+    assert progress["answered"] == 1
+    assert progress["verdict_counts"]["unlisted"] == 1
+    assert status["verdict"] == "unlisted"

@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { Color } from "tsshogi";
-import { fetchLearningSample, fetchLearningSamples, isNextMoveUnavailable, type LearningSample } from "../api/client";
+import { fetchAllLearningSamples, fetchLearningSample, isNextMoveUnavailable, type LearningSample } from "../api/client";
 import { NextMoveCandidateComparison, NextMoveResultPanel } from "../components/NextMoveResultPanel";
 import ShogiBoard from "../components/ShogiBoard";
 import { useNextMoveSession } from "../hooks/useNextMoveSession";
@@ -63,7 +63,8 @@ function NextMoveStudyContent({ id }: { id: string | undefined }) {
   useEffect(() => {
     if (!openingKey) return;
     let cancelled = false;
-    fetchLearningSamples(openingKey, 100)
+    const controller = new AbortController();
+    fetchAllLearningSamples(openingKey, controller.signal)
       .then((samples) => {
         if (!cancelled) setSiblings({ key: openingKey, samples });
       })
@@ -71,7 +72,7 @@ function NextMoveStudyContent({ id }: { id: string | undefined }) {
         if (!cancelled) setSiblings({ key: openingKey, samples: [] });
       });
     return () => {
-      cancelled = true;
+      cancelled = true; controller.abort();
     };
   }, [openingKey]);
 
@@ -85,7 +86,7 @@ function NextMoveStudyContent({ id }: { id: string | undefined }) {
 
   const basePosition = useMemo(() => (sample ? positionFromSfen(sample.sfen) : null), [sample]);
   const siblingSamples = siblings.key === openingKey ? siblings.samples : [];
-  const currentIndex = sample ? siblingSamples.findIndex((s) => s.id === sample.id) : -1;
+  const currentIndex = sample ? siblingSamples.findIndex((s) => s.problem_key === sample.problem_key) : -1;
   const nextSample =
     currentIndex >= 0 && siblingSamples.length > 1
       ? siblingSamples[(currentIndex + 1) % siblingSamples.length]

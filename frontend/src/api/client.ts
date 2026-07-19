@@ -423,10 +423,41 @@ export function fetchLearningSampleOpenings(): Promise<LearningSampleOpeningSumm
   return request<LearningSampleOpeningSummary[]>("/api/learning-samples/openings");
 }
 
-export function fetchLearningSamples(openingKey?: string, limit = 20): Promise<LearningSample[]> {
-  const params = new URLSearchParams({ limit: String(limit) });
+export interface LearningSamplePage { items: LearningSample[]; offset: number; limit: number; total: number; dataset_version: string }
+export type NextMoveVerdict = "top" | "strong" | "listed" | "unlisted";
+export interface NextMoveProgressItem { opening_key: string; opening_name: string; total: number; answered: number; verdict_counts: Record<NextMoveVerdict, number>; top_rate: number }
+export interface NextMoveStatusItem { problem_key: string; verdict: NextMoveVerdict | null; result_id: number | null }
+
+export function fetchLearningSamples(openingKey?: string, limit = 100, offset = 0, signal?: AbortSignal): Promise<LearningSamplePage> {
+  const params = new URLSearchParams({ limit: String(limit), offset: String(offset) });
   if (openingKey) params.set("opening_key", openingKey);
-  return request<LearningSample[]>(`/api/learning-samples?${params.toString()}`);
+  return request<LearningSamplePage>(`/api/learning-samples?${params.toString()}`, { signal });
+}
+
+export function fetchNextMoveProgress(): Promise<{ openings: NextMoveProgressItem[] }> { return request("/api/next-move/progress"); }
+export function fetchNextMoveStatus(openingKey: string): Promise<{ opening_key: string; items: NextMoveStatusItem[] }> {
+  return request(`/api/next-move/status?${new URLSearchParams({ opening_key: openingKey })}`);
+}
+
+export async function fetchAllLearningSamples(openingKey?: string, signal?: AbortSignal): Promise<LearningSample[]> {
+  const first = await fetchLearningSamples(openingKey, 100, 0, signal);
+  const expectedTotal = first.total;
+  const version = first.dataset_version;
+  const items = [...first.items];
+  let offset = first.offset + first.items.length;
+  while (items.length < expectedTotal) {
+    if (first.items.length === 0 || offset <= first.offset) throw new ApiError(409, "問題一覧のページングが進みません", "NEXT_MOVE_PAGE_INCONSISTENT");
+    const page = await fetchLearningSamples(openingKey, 100, offset, signal);
+    if (page.total !== expectedTotal || page.dataset_version !== version || page.items.length === 0 || page.offset !== offset) {
+      throw new ApiError(409, "問題一覧が取得中に更新されました", "NEXT_MOVE_PAGE_INCONSISTENT");
+    }
+    items.push(...page.items);
+    const nextOffset = page.offset + page.items.length;
+    if (nextOffset <= offset) throw new ApiError(409, "問題一覧のページングが進みません", "NEXT_MOVE_PAGE_INCONSISTENT");
+    offset = nextOffset;
+  }
+  if (items.length !== expectedTotal) throw new ApiError(409, "問題一覧の件数が一致しません", "NEXT_MOVE_PAGE_INCONSISTENT");
+  return items;
 }
 
 export function fetchLearningSample(id: number): Promise<LearningSample> {

@@ -250,6 +250,19 @@ def latest_next_move_result(conn: sqlite3.Connection, problem_key: str):
     ).fetchone()
 
 
+def latest_next_move_results(conn: sqlite3.Connection, problem_keys: list[str]):
+    """Return the same deterministic latest row for many current problems."""
+    if not problem_keys:
+        return {}
+    marks = ",".join("?" for _ in problem_keys)
+    rows = conn.execute(f"""SELECT * FROM (
+        SELECT r.*, ROW_NUMBER() OVER (PARTITION BY problem_key
+          ORDER BY answered_at DESC, id DESC) AS latest_rank
+        FROM next_move_results r WHERE problem_key IN ({marks})
+      ) WHERE latest_rank=1""", problem_keys).fetchall()
+    return {row["problem_key"]: row for row in rows}
+
+
 def db_path() -> Path:
     return Path(os.environ.get("SHOGI_DB_PATH", str(DEFAULT_DB_PATH)))
 
