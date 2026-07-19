@@ -16,7 +16,7 @@
 | 領域 | 最終設計 |
 | --- | --- |
 | DB責務 | `next_move.db` は配布可能な問題データ、`shogi.db` は端末固有の解答・進捗・将来のお気に入りを保持する。アプリ実行時は前者を読み取り専用、後者を読み書きで開く |
-| DB生成 | importer / 抽出・検証処理だけが `next_move.db` を生成・更新する。アプリはスキーマ移行もメタデータ補完も書き込まない |
+| DB生成・検証 | importerおよび抽出・生成処理だけが `next_move.db` を生成・更新する。`validate_next_move_db.py` 等の検証処理は読み取り専用で整合性を検査する。アプリ実行時も検証時も、既存DBへ補完やスキーマ移行を書き込まない |
 | 問題同一性 | 永続参照は `problem_key`、画面遷移と競合検出前の検索だけは `sample_id`。出典・正規化局面・判定に使う候補定義・定義バージョンが同じ問題だけを同一視する |
 | データ世代 | `dataset_version` はDB全体の世代を表し、ページをまたぐ混在検出だけに使う。問題同一性や履歴結合には使わない |
 | 整合性 | 解答の判定・合法性・`problem_key` 一致確認はbackendが行い、成功時だけ `shogi.db` の問題参照と解答を同一トランザクションで保存する |
@@ -453,7 +453,7 @@ ROW_NUMBER() OVER (PARTITION BY problem_key ORDER BY answered_at DESC, id DESC)
 
 - `extraction_runs` テーブルを追加する(`extraction_run_key`, `extractor_version`, `limit`, `per_opening_limit`, `seed`, `source_file_sha256`, `extracted_at`)。
 - `learning_samples` に `extraction_run_key` の参照を追加する。
-- 書き込みは**抽出ツールによる生成時のみ**(`extract_learning_samples.py` が新スキーマを生成する)。アプリ実行時の `mode=ro` 接続は維持し、実行時書き込みは一切行わない。
+- 書き込みは**importerおよび抽出・生成ツールによる生成時のみ**(`extract_learning_samples.py` 等が新スキーマを生成する)。アプリ実行時の `mode=ro` 接続は維持し、実行時書き込みは一切行わない。`validate_next_move_db.py` 等の検証処理も読み取り専用とし、既存DBに補完・修復・スキーマ移行を書き込まず、不整合は終了ステータスと診断メッセージで報告する。
 - **旧DBの後方互換を維持**する: `extraction_runs` メタデータの無い旧DBでも、`problem_key` の構成要素(`stable_source_key`・`normalized_sfen`・candidate fingerprint)は既存の `book_sources` / `book_moves` から backend が算出できるため **problem_key は完全に算出可能**。旧DBでは監査用の `extraction_run_key` のみ `"unknown"` にフォールバックする(キーには影響しない)。
 - `validate_next_move_db.py` を新旧両形式に対応させる(新形式では `extraction_runs` の整合、旧形式では不在を許容。あわせて重複 `problem_key`・メタデータ不整合の検出を追加)。
 
@@ -495,7 +495,9 @@ ROW_NUMBER() OVER (PARTITION BY problem_key ORDER BY answered_at DESC, id DESC)
 
 - 新規 `/api/next-move/*` のエラー本文は `{"detail": "利用者向け説明", "code": "安定した機械判定コード"}` とする。frontend は分岐に `code`、表示に `detail` を使い、未知の `code` でも一般エラーへフォールバックする。FastAPI標準の入力検証エラーは既存の422形式を維持できるが、上表で定義した業務エラーはこの共通形を返す。
 - 正常な作成は200、候補なしは204 (本文なし)。存在しない `sample_id` は404 `NEXT_MOVE_PROBLEM_NOT_FOUND`、表示後に問題定義が変わった場合は409 `NEXT_MOVE_PROBLEM_CHANGED`、USI構文不正は422 `NEXT_MOVE_MOVE_FORMAT_INVALID`、局面上の違法手は422 `NEXT_MOVE_ILLEGAL_MOVE`、問題DBの未配置・不正・空は503 `NEXT_MOVE_DATABASE_UNAVAILABLE` とする。予期しない障害は内部情報を露出せず500とする。
-- 409 / 422 / 503 / 500では `next_move_problem_refs` と `next_move_results` をどちらも変更しない。問題参照upsertと解答INSERTは `shogi.db` の単一トランザクションで行い、片方だけを残さない。
+- 409 / 422 / 503、および**トランザクションcommit前**に発生した500では、トランザクションをrollbackし、`next_move_problem_refs` と `next_move_results` をどちらも変更しない。問題参照upsertと解答INSERTは `shogi.db` の単一トランザクションで行い、片方だけを保存しない。
+- commit成功後のレスポンス生成、middleware、通信経路で障害が起きた場合、クライアントが500または通信エラーを受け取っても解答は保存済みの可能性がある。frontendは500・通信エラーに対して解答POSTを自動再送しない(結果表示を維持し、記録状態が不明である旨を案内できる)。
+- 将来自動再送を導入する場合は、重複記録を防ぐidempotency keyをリクエストと保存処理のAPI契約へ追加してから行う。本設計のP0〜P2にはidempotency keyおよび自動再送を含めない。
 - 既存 `GET /api/learning-samples*` は後方互換のためURLを維持する。一覧だけはPR-Bで配列からページオブジェクトへ変わるため、同じPR内で全frontend呼び出し元とテストを更新する。このローカルアプリには外部公開クライアント互換を保証しないが、問題詳細URLと既存フィールドは削除しない。
 
 ### フロントエンド
@@ -596,7 +598,7 @@ ROW_NUMBER() OVER (PARTITION BY problem_key ORDER BY answered_at DESC, id DESC)
   - 旧形式DB(メタデータ無し)では `extraction_run_key` が `"unknown"` にフォールバックする。
   - アプリ実行中に next_move.db への書き込みが一切発生しない(`mode=ro` の担保)。
   - 抽出ツール(`extract_learning_samples.py`)が新スキーマを生成する。
-  - `validate_next_move_db.py` が新旧形式を判定し、それぞれで検証が通る。
+  - `validate_next_move_db.py` が新旧形式を読み取り専用で判定し、それぞれで検証が通る。検証前後でDBファイルのSHA-256と内容が変化せず、不整合時にも補完・修復・スキーマ移行を書き込まない。
 - `move_usi` の合法性検証(422系):
   - USI 構文が不正な手は 422(`NEXT_MOVE_MOVE_FORMAT_INVALID`)となり、`next_move_results`・`next_move_problem_refs` のどちらにも書き込まれない。
   - 空きマスからの移動など局面上の違法手は 422(`NEXT_MOVE_ILLEGAL_MOVE`)となる。
@@ -627,7 +629,7 @@ ROW_NUMBER() OVER (PARTITION BY problem_key ORDER BY answered_at DESC, id DESC)
 
 - バッジ/進捗表示の純関数、ポリシー付き「次の問題」選択ロジック、経過時間の丸め。
 - `judgeNextMove` が判定用候補順序の共通規則(同順位は score降順→depth降順→move_usi昇順、NULLは後)に従うこと(backend側テストと同一の共通fixtureを使用)。
-- `client.ts`: 503 detail の抽出、409(`NEXT_MOVE_PROBLEM_CHANGED`)の構造化エラーの取り出し、記録API失敗時に例外を伝播させないこと。
+- `client.ts`: 503 detail の抽出、409(`NEXT_MOVE_PROBLEM_CHANGED`)の構造化エラーの取り出し、記録API失敗時に例外を伝播させないこと。500・通信エラー時に解答POSTを自動再送せず、保存済みか不明な状態として扱うこと。
 - 全ページ取得ヘルパーの終了条件(モックレスポンスで決定的に検証):
   - `total=101`、同一 `dataset_version` の1ページ目100件+2ページ目1件 → 正常完了(`loaded_count == expected_total` かつ世代一致)。
   - `total=101`、1ページ目100件+2ページ目が**空配列** → 失敗扱い(空ページを正常終了にしない。100件目を完了扱いしない)。
@@ -720,6 +722,6 @@ ROW_NUMBER() OVER (PARTITION BY problem_key ORDER BY answered_at DESC, id DESC)
 - 正本は本ファイルだけとし、分割文書やREADMEへの設計複製は作らない。将来の分割は文量が保守を妨げた場合の非ブロッカー候補に留める。
 - 現行backend・frontend・DB生成/検証処理・README・pytest/vitest/Playwright構成と照合し、現行との差は§1、採用設計は§4〜§6、担当PRは§8、テスト可能な条件は§5・§7に対応付けた。
 - `shogi.db` / `next_move.db`、`problem_key` / `sample_id` / `dataset_version`、現在分類 / 解答時スナップショット、APIページング / P2の一覧UIページングの役割を分離した。
-- DB差し替え、重複行、同時刻解答、途中ページの世代変更、違法手、削除済み問題について、誤結合または部分書き込みを防ぐ契約とテストを記載した。
+- DB差し替え、重複行、同時刻解答、途中ページの世代変更、違法手、削除済み問題について、誤結合または部分書き込みを防ぐ契約とテストを記載した。検証処理はread-onlyとし、500はcommit前のrollback保証とcommit後の保存済み可能性を区別した。
 - 内部名やSQL・React構成は固定せず、P2と任意最適化をP0/P1のブロッカーから除外した。
 - この設計PRではアプリケーションコード、テスト、DB、生成・検証スクリプト、依存関係、CI、設定を変更しない。
