@@ -39,6 +39,7 @@ function sample(
   rank: number,
   candidates: ReturnType<typeof candidate>[],
   sfen: string = INITIAL_SFEN,
+  problemKey: string = `v1:problem-${id}`,
 ) {
   return {
     id,
@@ -50,7 +51,7 @@ function sample(
     sample_rank: rank,
     sample_reason: "test sample",
     created_at: "2026-01-01T00:00:00",
-    problem_key: `v1:problem-${id}`,
+    problem_key: problemKey,
     source: SOURCE,
     candidates,
   };
@@ -67,6 +68,8 @@ const SAMPLES = [
     candidate("9g9f", 4, -8, null),
   ]),
   sample(102, "bogin", "棒銀", 2, [candidate("7g7f", 1, 10, "7g7f")]),
+  // 同じproblem_keyを共有する別sample ID。save noticeのsample境界テスト専用。
+  sample(103, "notice-reset", "通知リセット", 1, [candidate("7g7f", 1, 10, "7g7f")], INITIAL_SFEN, "v1:problem-101"),
   sample(201, "shikenbisha", "四間飛車", 3, [candidate("2h6h", 1, 15, "2h6h 8c8d")]),
   // 一覧(OPENINGS)には含めず、URL直接アクセスで後手番・成りの判定を確認する
   sample(
@@ -339,6 +342,13 @@ test.describe("次の一手", () => {
     await page.getByTestId("next-move-retry-button").click();
     release();
     await page.waitForTimeout(100);
+    await expect(page.getByTestId("next-move-save-message")).toHaveCount(0);
+    // The now-released route fails immediately: create a notice on sample 101.
+    await playMove(page, "77", "76");
+    await expect(page.getByTestId("next-move-save-message")).toContainText("確認できませんでした");
+    // sample 103 deliberately shares problem_key with 101; the sample ID boundary must still clear it.
+    await page.goto("/next-move/103");
+    await expect(page.getByTestId("next-move-heading")).toContainText("通知リセット");
     await expect(page.getByTestId("next-move-save-message")).toHaveCount(0);
   });
 

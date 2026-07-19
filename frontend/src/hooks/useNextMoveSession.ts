@@ -46,6 +46,9 @@ export function useNextMoveSession(sample: LearningSample | null): NextMoveSessi
     startedAt.current = performance.now();
     posting.current = false;
     attemptGeneration.current += 1;
+    // A different sample row may represent the same problem_key; never carry its save status forward.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setSaveNotice(null);
   }, [sample?.id, sample?.problem_key]);
   const saveMessage = saveNotice && saveNotice.key === sample?.problem_key ? saveNotice.text : null;
 
