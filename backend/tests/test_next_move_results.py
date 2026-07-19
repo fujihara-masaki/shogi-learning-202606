@@ -2,7 +2,7 @@ import os
 import sqlite3
 from pathlib import Path
 
-from app.database import get_connection, latest_next_move_result
+from app.database import get_connection, latest_next_move_result, latest_next_move_results
 from app.importers.yaneuraou_book import import_book
 from app.learning_samples import build_learning_sample_plan
 
@@ -157,3 +157,29 @@ def test_progress_and_status_share_latest_distinct_result(client):
     assert progress["answered"] == 1
     assert progress["verdict_counts"]["unlisted"] == 1
     assert status["verdict"] == "unlisted"
+
+
+def test_bulk_latest_results_chunks_more_than_1000_keys_and_deduplicates(client):
+    conn = get_connection()
+    keys = [f"problem-{index}" for index in range(1201)]
+    conn.executemany("""INSERT INTO next_move_problem_refs(
+        problem_key,stable_source_key,normalized_sfen,candidate_definition_fingerprint)
+        VALUES(?,?,?,?)""", [(key, "source", "sfen", "candidates") for key in keys])
+    conn.executemany("""INSERT INTO next_move_results(
+        problem_key,move_usi,verdict,hint_count,elapsed_ms,answered_at)
+        VALUES(?,?,?,?,?,?)""", [(key, "7g7f", "top", 0, 1, "2026-01-01 00:00:00") for key in keys])
+    # Same timestamp must still select the larger result id.
+    conn.execute("""INSERT INTO next_move_results(
+        problem_key,move_usi,verdict,hint_count,elapsed_ms,answered_at)
+        VALUES(?,?,?,?,?,?)""", (keys[-1], "5g5f", "unlisted", 0, 1, "2026-01-01 00:00:00"))
+    conn.commit()
+    previous_limit = conn.setlimit(sqlite3.SQLITE_LIMIT_VARIABLE_NUMBER, 500)
+    try:
+        assert latest_next_move_results(conn, []) == {}
+        results = latest_next_move_results(conn, keys + keys[:25])
+    finally:
+        conn.setlimit(sqlite3.SQLITE_LIMIT_VARIABLE_NUMBER, previous_limit)
+        conn.close()
+    assert len(results) == 1201
+    assert results[keys[0]]["verdict"] == "top"
+    assert results[keys[-1]]["verdict"] == "unlisted"

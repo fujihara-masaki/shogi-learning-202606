@@ -252,15 +252,20 @@ def latest_next_move_result(conn: sqlite3.Connection, problem_key: str):
 
 def latest_next_move_results(conn: sqlite3.Connection, problem_keys: list[str]):
     """Return the same deterministic latest row for many current problems."""
-    if not problem_keys:
+    unique_keys = list(dict.fromkeys(problem_keys))
+    if not unique_keys:
         return {}
-    marks = ",".join("?" for _ in problem_keys)
-    rows = conn.execute(f"""SELECT * FROM (
-        SELECT r.*, ROW_NUMBER() OVER (PARTITION BY problem_key
-          ORDER BY answered_at DESC, id DESC) AS latest_rank
-        FROM next_move_results r WHERE problem_key IN ({marks})
-      ) WHERE latest_rank=1""", problem_keys).fetchall()
-    return {row["problem_key"]: row for row in rows}
+    latest = {}
+    for start in range(0, len(unique_keys), 500):
+        chunk = unique_keys[start:start + 500]
+        marks = ",".join("?" for _ in chunk)
+        rows = conn.execute(f"""SELECT * FROM (
+            SELECT r.*, ROW_NUMBER() OVER (PARTITION BY problem_key
+              ORDER BY answered_at DESC, id DESC) AS latest_rank
+            FROM next_move_results r WHERE problem_key IN ({marks})
+          ) WHERE latest_rank=1""", chunk).fetchall()
+        latest.update((row["problem_key"], row) for row in rows)
+    return latest
 
 
 def db_path() -> Path:
