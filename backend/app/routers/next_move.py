@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 import sqlite3
+import logging
+import random
 from typing import Literal
 
 import shogi
@@ -12,10 +14,11 @@ from ..database import get_connection, latest_next_move_results
 from ..next_move_database import NextMoveDatabaseUnavailable, get_next_move_connection
 from ..next_move_identity import (PROBLEM_DEFINITION_VERSION, candidate_definition_fingerprint, get_dataset_version,
     normalize_candidates, normalize_sfen, problem_key, stable_source_key)
-from ..next_move_resolver import cached_resolve_problems
+from ..next_move_resolver import cached_resolve_problems, serialize_problem
 from ..next_move_database import next_move_db_path
 
 router = APIRouter(prefix="/api/next-move", tags=["next-move"])
+logger = logging.getLogger(__name__)
 
 
 class ResultInput(BaseModel):
@@ -109,6 +112,38 @@ def _current_problems(opening_key: str | None = None):
         return cached_resolve_problems(conn, dataset_version=version, database_path=str(next_move_db_path()), opening_key=opening_key)
     finally:
         conn.close()
+
+
+def select_next_problem(problems: list[dict], *, policy: str, latest: dict,
+                        exclude_problem_key: str | None = None,
+                        rng: random.Random | random.SystemRandom = random.SystemRandom()):
+    """Select from resolved (therefore distinct) problems; injectable RNG keeps tests deterministic."""
+    candidates = [p for p in problems if p["problem_key"] != exclude_problem_key]
+    if policy == "unattempted":
+        candidates = [p for p in candidates if p["problem_key"] not in latest]
+    return rng.choice(candidates) if candidates else None
+
+
+@router.get("/problems/next")
+def next_problem(policy: Literal["random", "unattempted"], opening_key: str | None = None,
+                 exclude_problem_key: str | None = None):
+    problems = _current_problems(opening_key)
+    if exclude_problem_key and not exclude_problem_key.startswith("v1:"):
+        logger.warning("Ignoring malformed exclude_problem_key: %s", exclude_problem_key)
+        exclude_problem_key = None
+    latest: dict = {}
+    if policy == "unattempted":
+        history = get_connection()
+        try:
+            latest = latest_next_move_results(history, [p["problem_key"] for p in problems])
+        finally:
+            history.close()
+    selected = select_next_problem(problems, policy=policy, latest=latest,
+                                   exclude_problem_key=exclude_problem_key)
+    if selected is None:
+        from fastapi import Response
+        return Response(status_code=204)
+    return serialize_problem(selected)
 
 
 @router.get("/progress")
