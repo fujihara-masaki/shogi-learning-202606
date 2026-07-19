@@ -11,9 +11,6 @@ const VERDICT_ICON: Record<NextMoveVerdict["kind"], string> = {
   unlisted: "?",
 };
 
-export const SCORE_NOTE =
-  "評価値は取り込み元の定跡DBに記録された数値をそのまま表示しています。数値の基準・単位は出典データに依存します。";
-
 interface NextMoveResultPanelProps {
   verdict: NextMoveVerdict;
   /** 着手前の局面(指し手の日本語表記に使用) */
@@ -78,9 +75,6 @@ export function NextMoveResultPanel({ verdict, basePosition, source }: NextMoveR
           </>
         )}
       </dl>
-      {(candidate?.score !== null && candidate?.score !== undefined) || (best && best.score !== null) ? (
-        <p className="muted next-move-score-note">{SCORE_NOTE}</p>
-      ) : null}
       <p className="muted">
         出典: {source.name}
         {source.license_name && ` / ライセンス: ${source.license_name}`}
@@ -130,7 +124,20 @@ export function NextMoveCandidateComparison({ candidates, basePosition, userMove
           })}
         </tbody>
       </table>
-      <p className="muted next-move-score-note">{SCORE_NOTE}</p>
     </div>
   );
+}
+
+export function NextMoveTerminologyHelp() {
+  return <details className="next-move-terminology" data-testid="next-move-terminology">
+    <summary>評価値・PV・候補順位とは</summary>
+    <dl>
+      <dt>評価値</dt>
+      <dd>取り込み元の定跡DBに記録されていた数値をそのまま表示しています。数値の基準、単位、符号の意味、どちら側から見た値かは出典データに依存します。このアプリでは数値だけから「有利」「不利」「悪手」などと断定しません。</dd>
+      <dt>PV</dt>
+      <dd>Principal Variationの略で、定跡DBに記録されたその後の進行例です。唯一の正解手順や、常に最善であることを保証するものではありません。元データにPVがない候補もあります。</dd>
+      <dt>候補順位</dt>
+      <dd>取り込み元の候補順位などをもとに、候補手を比較するために表示している順序です。同順位の候補が存在する場合があります。アプリでは正規化後の表示順の先頭を「最有力候補」として判定します。候補外の合法手を、局面上の悪手と断定するものではありません。</dd>
+    </dl>
+  </details>;
 }

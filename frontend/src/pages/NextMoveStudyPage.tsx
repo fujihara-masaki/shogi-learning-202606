@@ -3,8 +3,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { Color } from "tsshogi";
-import { fetchAllLearningSamplesCached, fetchLearningSample, fetchNextMoveProblem, isNextMoveUnavailable, type LearningSample, type NextMovePolicy } from "../api/client";
-import { NextMoveCandidateComparison, NextMoveResultPanel } from "../components/NextMoveResultPanel";
+import { ApiError, fetchAllLearningSamplesCached, fetchLearningSample, fetchNextMoveProblem, isNextMoveUnavailable, type LearningSample, type NextMovePolicy } from "../api/client";
+import { NextMoveDatabaseError } from "../components/NextMoveDatabaseError";
+import { errorMessage } from "../components/nextMoveError";
+import { NextMoveCandidateComparison, NextMoveResultPanel, NextMoveTerminologyHelp } from "../components/NextMoveResultPanel";
 import ShogiBoard from "../components/ShogiBoard";
 import { useNextMoveSession } from "../hooks/useNextMoveSession";
 import { positionFromSfen } from "../shogi/nextMove";
@@ -18,14 +20,14 @@ interface SampleState {
   /** どの問題IDに対する結果か(表示中IDと異なる間は loading 扱い) */
   id: number | null;
   sample: LearningSample | null;
-  error: string | null;
+  error: unknown | null;
 }
 
 interface SiblingsState {
   /** どの戦型に対する結果か */
   key: string | null;
   samples: LearningSample[];
-  error: string | null;
+  error: unknown | null;
 }
 
 function NextMoveStudyContent({ id }: { id: string | undefined }) {
@@ -36,7 +38,7 @@ function NextMoveStudyContent({ id }: { id: string | undefined }) {
   const [siblingsRetry, setSiblingsRetry] = useState(0);
   const [comparisonVisible, setComparisonVisible] = useState(false);
   const [completed, setCompleted] = useState(false);
-  const [nextError, setNextError] = useState<string | null>(null);
+  const [nextError, setNextError] = useState<unknown | null>(null);
   const [movingNext, setMovingNext] = useState(false);
   const headingRef = useRef<HTMLHeadingElement | null>(null);
   const navigate = useNavigate();
@@ -59,9 +61,7 @@ function NextMoveStudyContent({ id }: { id: string | undefined }) {
         if (!cancelled) setSampleState({ id: sampleId, sample: data, error: null });
       })
       .catch((e) => {
-        if (!cancelled) setSampleState({ id: sampleId, sample: null, error: isNextMoveUnavailable(e)
-          ? "次の一手データを利用できません。専用DBの設定を確認してください。"
-          : `問題の取得に失敗しました: ${e}` });
+        if (!cancelled) setSampleState({ id: sampleId, sample: null, error: e });
       });
     return () => {
       cancelled = true;
@@ -76,8 +76,8 @@ function NextMoveStudyContent({ id }: { id: string | undefined }) {
       .then((samples) => {
         if (!cancelled) setSiblings({ key: openingKey, samples, error: null });
       })
-      .catch(() => {
-        if (!cancelled) setSiblings({ key: openingKey, samples: [], error: "問題一覧を最後まで取得できませんでした。先頭から再試行してください。" });
+      .catch((error) => {
+        if (!cancelled) setSiblings({ key: openingKey, samples: [], error });
       });
     return () => { cancelled = true; };
   }, [openingKey, siblingsRetry]);
@@ -93,6 +93,7 @@ function NextMoveStudyContent({ id }: { id: string | undefined }) {
   const basePosition = useMemo(() => (sample ? positionFromSfen(sample.sfen) : null), [sample]);
   const siblingSamples = siblings.key === openingKey ? siblings.samples : [];
   const siblingError = siblings.key === openingKey ? siblings.error : null;
+  const unavailableError = [nextError, siblingError].find((error): error is ApiError => isNextMoveUnavailable(error));
   const currentIndex = sample ? siblingSamples.findIndex((s) => s.problem_key === sample.problem_key) : -1;
   const nextSample = currentIndex >= 0 && currentIndex + 1 < siblingSamples.length ? siblingSamples[currentIndex + 1] : null;
 
@@ -116,7 +117,9 @@ function NextMoveStudyContent({ id }: { id: string | undefined }) {
     return (
       <div className="next-move-page" data-testid="next-move-page">
         <Link to="/next-move">← 次の一手一覧へ</Link>
-        <div className="banner banner-error" role="alert">{loadError ?? "この問題は見つかりませんでした。"}</div>
+        {loadError instanceof ApiError && isNextMoveUnavailable(loadError)
+          ? <NextMoveDatabaseError error={loadError} />
+          : <div className="banner banner-error" role="alert">{loadError ? errorMessage(loadError, "問題の取得に失敗しました") : "この問題は見つかりませんでした。"}</div>}
       </div>
     );
   }
@@ -152,14 +155,14 @@ function NextMoveStudyContent({ id }: { id: string | undefined }) {
         else navigate(`/next-move/${next.id}?policy=${policy}&opening_key=${encodeURIComponent(policyOpeningKey ?? sample.opening_key)}`,
           { state: { autoFocusHeading: true } });
       } catch (e) {
-        setNextError(`次の問題を取得できませんでした: ${e}`);
+        setNextError(e);
       } finally {
         setMovingNext(false);
       }
       return;
     }
     if (siblingError || currentIndex < 0) {
-      setNextError("次の問題一覧を最後まで取得できませんでした。一覧を再取得してください。");
+      setNextError(new Error("次の問題一覧を最後まで取得できませんでした。一覧を再取得してください。"));
     } else if (nextSample) {
       navigate(`/next-move/${nextSample.id}`, { state: { autoFocusHeading: true } });
     } else {
@@ -175,7 +178,7 @@ function NextMoveStudyContent({ id }: { id: string | undefined }) {
       const next = await fetchNextMoveProblem({ policy: "random", opening_key: sample.opening_key,
         exclude_problem_key: sample.problem_key });
       if (!next) {
-        setNextError("この戦型にほかの問題はありません。");
+        setNextError(new Error("この戦型にほかの問題はありません。"));
       } else if (next.id === sample.id) {
         setCompleted(false);
         handleRetry();
@@ -185,7 +188,7 @@ function NextMoveStudyContent({ id }: { id: string | undefined }) {
           { state: { autoFocusHeading: true } });
       }
     } catch (e) {
-      setNextError(`ランダム出題を開始できませんでした: ${e}`);
+      setNextError(e);
     } finally {
       setMovingNext(false);
     }
@@ -202,7 +205,8 @@ function NextMoveStudyContent({ id }: { id: string | undefined }) {
       </p>
       {completed ? <div className="banner banner-success" role="status" aria-live="polite" data-testid="next-move-complete">
         <p>この戦型の問題を最後まで学習しました</p>
-        {nextError && <p role="alert">{nextError}</p>}
+        {unavailableError && <NextMoveDatabaseError error={unavailableError} />}
+        {Boolean(nextError) && !isNextMoveUnavailable(nextError) && <p role="alert">{errorMessage(nextError, "次の問題を取得できませんでした")}</p>}
         <div className="post-clear-actions">
           <Link to="/next-move">一覧へ戻る</Link>
           <button type="button" onClick={() => { setCompleted(false); handleRetry(); }}>もう一度取り組む</button>
@@ -220,9 +224,10 @@ function NextMoveStudyContent({ id }: { id: string | undefined }) {
               : `${sideLabel}番です。この局面で、あなたなら次の一手をどう指しますか?盤面で1手指してください。`}
           </div>
           {session.saveMessage && <p role="alert" className="muted" data-testid="next-move-save-message">{session.saveMessage}</p>}
-          {nextError && <div className="banner banner-error" role="alert">{nextError}</div>}
-          {siblingError && <div className="banner banner-error" role="alert" data-testid="next-move-page-error">
-            {siblingError} <button type="button" onClick={() => setSiblingsRetry((value) => value + 1)}>offset 0から再試行</button>
+          {unavailableError && <NextMoveDatabaseError error={unavailableError} />}
+          {Boolean(nextError) && !isNextMoveUnavailable(nextError) && <div className="banner banner-error" role="alert">{errorMessage(nextError, "次の問題を取得できませんでした")}</div>}
+          {Boolean(siblingError) && !isNextMoveUnavailable(siblingError) && <div className="banner banner-error" role="alert" data-testid="next-move-page-error">
+            {errorMessage(siblingError, "問題一覧を最後まで取得できませんでした")} <button type="button" onClick={() => setSiblingsRetry((value) => value + 1)}>offset 0から再試行</button>
           </div>}
           <ShogiBoard
             position={session.position}
@@ -284,6 +289,7 @@ function NextMoveStudyContent({ id }: { id: string | undefined }) {
           {answered && verdict ? (
             <>
               <NextMoveResultPanel verdict={verdict} basePosition={basePosition} source={sample.source} />
+              <NextMoveTerminologyHelp />
               {comparisonVisible && (
                 <section className="opening-current" data-testid="next-move-comparison">
                   <h2>候補手の比較</h2>

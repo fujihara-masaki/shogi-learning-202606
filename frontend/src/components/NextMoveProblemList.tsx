@@ -8,24 +8,27 @@ import {
   fetchNextMoveProgress,
   fetchNextMoveStatus,
   fetchNextMoveProblem,
+  ApiError,
   isNextMoveUnavailable,
   type LearningSample,
   type LearningSampleOpeningSummary,
   type NextMoveProgressItem,
   type NextMoveStatusItem,
 } from "../api/client";
+import { NextMoveDatabaseError } from "./NextMoveDatabaseError";
+import { errorMessage } from "./nextMoveError";
 
 interface OpeningsState {
   loaded: boolean;
   data: LearningSampleOpeningSummary[];
-  error: string | null;
+  error: unknown | null;
 }
 
 interface SamplesState {
   /** どの絞り込みに対する結果か(選択中と異なる間は loading 扱い) */
   key: string | null;
   data: LearningSample[];
-  error: string | null;
+  error: unknown | null;
   total: number;
 }
 
@@ -38,6 +41,7 @@ export default function NextMoveProblemList() {
   const [samples, setSamples] = useState<SamplesState>({ key: null, data: [], error: null, total: 0 });
   const [progress, setProgress] = useState<NextMoveProgressItem[]>([]);
   const [statuses, setStatuses] = useState<NextMoveStatusItem[]>([]);
+  const [selectionError, setSelectionError] = useState<unknown | null>(null);
   const [selectionMessage, setSelectionMessage] = useState<string | null>(null);
   const [selecting, setSelecting] = useState(false);
 
@@ -52,9 +56,7 @@ export default function NextMoveProblemList() {
         setSelectedOpening((prev) => prev || list[0]?.opening_key || "");
       })
       .catch((e) => {
-        if (!cancelled) setOpenings({ loaded: true, data: [], error: isNextMoveUnavailable(e)
-          ? "次の一手データを利用できません。専用DBの設定を確認してください。"
-          : `戦型一覧の取得に失敗しました: ${e}` });
+        if (!cancelled) setOpenings({ loaded: true, data: [], error: e });
       });
     return () => {
       cancelled = true;
@@ -78,9 +80,7 @@ export default function NextMoveProblemList() {
         }
       })
       .catch((e) => {
-        if (!cancelled) setSamples({ key: selectedOpening, data: [], total: 0, error: isNextMoveUnavailable(e)
-          ? "次の一手データを利用できません。専用DBの設定を確認してください。"
-          : `問題一覧の取得に失敗しました: ${e}` });
+        if (!cancelled) setSamples({ key: selectedOpening, data: [], total: 0, error: e });
       });
     return () => {
       cancelled = true;
@@ -94,21 +94,26 @@ export default function NextMoveProblemList() {
 
   async function startPolicy(policy: "random" | "unattempted") {
     setSelecting(true);
+    setSelectionError(null);
     setSelectionMessage(null);
     try {
       const problem = await fetchNextMoveProblem({ policy, opening_key: selectedOpening });
       if (problem) navigate(`/next-move/${problem.id}?policy=${policy}&opening_key=${encodeURIComponent(selectedOpening)}`);
       else setSelectionMessage(policy === "unattempted" ? "この戦型の未挑戦問題はありません。ランダム出題で復習できます。" : "この戦型に出題できる問題はありません。");
     } catch (e) {
-      setSelectionMessage(`問題の選択に失敗しました: ${e}`);
+      setSelectionError(e);
     } finally {
       setSelecting(false);
     }
   }
 
+  const unavailableError = [openings.error, samples.error, selectionError]
+    .find((error): error is ApiError => isNextMoveUnavailable(error));
+
   return (
     <section data-testid="next-move-section">
-      {openings.error && <div className="banner banner-error" role="alert">{openings.error}</div>}
+      {unavailableError && <NextMoveDatabaseError error={unavailableError} />}
+      {Boolean(openings.error) && !isNextMoveUnavailable(openings.error) && <div className="banner banner-error" role="alert">{errorMessage(openings.error, "戦型一覧の取得に失敗しました")}</div>}
       {!openings.error && !noOpenings && (
         <div className="filter-bar">
           <select
@@ -125,7 +130,7 @@ export default function NextMoveProblemList() {
           </select>
         </div>
       )}
-      {!samplesLoading && samples.error && <div className="banner banner-error" role="alert">{samples.error}</div>}
+      {!samplesLoading && Boolean(samples.error) && !isNextMoveUnavailable(samples.error) && <div className="banner banner-error" role="alert">{errorMessage(samples.error, "問題一覧の取得に失敗しました")}</div>}
       {samplesLoading && <p className="muted">問題を読み込み中...</p>}
       {!samplesLoading && summary && <div className="next-move-summary" data-testid="next-move-summary">
         <strong>挑戦済み {summary.answered} / 全{summary.total}問</strong><span>最有力率 {Math.round(summary.top_rate * 100)}%</span>
@@ -138,6 +143,7 @@ export default function NextMoveProblemList() {
         {selectionMessage}
         {selectionMessage.includes("未挑戦問題") && <button type="button" onClick={() => startPolicy("random")}>ランダムに続ける</button>}
       </div>}
+      {Boolean(selectionError) && !isNextMoveUnavailable(selectionError) && <div className="banner banner-error" role="alert">{errorMessage(selectionError, "問題の選択に失敗しました")}</div>}
       {!samplesLoading && samples.total > samples.data.length && <p className="muted count-note">全{samples.total}問中{samples.data.length}問を表示</p>}
       <h2>問題一覧</h2>
       <div className="opening-list" data-testid="next-move-problem-list">
