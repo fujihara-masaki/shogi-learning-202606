@@ -556,14 +556,18 @@ test.describe("次の一手", () => {
     await expect(page.getByTestId("next-move-page")).not.toContainText("不正解");
   });
 
-  test("候補外の合法手はDB未登録の説明になり、悪手とは断定しない", async ({ page }) => {
+  test("候補外の合法手は判定結果で悪手と断定しない", async ({ page }) => {
     await page.goto("/next-move/101");
     await playMove(page, "17", "16");
     const feedback = page.getByTestId("next-move-feedback");
+    const result = page.getByTestId("next-move-result");
+    const terminology = page.getByTestId("next-move-terminology");
     await expect(feedback).toContainText("定跡DBには候補手として登録されていません");
     await expect(feedback).toContainText("局面上の評価を完全に否定するものではありません");
-    await expect(page.getByTestId("next-move-page")).not.toContainText("不正解");
-    await expect(page.getByTestId("next-move-page")).not.toContainText("悪手");
+    await expect(feedback).not.toContainText("不正解");
+    await expect(feedback).not.toContainText("悪手");
+    await expect(result).not.toContainText("悪手");
+    await expect(terminology).toContainText("悪手");
     // 候補比較から最上位候補は確認できる
     await page.getByTestId("next-move-compare-button").click();
     await expect(page.getByTestId("next-move-candidate-table")).toContainText("7g7f");
