@@ -227,7 +227,7 @@ test.describe("次の一手", () => {
         await route.fulfill({ json: { items: Array(100).fill(SAMPLES[0]), offset: 0, limit: 100, total: 101, dataset_version: "v1:retry" } });
       } else await route.fulfill({ status: 500, json: { detail: "page failed" } });
     });
-    await page.goto("/next-move/1");
+    await page.goto("/next-move/101");
     await expect(page.getByTestId("next-move-page-error")).toContainText("最後まで取得できませんでした");
     await page.getByRole("button", { name: "offset 0から再試行" }).click();
     await expect.poll(() => firstRequests).toBeGreaterThan(1);
