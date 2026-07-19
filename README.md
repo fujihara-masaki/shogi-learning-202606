@@ -392,9 +392,9 @@ NEXT_MOVE_DB_PATH=./data/next_move.db python -m app.importers.yaneuraou_book <bo
   --name "YaneuraOu Book" --source-url <URL> --license-name <LICENSE>
 NEXT_MOVE_DB_PATH=./data/next_move.db python -m app.scripts.extract_learning_samples \
   --source-id <ID> --limit 10000 --per-opening-limit 500 --seed 1
-python scripts/validate_next_move_db.py ./data/next_move.db --expected-learning-samples 10000
+python scripts/validate_next_move_db.py ./data/next_move.db
 ```
 
-検証コマンドはintegrity/foreign key、孤立参照、件数、出典・ライセンス、重複を読み取り専用で確認します。`--expected-learning-samples` を省略するとサンプル件数は任意です。差し替え時はbackendを停止し、新DBを別名で生成・検証してから `next_move.db` を置換してください。自動テストとE2Eは数局面だけのYaneuraOuテキストfixtureから一時DBを生成し、正式な10,000件DBを複製しません。大規模な外部定跡DBは容量と再配布ライセンスの確認が必要なためGit管理せず、出典・ライセンス情報を `book_sources` に必ず登録してください。
+検証コマンドはintegrity/foreign key、孤立参照、件数、出典・ライセンス、重複を読み取り専用で確認します。通常の復旧確認では `--expected-learning-samples` を省略し、サンプル件数を固定しません。抽出件数を厳密に確認する場合は、抽出コマンドの出力に表示された `selected` 件数を `--expected-learning-samples` に指定してください。元データの戦型別候補数と `--per-opening-limit` によって実際の抽出件数が変わるため、固定値10,000は指定しません。差し替え時はbackendを停止し、新DBを別名で生成・検証してから `next_move.db` を置換してください。自動テストとE2Eは数局面だけのYaneuraOuテキストfixtureから一時DBを生成し、正式な10,000件DBを複製しません。大規模な外部定跡DBは容量と再配布ライセンスの確認が必要なためGit管理せず、出典・ライセンス情報を `book_sources` に必ず登録してください。
 
 `learning_samples.id` は再生成で変わり得る内部IDです。履歴などの永続参照には、出典、正規化SFEN、候補手定義(または対象手)、問題定義バージョンから作る安定キーを利用します。抽出件数やseedなどの抽出条件は問題キーに含めず、監査メタデータとして分離します。

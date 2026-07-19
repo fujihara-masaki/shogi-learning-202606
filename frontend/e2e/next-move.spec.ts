@@ -150,12 +150,22 @@ test("専用DBから次の一手一覧と出典を取得できる", async ({ pag
   await expect(page.getByTestId("next-move-section").locator('[role="alert"]')).toHaveCount(0);
 });
 
-test("戦型取得が503の場合は利用不可だけを表示する", async ({ page }) => {
+test("戦型取得が503の場合は原因と復旧手順を表示する", async ({ page }) => {
+  const detail = "次の一手専用DBが存在しません: /very/long/path/to/next_move.db";
   await page.route("**/api/learning-samples/openings", (route) =>
-    route.fulfill({ status: 503, json: { detail: "next move database unavailable" } }),
+    route.fulfill({ status: 503, json: { detail } }),
   );
   await page.goto("/next-move");
-  await expect(page.getByRole("alert")).toContainText("次の一手データを利用できません");
+  const recovery = page.getByTestId("next-move-db-recovery");
+  await expect(recovery).toContainText(detail);
+  await expect(recovery).toContainText("通常DBと次の一手専用DB");
+  await expect(recovery).toContainText("やねうら王定跡からの学習用サンプル抽出");
+  await expect(recovery).toContainText("app.importers.yaneuraou_book");
+  await expect(recovery).toContainText("extract_learning_samples");
+  await expect(recovery).toContainText("validate_next_move_db.py");
+  await expect(recovery).not.toContainText("--expected-learning-samples 10000");
+  await expect(recovery.getByRole("alert")).toContainText(detail);
+  await expect(recovery.getByRole("alert")).not.toContainText("validate_next_move_db.py");
   await expect(page.getByTestId("next-move-opening-filter")).toHaveCount(0);
   await expect(page.getByTestId("next-move-empty-state")).toHaveCount(0);
 });
@@ -166,12 +176,41 @@ test("問題一覧取得が503の場合も専用DBの利用不可を表示する
     if (path.endsWith("/openings")) {
       await route.fulfill({ json: OPENINGS });
     } else {
-      await route.fulfill({ status: 503, json: { detail: "next move database unavailable" } });
+      await route.fulfill({ status: 503, json: { detail: "learning_samplesが0件です" } });
     }
   });
   await page.goto("/next-move");
-  await expect(page.getByRole("alert")).toContainText("次の一手データを利用できません");
+  await expect(page.getByTestId("next-move-db-recovery")).toContainText("learning_samplesが0件です");
   await expect(page.getByTestId("next-move-empty-state")).toHaveCount(0);
+});
+
+test("問題詳細のスキーマ異常503でも原因と復旧手順を表示する", async ({ page }) => {
+  const detail = "次の一手専用DBの必須テーブルまたは必須カラムが不足しています: learning_samples.problem_key";
+  await page.route("**/api/learning-samples/101", (route) => route.fulfill({ status: 503, json: { detail } }));
+  await page.goto("/next-move/101");
+  const recovery = page.getByTestId("next-move-db-recovery");
+  await expect(recovery).toContainText(detail);
+  await expect(recovery).toContainText("validate_next_move_db.py");
+});
+
+test("500では一般エラーだけを表示しDB復旧手順を表示しない", async ({ page }) => {
+  await page.route("**/api/learning-samples/openings", (route) =>
+    route.fulfill({ status: 500, json: { detail: "internal error" } }),
+  );
+  await page.goto("/next-move");
+  await expect(page.getByRole("alert")).toContainText("戦型一覧の取得に失敗しました: internal error");
+  await expect(page.getByTestId("next-move-db-recovery")).toHaveCount(0);
+});
+
+test("360px幅でも長いDB異常案内がページ全体を横スクロールさせない", async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 800 });
+  await page.route("**/api/learning-samples/openings", (route) => route.fulfill({
+    status: 503,
+    json: { detail: `DBを開けません: /${"very-long-database-directory/".repeat(12)}next_move.db` },
+  }));
+  await page.goto("/next-move");
+  await expect(page.getByTestId("next-move-db-recovery")).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBeTruthy();
 });
 
 test.describe("次の一手", () => {
@@ -361,6 +400,20 @@ test.describe("次の一手", () => {
     expect(requestedUrls.every((url) => !url.match(/\/api\/learning-samples\?(?!.*opening_key=)/))).toBeTruthy();
   });
 
+  test("出題開始の古い503案内は戦型変更時にクリアする", async ({ page }) => {
+    await page.route("**/api/next-move/problems/next**", (route) => route.fulfill({
+      status: 503,
+      json: { detail: "ランダム出題用DBを開けません" },
+    }));
+    await page.goto("/next-move");
+    await page.getByRole("button", { name: "ランダムに1問" }).click();
+    await expect(page.getByTestId("next-move-db-recovery")).toContainText("ランダム出題用DBを開けません");
+
+    await page.getByTestId("next-move-opening-filter").selectOption("shikenbisha");
+    await expect(page.getByTestId("next-move-problem-list")).toContainText("四間飛車");
+    await expect(page.getByTestId("next-move-db-recovery")).toHaveCount(0);
+  });
+
   test("着手前は候補手・評価値・PVを表示しない", async ({ page }) => {
     await page.goto("/next-move/101");
     await expect(page.getByTestId("next-move-heading")).toContainText("棒銀");
@@ -371,6 +424,7 @@ test.describe("次の一手", () => {
     await expect(page.getByTestId("next-move-page")).not.toContainText("7g7f");
     await expect(page.getByTestId("next-move-page")).not.toContainText("評価値");
     await expect(page.getByTestId("next-move-page")).not.toContainText("PV");
+    await expect(page.getByText("評価値・PV・候補順位とは")).toHaveCount(0);
   });
 
   test("段階ヒントは要求したときだけ表示される", async ({ page }) => {
@@ -396,6 +450,17 @@ test.describe("次の一手", () => {
     await expect(result).toContainText("7g7f 3c3d 2g2f");
     await expect(result).toContainText("出典: Sample YaneuraOu Book");
     await expect(result).toContainText("MIT License");
+
+    const terminology = page.getByTestId("next-move-terminology");
+    const summary = terminology.getByText("評価値・PV・候補順位とは");
+    await expect(summary).toBeVisible();
+    await summary.focus();
+    await expect(summary).toBeFocused();
+    await page.keyboard.press("Enter");
+    await expect(terminology).toHaveAttribute("open", "");
+    await expect(terminology.locator("dt")).toHaveText(["評価値", "PV", "候補順位"]);
+    await page.keyboard.press("Space");
+    await expect(terminology).not.toHaveAttribute("open", "");
 
     await page.getByTestId("next-move-compare-button").click();
     await expect(page.getByTestId("next-move-compare-button")).toHaveAttribute("aria-pressed", "true");
@@ -492,14 +557,18 @@ test.describe("次の一手", () => {
     await expect(page.getByTestId("next-move-page")).not.toContainText("不正解");
   });
 
-  test("候補外の合法手はDB未登録の説明になり、悪手とは断定しない", async ({ page }) => {
+  test("候補外の合法手は判定結果で悪手と断定しない", async ({ page }) => {
     await page.goto("/next-move/101");
     await playMove(page, "17", "16");
     const feedback = page.getByTestId("next-move-feedback");
+    const result = page.getByTestId("next-move-result");
+    const terminology = page.getByTestId("next-move-terminology");
     await expect(feedback).toContainText("定跡DBには候補手として登録されていません");
     await expect(feedback).toContainText("局面上の評価を完全に否定するものではありません");
-    await expect(page.getByTestId("next-move-page")).not.toContainText("不正解");
-    await expect(page.getByTestId("next-move-page")).not.toContainText("悪手");
+    await expect(feedback).not.toContainText("不正解");
+    await expect(feedback).not.toContainText("悪手");
+    await expect(result).not.toContainText("悪手");
+    await expect(terminology).toContainText("悪手");
     // 候補比較から最上位候補は確認できる
     await page.getByTestId("next-move-compare-button").click();
     await expect(page.getByTestId("next-move-candidate-table")).toContainText("7g7f");
@@ -583,6 +652,21 @@ test.describe("次の一手", () => {
     await page.getByRole("button", { name: "ランダムに続ける" }).click();
     await expect(page.getByTestId("shogi-board")).toBeVisible();
     expect(excludes).toEqual(["v1:problem-102", "v1:problem-102"]);
+  });
+
+  test("完了後のランダム継続503は成功バナーの外に復旧案内を表示する", async ({ page }) => {
+    const detail = "次の一手専用DBのlearning_samplesが0件です";
+    await page.route("**/api/next-move/problems/next**", (route) => route.fulfill({ status: 503, json: { detail } }));
+    await page.goto("/next-move/201");
+    await page.getByTestId("next-move-skip-button").click();
+    const complete = page.getByTestId("next-move-complete");
+    await expect(complete).toBeVisible();
+
+    await page.getByRole("button", { name: "ランダムに続ける" }).click();
+    const recovery = page.getByTestId("next-move-db-recovery");
+    await expect(recovery).toContainText(detail);
+    await expect(recovery).toContainText("次の一手専用DBの復旧手順");
+    await expect(complete.getByTestId("next-move-db-recovery")).toHaveCount(0);
   });
 
   test("通常順次移動は1→2→3で進み、APIを使わず3問目だけで完了する", async ({ page }) => {
