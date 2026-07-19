@@ -61,11 +61,30 @@ export function displayRank(candidate: NextMoveCandidateLike, index: number): nu
   return candidate.rank ?? index + 1;
 }
 
+export function normalizeNextMoveCandidates<T extends NextMoveCandidateLike>(candidates: T[]): T[] {
+  return candidates.map((candidate, index) => ({candidate, index})).sort((a, b) => {
+    const rank = displayRank(a.candidate, a.index) - displayRank(b.candidate, b.index);
+    if (rank) return rank;
+    if (a.candidate.score !== b.candidate.score) {
+      if (a.candidate.score === null) return 1;
+      if (b.candidate.score === null) return -1;
+      return b.candidate.score - a.candidate.score;
+    }
+    if (a.candidate.depth !== b.candidate.depth) {
+      if (a.candidate.depth === null) return 1;
+      if (b.candidate.depth === null) return -1;
+      return b.candidate.depth - a.candidate.depth;
+    }
+    return a.candidate.move_usi.localeCompare(b.candidate.move_usi);
+  }).map(({candidate}) => candidate);
+}
+
 /**
  * ユーザーの指した手(合法手)を候補手リストと突き合わせる。
  * candidates は API の返却順(定跡DBの候補順)をそのまま渡すこと。
  */
 export function judgeNextMove(moveUsi: string, candidates: NextMoveCandidateLike[]): NextMoveVerdict {
+  candidates = normalizeNextMoveCandidates(candidates);
   const best = candidates[0] ?? null;
   const index = candidates.findIndex((c) => c.move_usi === moveUsi);
   if (index < 0) {

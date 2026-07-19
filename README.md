@@ -397,4 +397,4 @@ python scripts/validate_next_move_db.py ./data/next_move.db --expected-learning-
 
 検証コマンドはintegrity/foreign key、孤立参照、件数、出典・ライセンス、重複を読み取り専用で確認します。`--expected-learning-samples` を省略するとサンプル件数は任意です。差し替え時はbackendを停止し、新DBを別名で生成・検証してから `next_move.db` を置換してください。自動テストとE2Eは数局面だけのYaneuraOuテキストfixtureから一時DBを生成し、正式な10,000件DBを複製しません。大規模な外部定跡DBは容量と再配布ライセンスの確認が必要なためGit管理せず、出典・ライセンス情報を `book_sources` に必ず登録してください。
 
-`learning_samples.id` は再生成で変わり得る内部IDです。将来、履歴やお気に入りを通常DBへ保存する場合は、出典、正規化SFEN、対象手、生成条件から作る安定キーを利用してください。
+`learning_samples.id` は再生成で変わり得る内部IDです。履歴などの永続参照には、出典、正規化SFEN、候補手定義(または対象手)、問題定義バージョンから作る安定キーを利用します。抽出件数やseedなどの抽出条件は問題キーに含めず、監査メタデータとして分離します。

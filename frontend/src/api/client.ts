@@ -95,10 +95,14 @@ export interface StatsResponse {
 
 export class ApiError extends Error {
   readonly status: number;
+  readonly detail: string;
+  readonly code: string | null;
 
-  constructor(status: number, message: string) {
+  constructor(status: number, message: string, code: string | null = null) {
     super(message);
     this.status = status;
+    this.detail = message;
+    this.code = code;
     this.name = "ApiError";
   }
 }
@@ -113,7 +117,15 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     ...init,
   });
   if (!res.ok) {
-    throw new ApiError(res.status, `API error ${res.status}: ${await res.text()}`);
+    const text = await res.text();
+    let detail = `API error ${res.status}: ${text}`;
+    let code: string | null = null;
+    try {
+      const data = JSON.parse(text) as { detail?: string; code?: string };
+      if (typeof data.detail === "string") detail = data.detail;
+      if (typeof data.code === "string") code = data.code;
+    } catch { /* Preserve existing plain-text error behavior. */ }
+    throw new ApiError(res.status, detail, code);
   }
   if (res.status === 204) {
     return undefined as T;
@@ -402,6 +414,7 @@ export interface LearningSample {
   sample_rank: number;
   sample_reason: string;
   created_at: string;
+  problem_key: string;
   source: LearningSampleSource;
   candidates: BookCandidate[];
 }
@@ -418,6 +431,25 @@ export function fetchLearningSamples(openingKey?: string, limit = 20): Promise<L
 
 export function fetchLearningSample(id: number): Promise<LearningSample> {
   return request<LearningSample>(`/api/learning-samples/${id}`);
+}
+
+export interface NextMoveResultInput {
+  sample_id: number;
+  problem_key: string;
+  move_usi: string;
+  hint_count: number;
+  elapsed_ms: number;
+}
+
+export interface NextMoveResultResponse {
+  id: number;
+  verdict: "top" | "strong" | "listed" | "unlisted";
+  candidate_rank: number | null;
+  judgment_position: number | null;
+}
+
+export function postNextMoveResult(body: NextMoveResultInput): Promise<NextMoveResultResponse> {
+  return request<NextMoveResultResponse>("/api/next-move/results", {method: "POST", body: JSON.stringify(body)});
 }
 
 export interface TsumeSourceLicense {

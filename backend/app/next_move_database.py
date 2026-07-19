@@ -28,9 +28,15 @@ CREATE TABLE IF NOT EXISTS learning_samples (
  id INTEGER PRIMARY KEY AUTOINCREMENT, book_source_id INTEGER NOT NULL REFERENCES book_sources(id) ON DELETE CASCADE,
  book_position_id INTEGER NOT NULL REFERENCES book_positions(id) ON DELETE CASCADE, opening_key TEXT NOT NULL DEFAULT 'unclassified',
  opening_name TEXT NOT NULL DEFAULT '未分類', sfen TEXT NOT NULL, sample_rank INTEGER NOT NULL,
- sample_reason TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL DEFAULT (datetime('now')),
+ sample_reason TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL DEFAULT (datetime('now')), extraction_run_key TEXT,
  UNIQUE(book_source_id, book_position_id)
 );
+CREATE TABLE IF NOT EXISTS extraction_runs (
+ extraction_run_key TEXT PRIMARY KEY, extractor_version TEXT NOT NULL, "limit" INTEGER NOT NULL,
+ per_opening_limit INTEGER NOT NULL, seed INTEGER NOT NULL, source_file_sha256 TEXT NOT NULL,
+ extracted_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS database_metadata (key TEXT PRIMARY KEY, value TEXT NOT NULL);
 CREATE INDEX IF NOT EXISTS idx_book_positions_source ON book_positions(source_id);
 CREATE INDEX IF NOT EXISTS idx_book_positions_sfen ON book_positions(sfen);
 CREATE INDEX IF NOT EXISTS idx_book_moves_position ON book_moves(position_id, sort_order);
@@ -98,6 +104,9 @@ def init_next_move_db() -> None:
     conn = _connect(path, read_only=False)
     try:
         conn.executescript(NEXT_MOVE_SCHEMA)
+        columns = {row[1] for row in conn.execute("PRAGMA table_info(learning_samples)")}
+        if "extraction_run_key" not in columns:
+            conn.execute("ALTER TABLE learning_samples ADD COLUMN extraction_run_key TEXT")
         conn.commit()
     finally:
         conn.close()

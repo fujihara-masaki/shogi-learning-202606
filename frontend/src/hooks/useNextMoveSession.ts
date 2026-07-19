@@ -1,8 +1,9 @@
 // 「次の一手」1問分のセッション状態。
 // 局面・着手・判定・ヒント段階を保持し、表示コンポーネントからロジックを分離する。
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Square, type Move } from "tsshogi";
 import type { LearningSample } from "../api/client";
+import { ApiError, postNextMoveResult } from "../api/client";
 import {
   hintsForTopCandidate,
   judgeNextMove,
@@ -30,11 +31,21 @@ export interface NextMoveSession {
   playMove: (move: Move) => void;
   revealNextHint: () => void;
   retry: () => void;
+  saveMessage: string | null;
 }
 
 export function useNextMoveSession(sample: LearningSample | null): NextMoveSession {
   const [userMoveUsi, setUserMoveUsi] = useState<string | null>(null);
   const [hintStage, setHintStage] = useState(0);
+  const [saveNotice, setSaveNotice] = useState<{key: string; text: string} | null>(null);
+  const startedAt = useRef(0);
+  const posting = useRef(false);
+
+  useEffect(() => {
+    startedAt.current = performance.now();
+    posting.current = false;
+  }, [sample?.id, sample?.problem_key]);
+  const saveMessage = saveNotice && saveNotice.key === sample?.problem_key ? saveNotice.text : null;
 
   const basePosition = useMemo(() => (sample ? positionFromSfen(sample.sfen) : null), [sample]);
 
@@ -58,8 +69,16 @@ export function useNextMoveSession(sample: LearningSample | null): NextMoveSessi
   );
 
   const playMove = useCallback((move: Move) => {
+    if (!sample || posting.current) return;
+    posting.current = true;
     setUserMoveUsi(move.usi);
-  }, []);
+    void postNextMoveResult({sample_id: sample.id, problem_key: sample.problem_key, move_usi: move.usi,
+      hint_count: hintStage, elapsed_ms: Math.max(0, Math.round(performance.now() - startedAt.current))})
+      .catch((error: unknown) => setSaveNotice({key: sample.problem_key, text:
+        error instanceof ApiError && error.code === "NEXT_MOVE_PROBLEM_CHANGED"
+          ? "問題データが更新されました。再読み込みしてください。"
+          : "解答記録が保存されたか確認できませんでした。学習はそのまま続けられます。"}));
+  }, [hintStage, sample]);
 
   const revealNextHint = useCallback(() => {
     setHintStage((stage) => Math.min(stage + 1, hints.length));
@@ -68,6 +87,9 @@ export function useNextMoveSession(sample: LearningSample | null): NextMoveSessi
   const retry = useCallback(() => {
     setUserMoveUsi(null);
     setHintStage(0);
+    startedAt.current = performance.now();
+    posting.current = false;
+    setSaveNotice(null);
   }, []);
 
   const lastMove = applied?.move ?? null;
@@ -84,5 +106,6 @@ export function useNextMoveSession(sample: LearningSample | null): NextMoveSessi
     playMove,
     revealNextHint,
     retry,
+    saveMessage,
   };
 }

@@ -7,6 +7,7 @@ from fastapi import APIRouter, HTTPException, Query
 
 from ..database import get_connection
 from ..next_move_database import NextMoveDatabaseUnavailable, get_next_move_connection
+from ..next_move_identity import normalize_candidates, problem_key
 
 router = APIRouter(tags=["book"])
 
@@ -65,11 +66,11 @@ def _candidate_rows_for_position(conn, position_id: int) -> list[dict[str, Any]]
             bm.score DESC,
             CASE WHEN bm.depth IS NULL THEN 1 ELSE 0 END ASC,
             bm.depth DESC,
-            bm.id ASC
+            bm.usi ASC
         """,
         (position_id,),
     ).fetchall()
-    return [_candidate(row) for row in rows]
+    return normalize_candidates([_candidate(row) for row in rows])
 
 
 def _candidate(row: Any) -> dict[str, Any]:
@@ -91,6 +92,7 @@ def _candidate(row: Any) -> dict[str, Any]:
 
 
 def _learning_sample(row: Any, candidates: list[dict[str, Any]]) -> dict[str, Any]:
+    source_identity = {"name": row["source_name"], "version": row["source_version"], "source_url": row["source_url"]}
     return {
         "id": row["id"],
         "book_source_id": row["book_source_id"],
@@ -101,6 +103,7 @@ def _learning_sample(row: Any, candidates: list[dict[str, Any]]) -> dict[str, An
         "sample_rank": row["sample_rank"],
         "sample_reason": row["sample_reason"],
         "created_at": row["created_at"],
+        "problem_key": problem_key(source_identity, row["sfen"], candidates),
         "source": {
             "id": row["source_id"],
             "name": row["source_name"],
@@ -151,7 +154,7 @@ def get_book_candidates(sfen: str = Query(..., min_length=1)) -> dict[str, Any]:
                 bm.depth DESC,
                 bs.imported_at DESC,
                 bs.id DESC,
-                bm.id ASC
+                bm.usi ASC
             """,
             (normalized_sfen,),
         ).fetchall()
