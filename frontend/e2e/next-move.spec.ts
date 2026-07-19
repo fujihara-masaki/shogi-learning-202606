@@ -271,15 +271,21 @@ test.describe("次の一手", () => {
   });
 
   for (const inconsistency of ["empty", "version"] as const) {
-    test(`${inconsistency}な途中ページでは一覧を破棄しoffset 0再試行を促す`, async ({ page }) => {
+    test(`${inconsistency}な途中ページから再試行成功後に101問目まで進める`, async ({ page }) => {
       let offsetZero = 0;
-      const first = Array.from({ length: 100 }, (_, index) => ({ ...SAMPLES[0], id: 3000 + index, problem_key: `v1:${inconsistency}-${index}` }));
+      const first = [
+        ...Array.from({ length: 99 }, (_, index) => ({ ...SAMPLES[0], id: 3000 + index, problem_key: `v1:${inconsistency}-${index}` })),
+        SAMPLES[0],
+      ];
       await page.route("**/api/learning-samples?**", async (route) => {
         const url = new URL(route.request().url());
         const offset = Number(url.searchParams.get("offset") ?? 0);
         if (offset === 0) {
           offsetZero += 1;
           return route.fulfill({ json: { items: first, offset: 0, limit: 100, total: 101, dataset_version: "v1:before" } });
+        }
+        if (offsetZero > 1) {
+          return route.fulfill({ json: { items: [SAMPLES[1]], offset: 100, limit: 100, total: 101, dataset_version: "v1:before" } });
         }
         return route.fulfill({ json: { items: inconsistency === "empty" ? [] : [{ ...SAMPLES[1], problem_key: "v1:last" }],
           offset: 100, limit: 100, total: 101, dataset_version: inconsistency === "version" ? "v1:after" : "v1:before" } });
@@ -288,6 +294,13 @@ test.describe("次の一手", () => {
       await expect(page.getByTestId("next-move-page-error")).toContainText("最後まで取得できませんでした");
       await page.getByRole("button", { name: "offset 0から再試行" }).click();
       await expect.poll(() => offsetZero).toBe(2);
+      await expect(page.getByTestId("next-move-page-error")).toHaveCount(0);
+      await expect(page.getByTestId("next-move-progress")).toContainText("問題 100 / 101");
+      await page.getByTestId("next-move-skip-button").click();
+      await expect(page).toHaveURL(/next-move\/102/);
+      await expect(page.getByTestId("next-move-complete")).toHaveCount(0);
+      await page.getByTestId("next-move-skip-button").click();
+      await expect(page.getByTestId("next-move-complete")).toBeVisible();
     });
   }
 
