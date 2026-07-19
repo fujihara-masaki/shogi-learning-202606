@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { Color } from "tsshogi";
-import { fetchAllLearningSamples, fetchLearningSample, fetchNextMoveProblem, isNextMoveUnavailable, type LearningSample, type NextMovePolicy } from "../api/client";
+import { fetchAllLearningSamplesCached, fetchLearningSample, fetchNextMoveProblem, isNextMoveUnavailable, type LearningSample, type NextMovePolicy } from "../api/client";
 import { NextMoveCandidateComparison, NextMoveResultPanel } from "../components/NextMoveResultPanel";
 import ShogiBoard from "../components/ShogiBoard";
 import { useNextMoveSession } from "../hooks/useNextMoveSession";
@@ -71,15 +71,15 @@ function NextMoveStudyContent({ id }: { id: string | undefined }) {
   const openingKey = sample?.opening_key ?? null;
   useEffect(() => {
     if (!openingKey) return;
-    const controller = new AbortController();
-    fetchAllLearningSamples(openingKey, controller.signal)
+    let cancelled = false;
+    fetchAllLearningSamplesCached(openingKey, siblingsRetry > 0)
       .then((samples) => {
-        if (!controller.signal.aborted) setSiblings({ key: openingKey, samples, error: null });
+        if (!cancelled) setSiblings({ key: openingKey, samples, error: null });
       })
       .catch(() => {
-        if (!controller.signal.aborted) setSiblings({ key: openingKey, samples: [], error: "問題一覧を最後まで取得できませんでした。先頭から再試行してください。" });
+        if (!cancelled) setSiblings({ key: openingKey, samples: [], error: "問題一覧を最後まで取得できませんでした。先頭から再試行してください。" });
       });
-    return () => controller.abort();
+    return () => { cancelled = true; };
   }, [openingKey, siblingsRetry]);
 
   // 「次の問題」で遷移してきた場合は見出しへフォーカスを移す(直接アクセス時は動かさない)。
@@ -167,6 +167,30 @@ function NextMoveStudyContent({ id }: { id: string | undefined }) {
     }
   }
 
+  async function continueRandom() {
+    if (!sample) return;
+    setMovingNext(true);
+    setNextError(null);
+    try {
+      const next = await fetchNextMoveProblem({ policy: "random", opening_key: sample.opening_key,
+        exclude_problem_key: sample.problem_key });
+      if (!next) {
+        setNextError("この戦型にほかの問題はありません。");
+      } else if (next.id === sample.id) {
+        setCompleted(false);
+        handleRetry();
+        queueMicrotask(() => headingRef.current?.focus());
+      } else {
+        navigate(`/next-move/${next.id}?policy=random&opening_key=${encodeURIComponent(sample.opening_key)}`,
+          { state: { autoFocusHeading: true } });
+      }
+    } catch (e) {
+      setNextError(`ランダム出題を開始できませんでした: ${e}`);
+    } finally {
+      setMovingNext(false);
+    }
+  }
+
   return (
     <div className="next-move-page" data-testid="next-move-page">
       <Link to="/next-move">← 次の一手一覧へ</Link>
@@ -176,7 +200,15 @@ function NextMoveStudyContent({ id }: { id: string | undefined }) {
       <p className="muted" data-testid="next-move-progress">
         {progressLabel}(戦型: {sample.opening_name})
       </p>
-      <div className="player-layout">
+      {completed ? <div className="banner banner-success" role="status" aria-live="polite" data-testid="next-move-complete">
+        <p>この戦型の問題を最後まで学習しました</p>
+        {nextError && <p role="alert">{nextError}</p>}
+        <div className="post-clear-actions">
+          <Link to="/next-move">一覧へ戻る</Link>
+          <button type="button" onClick={() => { setCompleted(false); handleRetry(); }}>もう一度取り組む</button>
+          <button type="button" disabled={movingNext} onClick={continueRandom}>ランダムに続ける</button>
+        </div>
+      </div> : <div className="player-layout">
         <div className="player-board">
           <div
             className={`banner ${answered && verdict && verdict.kind !== "unlisted" ? "banner-success" : "banner-info"}`}
@@ -222,18 +254,7 @@ function NextMoveStudyContent({ id }: { id: string | undefined }) {
               ))}
             </div>
           )}
-          {completed && <div className="banner banner-success" role="status" aria-live="polite" data-testid="next-move-complete">
-            <p>この戦型の問題を最後まで学習しました</p>
-            <div className="post-clear-actions">
-              <Link to="/next-move">一覧へ戻る</Link>
-              <button type="button" onClick={() => { setCompleted(false); handleRetry(); }}>もう一度取り組む</button>
-              <button type="button" onClick={async () => {
-                const next = await fetchNextMoveProblem({ policy: "random", opening_key: sample.opening_key });
-                if (next) navigate(`/next-move/${next.id}?policy=random&opening_key=${encodeURIComponent(sample.opening_key)}`, { state: { autoFocusHeading: true } });
-              }}>ランダムに続ける</button>
-            </div>
-          </div>}
-          {answered && verdict && !completed && (
+          {answered && verdict && (
             <div className="post-clear-actions next-move-actions" data-testid="next-move-actions">
               <button
                 type="button"
@@ -290,7 +311,7 @@ function NextMoveStudyContent({ id }: { id: string | undefined }) {
             </p>
           </details>
         </div>
-      </div>
+      </div>}
     </div>
   );
 }
