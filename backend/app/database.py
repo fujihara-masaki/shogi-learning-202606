@@ -221,7 +221,33 @@ CREATE INDEX IF NOT EXISTS idx_learning_samples_source_opening
     ON learning_samples(book_source_id, opening_key, sample_rank);
 CREATE INDEX IF NOT EXISTS idx_learning_samples_position
     ON learning_samples(book_position_id);
+
+CREATE TABLE IF NOT EXISTS next_move_problem_refs (
+    problem_key TEXT PRIMARY KEY, stable_source_key TEXT NOT NULL, normalized_sfen TEXT NOT NULL,
+    candidate_definition_fingerprint TEXT NOT NULL, problem_definition_version INTEGER NOT NULL DEFAULT 1,
+    last_extraction_run_key TEXT NOT NULL DEFAULT '', last_source_file_sha256 TEXT NOT NULL DEFAULT '',
+    first_seen_at TEXT NOT NULL DEFAULT (datetime('now')), last_seen_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE TABLE IF NOT EXISTS next_move_results (
+    id INTEGER PRIMARY KEY AUTOINCREMENT, problem_key TEXT NOT NULL REFERENCES next_move_problem_refs(problem_key),
+    opening_key_at_answer TEXT NOT NULL DEFAULT '', opening_name_at_answer TEXT NOT NULL DEFAULT '',
+    move_usi TEXT NOT NULL, verdict TEXT NOT NULL, candidate_rank INTEGER,
+    judgment_position INTEGER, hint_count INTEGER NOT NULL, elapsed_ms INTEGER NOT NULL,
+    answered_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_next_move_results_latest
+    ON next_move_results(problem_key, answered_at DESC, id DESC);
+CREATE INDEX IF NOT EXISTS idx_next_move_results_answered
+    ON next_move_results(answered_at);
 """
+
+LATEST_NEXT_MOVE_RESULT_ORDER = "answered_at DESC, id DESC"
+
+def latest_next_move_result(conn: sqlite3.Connection, problem_key: str):
+    return conn.execute(
+        f"SELECT * FROM next_move_results WHERE problem_key = ? ORDER BY {LATEST_NEXT_MOVE_RESULT_ORDER} LIMIT 1",
+        (problem_key,),
+    ).fetchone()
 
 
 def db_path() -> Path:

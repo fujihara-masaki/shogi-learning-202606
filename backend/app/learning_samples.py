@@ -2,10 +2,14 @@
 from __future__ import annotations
 
 import random
+from datetime import datetime, timezone
 from dataclasses import dataclass
 from typing import Any
 
 from .next_move_database import get_next_move_write_connection, init_next_move_db
+from .next_move_identity import canonical_hash, extraction_run_key
+
+EXTRACTOR_VERSION = "1"
 
 UNKNOWN_OPENING = "unclassified"
 
@@ -241,11 +245,21 @@ def build_learning_sample_plan(source_id: int, *, limit: int, per_opening_limit:
         for key, summary in by_opening.items():
             summary["selected_count"] = selected_by_key.get(key, 0)
         if not dry_run:
+            source = conn.execute("SELECT file_sha256 FROM book_sources WHERE id=?", (source_id,)).fetchone()
+            extracted_at = datetime.now(timezone.utc).isoformat()
+            run_metadata = {"extractor_version": EXTRACTOR_VERSION, "limit": limit,
+                "per_opening_limit": per_opening_limit, "seed": seed,
+                "source_file_sha256": source["file_sha256"], "extracted_at": extracted_at}
+            run_key = extraction_run_key(run_metadata)
+            conn.execute("""INSERT INTO extraction_runs
+                (extraction_run_key,extractor_version,"limit",per_opening_limit,seed,source_file_sha256,extracted_at)
+                VALUES(?,?,?,?,?,?,?)""", (run_key, EXTRACTOR_VERSION, limit, per_opening_limit, seed,
+                source["file_sha256"], extracted_at))
             conn.execute("DELETE FROM learning_samples WHERE book_source_id = ?", (source_id,))
             conn.executemany(
                 """
-                INSERT INTO learning_samples(book_source_id, book_position_id, opening_key, opening_name, sfen, sample_rank, sample_reason)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO learning_samples(book_source_id, book_position_id, opening_key, opening_name, sfen, sample_rank, sample_reason, extraction_run_key)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 [
                     (
@@ -256,10 +270,19 @@ def build_learning_sample_plan(source_id: int, *, limit: int, per_opening_limit:
                         x["sfen"],
                         x["sample_rank"],
                         x["sample_reason"],
+                        run_key,
                     )
                     for x in selected
                 ],
             )
+            counts = {table: conn.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]
+                      for table in ("book_sources", "book_positions", "book_moves", "learning_samples")}
+            runs = [r[0] for r in conn.execute("SELECT extraction_run_key FROM extraction_runs ORDER BY extraction_run_key")]
+            hashes = [r[0] for r in conn.execute("SELECT DISTINCT file_sha256 FROM book_sources ORDER BY file_sha256")]
+            dataset_version = canonical_hash({"schema_version": 1, "generated_at": extracted_at,
+                "extractor_version": EXTRACTOR_VERSION, "extraction_run_keys": runs,
+                "source_file_sha256_values": hashes, "row_counts": counts})
+            conn.execute("INSERT OR REPLACE INTO database_metadata(key,value) VALUES('dataset_version',?)", (dataset_version,))
             conn.commit()
         return LearningSamplePlan(
             source_id,

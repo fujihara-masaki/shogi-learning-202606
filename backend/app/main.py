@@ -7,12 +7,12 @@ import os
 import logging
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
 from .database import init_db
 from .next_move_database import NextMoveDatabaseUnavailable, get_next_move_connection, next_move_db_path
-from .routers import book, openings, stats, time_attack, tsume
+from .routers import book, next_move, openings, stats, time_attack, tsume
 from .seed import seed_if_empty
 
 
@@ -47,6 +47,14 @@ app.include_router(time_attack.router)
 app.include_router(stats.router)
 app.include_router(openings.router)
 app.include_router(book.router)
+app.include_router(next_move.router)
+
+@app.exception_handler(HTTPException)
+async def structured_http_error(_, exc):
+    from fastapi.responses import JSONResponse
+    if isinstance(exc.detail, dict) and set(exc.detail) >= {"detail", "code"}:
+        return JSONResponse(status_code=exc.status_code, content=exc.detail)
+    return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
 
 
 @app.get("/api/health")

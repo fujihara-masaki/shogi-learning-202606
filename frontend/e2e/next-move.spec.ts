@@ -39,6 +39,7 @@ function sample(
   rank: number,
   candidates: ReturnType<typeof candidate>[],
   sfen: string = INITIAL_SFEN,
+  problemKey: string = `v1:problem-${id}`,
 ) {
   return {
     id,
@@ -50,6 +51,7 @@ function sample(
     sample_rank: rank,
     sample_reason: "test sample",
     created_at: "2026-01-01T00:00:00",
+    problem_key: problemKey,
     source: SOURCE,
     candidates,
   };
@@ -66,6 +68,8 @@ const SAMPLES = [
     candidate("9g9f", 4, -8, null),
   ]),
   sample(102, "bogin", "棒銀", 2, [candidate("7g7f", 1, 10, "7g7f")]),
+  // 同じproblem_keyを共有する別sample ID。save noticeのsample境界テスト専用。
+  sample(103, "notice-reset", "通知リセット", 1, [candidate("7g7f", 1, 10, "7g7f")], INITIAL_SFEN, "v1:problem-101"),
   sample(201, "shikenbisha", "四間飛車", 3, [candidate("2h6h", 1, 15, "2h6h 8c8d")]),
   // 一覧(OPENINGS)には含めず、URL直接アクセスで後手番・成りの判定を確認する
   sample(
@@ -83,7 +87,21 @@ const OPENINGS = [
   { opening_key: "shikenbisha", opening_name: "四間飛車", sample_count: 1, first_rank: 3 },
 ];
 
-async function mockNextMoveApi(page: Page, requestedUrls?: string[]) {
+async function mockNextMoveApi(
+  page: Page,
+  requestedUrls?: string[],
+  resultHandler?: (body: Record<string, unknown>, requestCount: number) => {status?: number; json?: unknown} | "abort",
+) {
+  let resultRequestCount = 0;
+  await page.route("**/api/next-move/results", async (route) => {
+    resultRequestCount += 1;
+    const body = route.request().postDataJSON() as Record<string, unknown>;
+    const response = resultHandler?.(body, resultRequestCount) ?? {
+      json: {id: resultRequestCount, verdict: "top", candidate_rank: 1, judgment_position: 1},
+    };
+    if (response === "abort") await route.abort("connectionfailed");
+    else await route.fulfill({status: response.status ?? 200, json: response.json ?? {}});
+  });
   await page.route("**/api/learning-samples**", async (route) => {
     const url = new URL(route.request().url());
     requestedUrls?.push(url.pathname + url.search);
@@ -259,6 +277,79 @@ test.describe("次の一手", () => {
     await expect(table).toBeVisible();
     await expect(table).toContainText("2g2f");
     await expect(table).toContainText("あなたの手");
+  });
+
+  test("着手ごとに5項目だけを一度POSTし、ヒント・時間と再挑戦を記録する", async ({ page }) => {
+    const posts: Record<string, unknown>[] = [];
+    await mockNextMoveApi(page, undefined, (body) => {
+      posts.push(body);
+      return {json: {id: posts.length, verdict: "top", candidate_rank: 1, judgment_position: 1}};
+    });
+    await page.goto("/next-move/101");
+    await page.getByTestId("next-move-hint-button").click();
+    await playMove(page, "77", "76");
+    await expect.poll(() => posts.length).toBe(1);
+    expect(Object.keys(posts[0]).sort()).toEqual(["elapsed_ms", "hint_count", "move_usi", "problem_key", "sample_id"]);
+    expect(posts[0]).toMatchObject({sample_id: 101, problem_key: "v1:problem-101", move_usi: "7g7f", hint_count: 1});
+    expect(posts[0].elapsed_ms).toEqual(expect.any(Number));
+    expect(posts[0].elapsed_ms as number).toBeGreaterThanOrEqual(0);
+    await page.getByTestId("next-move-retry-button").click();
+    await playMove(page, "77", "76");
+    await expect.poll(() => posts.length).toBe(2);
+    expect(posts[1]).toMatchObject({hint_count: 0, move_usi: "7g7f"});
+  });
+
+  test("409でも判定を維持して再読み込み案内を表示し、自動再送しない", async ({ page }) => {
+    let posts = 0;
+    await mockNextMoveApi(page, undefined, () => {
+      posts += 1;
+      return {status: 409, json: {detail: "changed", code: "NEXT_MOVE_PROBLEM_CHANGED"}};
+    });
+    await page.goto("/next-move/101");
+    await playMove(page, "77", "76");
+    await expect(page.getByTestId("next-move-feedback")).toContainText("最有力候補");
+    await expect(page.getByTestId("next-move-save-message")).toContainText("再読み込みしてください");
+    await page.waitForTimeout(100);
+    expect(posts).toBe(1);
+  });
+
+  for (const failure of ["500", "network"] as const) {
+    test(`${failure}でも判定を維持し、自動再送しない`, async ({ page }) => {
+      let posts = 0;
+      await mockNextMoveApi(page, undefined, () => {
+        posts += 1;
+        return failure === "network" ? "abort" : {status: 500, json: {detail: "failed", code: "SAVE_FAILED"}};
+      });
+      await page.goto("/next-move/101");
+      await playMove(page, "77", "76");
+      await expect(page.getByTestId("next-move-feedback")).toContainText("最有力候補");
+      await expect(page.getByTestId("next-move-save-message")).toContainText("確認できませんでした");
+      await page.waitForTimeout(100);
+      expect(posts).toBe(1);
+    });
+  }
+
+  test("再挑戦後に返った前attemptの失敗は表示しない", async ({ page }) => {
+    let release!: () => void;
+    const pending = new Promise<void>((resolve) => { release = resolve; });
+    await page.route("**/api/next-move/results", async (route) => {
+      await pending;
+      await route.fulfill({status: 500, json: {detail: "late failure", code: "SAVE_FAILED"}});
+    });
+    await page.goto("/next-move/101");
+    await playMove(page, "77", "76");
+    await expect(page.getByTestId("next-move-feedback")).toContainText("最有力候補");
+    await page.getByTestId("next-move-retry-button").click();
+    release();
+    await page.waitForTimeout(100);
+    await expect(page.getByTestId("next-move-save-message")).toHaveCount(0);
+    // The now-released route fails immediately: create a notice on sample 101.
+    await playMove(page, "77", "76");
+    await expect(page.getByTestId("next-move-save-message")).toContainText("確認できませんでした");
+    // sample 103 deliberately shares problem_key with 101; the sample ID boundary must still clear it.
+    await page.goto("/next-move/103");
+    await expect(page.getByTestId("next-move-heading")).toContainText("通知リセット");
+    await expect(page.getByTestId("next-move-save-message")).toHaveCount(0);
   });
 
   test("第2候補を指しても不正解扱いにならず、最上位候補との差を表示する", async ({ page }) => {

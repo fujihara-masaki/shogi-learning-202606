@@ -155,6 +155,7 @@ function NextMoveStudyContent({ id }: { id: string | undefined }) {
               ? `${verdict.label}: ${verdict.description}`
               : `${sideLabel}番です。この局面で、あなたなら次の一手をどう指しますか?盤面で1手指してください。`}
           </div>
+          {session.saveMessage && <p role="alert" className="muted" data-testid="next-move-save-message">{session.saveMessage}</p>}
           <ShogiBoard
             position={session.position}
             flipped={basePosition?.color === Color.WHITE}

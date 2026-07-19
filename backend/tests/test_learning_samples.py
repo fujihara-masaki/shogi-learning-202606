@@ -1,4 +1,5 @@
 import os
+import sqlite3
 from pathlib import Path
 
 import pytest
@@ -74,6 +75,32 @@ def test_seed_makes_results_reproducible(tmp_path):
     first = build_learning_sample_plan(source_id, limit=3, per_opening_limit=10, seed=7, dry_run=True)
     second = build_learning_sample_plan(source_id, limit=3, per_opening_limit=10, seed=7, dry_run=True)
     assert [x["book_position_id"] for x in first.selected] == [x["book_position_id"] for x in second.selected]
+
+
+def test_repeated_extraction_preserves_distinct_run_metadata(tmp_path):
+    source_id = imported_source(tmp_path)
+    build_learning_sample_plan(source_id, limit=3, per_opening_limit=10, seed=7, dry_run=False)
+    build_learning_sample_plan(source_id, limit=3, per_opening_limit=10, seed=7, dry_run=False)
+    conn = get_connection()
+    try:
+        runs = conn.execute("SELECT extraction_run_key, extracted_at FROM extraction_runs ORDER BY extracted_at").fetchall()
+        assert len(runs) == 2
+        assert runs[0]["extraction_run_key"] != runs[1]["extraction_run_key"]
+        assert conn.execute("SELECT COUNT(*) FROM learning_samples ls JOIN extraction_runs er ON er.extraction_run_key=ls.extraction_run_key").fetchone()[0] == 3
+    finally:
+        conn.close()
+
+
+def test_new_schema_enforces_extraction_run_foreign_key(tmp_path):
+    imported_source(tmp_path)
+    conn = get_connection()
+    try:
+        with pytest.raises(sqlite3.IntegrityError, match="FOREIGN KEY"):
+            conn.execute("""INSERT INTO learning_samples(
+                book_source_id,book_position_id,opening_key,opening_name,sfen,sample_rank,extraction_run_key)
+                VALUES(1,1,'x','x','invalid',1,'missing')""")
+    finally:
+        conn.close()
 
 
 def test_learning_sample_summary_api(client, tmp_path):
