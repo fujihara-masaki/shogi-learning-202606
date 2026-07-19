@@ -102,6 +102,15 @@ async function mockNextMoveApi(
     if (response === "abort") await route.abort("connectionfailed");
     else await route.fulfill({status: response.status ?? 200, json: response.json ?? {}});
   });
+  await page.route("**/api/next-move/progress", (route) => route.fulfill({ json: { openings: OPENINGS.map((o) => ({
+    opening_key: o.opening_key, opening_name: o.opening_name, total: o.opening_key === "bogin" ? 250 : o.sample_count, answered: o.opening_key === "bogin" ? 1 : 0,
+    verdict_counts: { top: o.opening_key === "bogin" ? 1 : 0, strong: 0, listed: 0, unlisted: 0 }, top_rate: o.opening_key === "bogin" ? 1 : 0,
+  })) } }));
+  await page.route("**/api/next-move/status**", (route) => {
+    const opening = new URL(route.request().url()).searchParams.get("opening_key");
+    const items = SAMPLES.filter((s) => s.opening_key === opening).map((s, index) => ({ problem_key: s.problem_key, verdict: index ? null : "top", result_id: index ? null : 1 }));
+    return route.fulfill({ json: { opening_key: opening, items } });
+  });
   await page.route("**/api/learning-samples**", async (route) => {
     const url = new URL(route.request().url());
     requestedUrls?.push(url.pathname + url.search);
@@ -117,7 +126,10 @@ async function mockNextMoveApi(
     }
     const openingKey = url.searchParams.get("opening_key");
     const list = openingKey ? SAMPLES.filter((s) => s.opening_key === openingKey) : SAMPLES;
-    await route.fulfill({ json: list });
+    const offset = Number(url.searchParams.get("offset") ?? 0);
+    const limit = Number(url.searchParams.get("limit") ?? 100);
+    const total = limit === 30 && openingKey === "bogin" ? 250 : list.length;
+    await route.fulfill({ json: { items: list.slice(offset, offset + limit), offset, limit, total, dataset_version: "v1:e2e" } });
   });
 }
 
@@ -171,11 +183,70 @@ test.describe("次の一手", () => {
     // 初期状態では先頭の戦型(棒銀)が選択され、その問題のみ表示される
     await expect(page.getByTestId("next-move-opening-filter")).toHaveValue("bogin");
     await expect(page.getByTestId("next-move-problem-card")).toHaveCount(2);
+    await expect(page.getByTestId("next-move-summary")).toContainText("挑戦済み 1 / 全250問");
+    await expect(page.getByTestId("next-move-summary")).toContainText("最有力率 100%");
+    await expect(page.getByText("全250問中2問を表示")).toBeVisible();
+    await expect(page.getByLabel("最新状態: 最有力")).toBeVisible();
+    await expect(page.getByLabel("最新状態: 未挑戦")).toBeVisible();
+    await expect(page.getByRole("heading", { level: 2, name: "問題一覧" })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 3 })).toHaveCount(2);
     // 一覧では内部ID・SFEN・候補手・評価値を出さない
     await expect(page.getByTestId("next-move-problem-list")).not.toContainText("サンプル局面");
     await expect(page.getByTestId("next-move-problem-list")).not.toContainText("7g7f");
     await expect(page.getByTestId("next-move-problem-list")).not.toContainText("評価値");
     await expect(page.getByTestId("next-move-problem-list")).toContainText("出典: Sample YaneuraOu Book");
+  });
+
+  test("status API失敗時も一覧と挑戦導線を表示する", async ({ page }) => {
+    await page.route("**/api/next-move/status**", (route) => route.fulfill({ status: 500, json: { detail: "failed" } }));
+    await page.goto("/next-move");
+    await expect(page.getByTestId("next-move-problem-card")).toHaveCount(2);
+    await expect(page.getByRole("link", { name: "挑戦する" }).first()).toBeVisible();
+  });
+
+  test("30件だけ表示すると全件数の注記を表示する", async ({ page }) => {
+    const thirty = Array.from({ length: 30 }, (_, index) => ({ ...SAMPLES[0], id: 1000 + index, problem_key: `problem-${index}` }));
+    await page.route("**/api/learning-samples?**", (route) => {
+      const url = new URL(route.request().url());
+      if (url.searchParams.get("limit") !== "30") return route.fallback();
+      return route.fulfill({ json: { items: thirty, offset: 0, limit: 30, total: 250, dataset_version: "v1:thirty" } });
+    });
+    await page.goto("/next-move");
+    await expect(page.getByTestId("next-move-problem-card")).toHaveCount(30);
+    await expect(page.getByText("全250問中30問を表示")).toBeVisible();
+  });
+
+  test("後続ページ失敗を説明しoffset 0から再試行できる", async ({ page }) => {
+    let firstRequests = 0;
+    await page.route("**/api/learning-samples?**", async (route) => {
+      const url = new URL(route.request().url());
+      if (url.searchParams.get("opening_key") !== "bogin") return route.fallback();
+      const offset = Number(url.searchParams.get("offset"));
+      if (offset === 0) {
+        firstRequests += 1;
+        await route.fulfill({ json: { items: Array(100).fill(SAMPLES[0]), offset: 0, limit: 100, total: 101, dataset_version: "v1:retry" } });
+      } else await route.fulfill({ status: 500, json: { detail: "page failed" } });
+    });
+    await page.goto("/next-move/101");
+    await expect(page.getByTestId("next-move-page-error")).toContainText("最後まで取得できませんでした");
+    await page.getByRole("button", { name: "offset 0から再試行" }).click();
+    await expect.poll(() => firstRequests).toBeGreaterThan(1);
+  });
+
+  test("100件を超える戦型でも正確な問題X/Yを表示する", async ({ page }) => {
+    const many = Array.from({ length: 101 }, (_, index) => ({ ...SAMPLES[0], id: 1000 + index, problem_key: `many-${index}` }));
+    await page.route("**/api/learning-samples**", async (route) => {
+      const url = new URL(route.request().url());
+      if (url.pathname === "/api/learning-samples/1100") return route.fulfill({ json: many[100] });
+      if (url.pathname === "/api/learning-samples") {
+        const offset = Number(url.searchParams.get("offset") ?? 0);
+        const limit = Number(url.searchParams.get("limit") ?? 100);
+        return route.fulfill({ json: { items: many.slice(offset, offset + limit), offset, limit, total: 101, dataset_version: "v1:many" } });
+      }
+      return route.fallback();
+    });
+    await page.goto("/next-move/1100");
+    await expect(page.getByTestId("next-move-progress")).toContainText("問題 101 / 101");
   });
 
   test("ナビの「次の一手」が一覧・個別問題で現在位置になる", async ({ page }) => {
