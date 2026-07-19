@@ -26,8 +26,7 @@ NEXT_MOVE_DB_PATH=./data/next_move.db python -m app.importers.yaneuraou_book <bo
 NEXT_MOVE_DB_PATH=./data/next_move.db python -m app.scripts.extract_learning_samples \\
   --source-id <ID> --limit 10000 --per-opening-limit 500 --seed 1
 
-python scripts/validate_next_move_db.py ./data/next_move.db \\
-  --expected-learning-samples 10000`}</code></pre>
+python scripts/validate_next_move_db.py ./data/next_move.db`}</code></pre>
       </section>
     </aside>
   );

@@ -163,6 +163,7 @@ test("戦型取得が503の場合は原因と復旧手順を表示する", async
   await expect(recovery).toContainText("app.importers.yaneuraou_book");
   await expect(recovery).toContainText("extract_learning_samples");
   await expect(recovery).toContainText("validate_next_move_db.py");
+  await expect(recovery).not.toContainText("--expected-learning-samples 10000");
   await expect(recovery.getByRole("alert")).toContainText(detail);
   await expect(recovery.getByRole("alert")).not.toContainText("validate_next_move_db.py");
   await expect(page.getByTestId("next-move-opening-filter")).toHaveCount(0);
