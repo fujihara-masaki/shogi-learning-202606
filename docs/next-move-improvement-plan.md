@@ -478,7 +478,8 @@ ROW_NUMBER() OVER (PARTITION BY problem_key ORDER BY answered_at DESC, id DESC)
 補足:
 
 - **URL namespace の方針**: 出題APIは `/api/learning-samples/next` に**しない**。既存の動的ルート `GET /api/learning-samples/{sample_id}` が先にマッチし、ルーター登録順によっては `"next"` を整数として解析しようとして 422 になり、static route に到達できないため。新規の次の一手専用APIは `results` / `progress` / `status` / `review` / `history` と同じ **`/api/next-move/*` namespace に統一**し(`/api/next-move/problems/next`)、動的ルートと衝突せず**ルーター登録順に依存しない**構成にする(OpenAPI 上も動的/静的ルートが曖昧にならない)。
-- 既存の問題一覧 `GET /api/learning-samples` と問題詳細 `GET /api/learning-samples/{id}` は互換のため**当面現行URLに残す**。役割分担: 問題一覧・詳細の読み取りと **P0での通常の順次移動(クライアント側の distinct `problem_key` 巡回)** は `/api/learning-samples`、`random` / `unattempted` / `weak` の出題開始・継続(`exclude_problem_key` による直前問題除外を含む)は `/api/next-move/problems/next`、記録・集計は `/api/next-move/*`。通常の順次移動を新APIへ強制統合しない(順次移動のサーバーAPI化は P2-3 で再検討し、行う場合は別PR)。将来一覧・詳細を `/api/next-move/problems` 系へ移す場合も、互換期間を設けて別PRで行う(本計画のスコープ外)。
+- **URL継続とレスポンス互換は別契約**: 問題一覧は既存URL `GET /api/learning-samples` を継続するが、これはレスポンス形式の後方互換を意味しない。PR-Bで一覧レスポンスを既存の配列からページオブジェクト `{items, offset, limit, total, dataset_version}` へ意図的に変更する。このローカルアプリでは外部公開APIクライアントや独立した外部スクリプトとのレスポンス互換を保証しない。問題詳細 `GET /api/learning-samples/{id}` は既存URLと既存フィールドを維持する。
+- 問題一覧・詳細の読み取りと **P0での通常の順次移動(クライアント側の distinct `problem_key` 巡回)** は `/api/learning-samples`、`random` / `unattempted` / `weak` の出題開始・継続(`exclude_problem_key` による直前問題除外を含む)は `/api/next-move/problems/next`、記録・集計は `/api/next-move/*` を使う。通常の順次移動を新APIへ強制統合しない(順次移動のサーバーAPI化は P2-3 で再検討し、行う場合は別PR)。**PR-Bでは新しいページングendpointを追加せず**、既存一覧URLに `offset` / `limit` queryと新レスポンスを導入する。`dataset_version` はレスポンス値であり、version queryは追加しない。
 - 既存 `GET /api/learning-samples` / `GET /api/learning-samples/{id}` のレスポンスに `problem_key` を追加する(backend が算出。一覧バッジ・status API との突合に使用)。
 - 候補手の返却順を共通の判定用候補正規化規則に統一する。既存の ORDER BY との差分は最終 tie-breaker のみ(`bm.id` → `move_usi`。行IDはDB再生成で変わるため安定キーの順序決定に使わない)。
 - **一覧APIのページング(PR-B)**: 既存 `GET /api/learning-samples` に `offset` / `limit` / `total` / `dataset_version` を追加し、レスポンスを次の形にする:
@@ -498,7 +499,7 @@ ROW_NUMBER() OVER (PARTITION BY problem_key ORDER BY answered_at DESC, id DESC)
 - 409 / 422 / 503、および**トランザクションcommit前**に発生した500では、トランザクションをrollbackし、`next_move_problem_refs` と `next_move_results` をどちらも変更しない。問題参照upsertと解答INSERTは `shogi.db` の単一トランザクションで行い、片方だけを保存しない。
 - commit成功後のレスポンス生成、middleware、通信経路で障害が起きた場合、クライアントが500または通信エラーを受け取っても解答は保存済みの可能性がある。frontendは500・通信エラーに対して解答POSTを自動再送しない(結果表示を維持し、記録状態が不明である旨を案内できる)。
 - 将来自動再送を導入する場合は、重複記録を防ぐidempotency keyをリクエストと保存処理のAPI契約へ追加してから行う。本設計のP0〜P2にはidempotency keyおよび自動再送を含めない。
-- 既存 `GET /api/learning-samples*` は後方互換のためURLを維持する。一覧だけはPR-Bで配列からページオブジェクトへ変わるため、同じPR内で全frontend呼び出し元とテストを更新する。このローカルアプリには外部公開クライアント互換を保証しないが、問題詳細URLと既存フィールドは削除しない。
+- 一覧URLの継続はレスポンス互換を保証しない。PR-Bではbackendの一覧レスポンス変更と、リポジトリ内の全frontend呼び出し元・型・unit test・E2Eの更新を同時に行う。backendだけ、またはfrontendだけが旧形式のまま混在する状態を完成扱いにせず、両方の全テストがgreenの一体変更としてマージする。問題詳細APIは既存URLと既存フィールドを維持する。
 
 ### フロントエンド
 
@@ -586,7 +587,12 @@ ROW_NUMBER() OVER (PARTITION BY problem_key ORDER BY answered_at DESC, id DESC)
   - 一覧・ランダム出題・未挑戦優先・復習で同一 `problem_key` が重複表示・重複出題されない。
   - 代表 sample の選択が DB の行順・挿入順に依存せず決定的である(選択規則: 最新抽出実行 → `sample_rank` 昇順 → `sample_id` 昇順)。
   - 同一 `problem_key` 内で現在メタデータ(`opening_key` 等)が競合する fixture で、表示が決定的(代表 sample の値)になり、`validate_next_move_db.py` が警告を出す。
-- 一覧APIのページング(backend):
+- 一覧APIのページングとPR-Bの移行契約(backend / repository内client):
+  - `GET /api/learning-samples` のURLは変えず、backendのレスポンスが配列から `{items, offset, limit, total, dataset_version}` のページオブジェクトへ変わる。
+  - 新しいページングendpointおよびversion queryを追加しない。`dataset_version` はレスポンスで返す。
+  - リポジトリ内検索と型チェックにより、旧配列レスポンスを前提とするfrontend呼び出し元・型・unit test・E2Eが残っていないことを確認する。
+  - frontendの型、画面、unit test、E2Eをbackend変更と同じPR-Bで新形式へ更新し、PR-B完了時にbackend・frontendの全テストをgreenにする。片側だけの移行は完了としない。
+  - `GET /api/learning-samples/{sample_id}` は既存URLと問題詳細の既存フィールドを維持し、既存の詳細APIテストを変更後も通す。
   - `total` が `learning_samples` 行数ではなく distinct `problem_key` 数になる。
   - 同一DBの複数ページで `dataset_version` が一致し、DB再生成時には `database_metadata.dataset_version` が変わる。
   - 旧形式DBではファイルSHA-256 fallbackが同一ファイルで安定し、旧DB差し替え時に変化する。
@@ -674,7 +680,7 @@ ROW_NUMBER() OVER (PARTITION BY problem_key ORDER BY answered_at DESC, id DESC)
 | PR | 開始条件 | 完了ゲート |
 | --- | --- | --- |
 | A | 本設計の承認 | problem key、DB新旧互換、競合・合法性・原子的保存のbackend/frontend/E2E受け入れ条件がgreen |
-| B | Aマージ | distinct集計、代表選択、同一世代ページング、100件超を含む進捗テストがgreen |
+| B | Aマージ | 一覧URLを維持したページオブジェクト移行、全repository内client・型・unit/E2Eの同時更新、詳細API互換、distinct集計・同一世代ページングを含むbackend/frontend全テストがgreen |
 | C | A・Bマージ | random/unattempted、スキップ、順次完了、途中取得失敗・世代変更の再試行テストがgreen |
 | D | 本設計の承認 (A〜Cと並行可。競合時はrebase) | 503原因別案内、復旧導線、着手後だけの用語説明、a11yテストがgreen |
 | E | A〜Cマージ | 履歴・復習・weak・均等出題、削除済み問題と分類変更の整合性テストがgreen |
@@ -686,7 +692,7 @@ ROW_NUMBER() OVER (PARTITION BY problem_key ORDER BY answered_at DESC, id DESC)
    - README の安定キー方針の更新(下記ドキュメント欄参照)。
    - backend/frontend/E2E テスト(problem_key 安定性・fingerprint 検出・DB差し替え409を含む)。ここが全ての土台。
 2. **PR-B: 進捗表示と一覧の改善**(P0-2、P1-5の見出し階層)
-   - `progress`/`status` API と分類 resolver(`problem_key`→現在の代表 sample_id / opening_key / opening_name。**distinct `problem_key` 基準**の集計・重複排除・代表 sample の決定的選択)、**一覧APIのページング**(`offset`/`limit`/`total`/`dataset_version`。backend で重複排除→順序付け→ページング。`total` は distinct `problem_key` 数、`dataset_version` は同一DB生成物全体の世代ID)、一覧バッジ・サマリー・件数注記、挑戦画面の「X / Y」修正(distinct `problem_key` 数ベース)。
+   - `progress`/`status` API と分類 resolver(`problem_key`→現在の代表 sample_id / opening_key / opening_name。**distinct `problem_key` 基準**の集計・重複排除・代表 sample の決定的選択)、**既存一覧URLのページオブジェクト移行**(`offset`/`limit`/`total`/`dataset_version`。新endpoint・version queryは追加しない。backendで重複排除→順序付け→ページング)、リポジトリ内の全frontend呼び出し元・型・unit test・E2Eの同時更新、問題詳細URL・既存フィールドの維持、一覧バッジ・サマリー・件数注記、挑戦画面の「X / Y」修正。backend/frontendの全テストgreenを一体の完了条件とする。
 3. **PR-C: 出題ポリシーとスキップ**(P0-3、P0-4)
    - 出題API `GET /api/next-move/problems/next`(次の一手専用 namespace。既存の動的ルート `/api/learning-samples/{sample_id}` と衝突せず登録順に非依存。distinct `problem_key` 候補集合+`exclude_problem_key` 除外+候補なし時の204)は **PR-Cでは random / unattempted、PR-Eで追加する weak の出題開始・継続に使用**。**通常の「次の問題」(順次移動)はクライアント側巡回を維持**し、**PR-Bのページング(`offset`/`limit`/`total`/`dataset_version`)に依存して全ページ取得**で対象戦型の全 distinct `problem_key` を統合してから、現在キー位置基準の前進・最終 distinct キーでの完了表示に改める(`(index+1) % length` と「取得済み配列末尾=最後」の判定を廃止。途中失敗・世代不一致時は完了扱いにせず取得済み一覧を破棄して再試行導線)。ランダム/未挑戦優先ボタン、スキップ、完了状態(204時・最終問題到達時の表示)。frontend(`client.ts`)は random 系で新URLを使用し、表示中の `problem_key` を送る。E2Eは順次移動の完了到達(101件fixture含む)と、random 系操作が新URLを経由することを確認。READMEの「既知の制限」更新。
 4. **PR-D: DB異常案内と用語説明**(P0-5、P1-4)
