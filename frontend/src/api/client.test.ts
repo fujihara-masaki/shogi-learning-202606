@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test, vi } from "vitest";
-import { fetchAllLearningSamples, fetchLearningSamples, fetchProblems, fetchTsumeTags } from "./client";
+import { fetchAllLearningSamples, fetchAllLearningSamplesCached, fetchLearningSamples, fetchNextMoveProblem, fetchProblems, fetchTsumeTags } from "./client";
 
 describe("tsume API client", () => {
   afterEach(() => {
@@ -52,28 +52,31 @@ describe("next move paging", () => {
   function mockPages(pages: unknown[]) {
     vi.stubGlobal("fetch", vi.fn().mockImplementation(async () => ({ ok: true, status: 200, json: async () => pages.shift() })));
   }
+  const problems = (count: number, start = 0) => Array.from({ length: count }, (_, index) => ({ id: start + index, problem_key: `v1:${start + index}` }));
   test("loads multiple pages completely", async () => {
     mockPages([
-      { items: Array(100).fill({ id: 1 }), offset: 0, limit: 100, total: 101, dataset_version: "v1:a" },
-      { items: [{ id: 2 }], offset: 100, limit: 100, total: 101, dataset_version: "v1:a" },
+      { items: problems(100), offset: 0, limit: 100, total: 101, dataset_version: "v1:a" },
+      { items: problems(1, 100), offset: 100, limit: 100, total: 101, dataset_version: "v1:a" },
     ]);
     await expect(fetchAllLearningSamples("bogin")).resolves.toHaveLength(101);
   });
   test("rejects a changed dataset version", async () => {
     const responses = [
-      { items: Array(100).fill({}), offset: 0, limit: 100, total: 101, dataset_version: "v1:a" },
-      { items: [{}], offset: 100, limit: 100, total: 101, dataset_version: "v1:b" },
+      { items: problems(100), offset: 0, limit: 100, total: 101, dataset_version: "v1:a" },
+      { items: problems(1, 100), offset: 100, limit: 100, total: 101, dataset_version: "v1:b" },
     ];
     mockPages(responses);
     await expect(fetchAllLearningSamples("bogin")).rejects.toMatchObject({ code: "NEXT_MOVE_PAGE_INCONSISTENT" });
   });
   test.each([
-    ["total change", { items: [{}], offset: 100, limit: 100, total: 102, dataset_version: "v1:a" }],
+    ["total increase", { items: problems(1, 100), offset: 100, limit: 100, total: 102, dataset_version: "v1:a" }],
+    ["total decrease", { items: problems(1, 100), offset: 100, limit: 100, total: 100, dataset_version: "v1:a" }],
     ["empty incomplete page", { items: [], offset: 100, limit: 100, total: 101, dataset_version: "v1:a" }],
-    ["offset mismatch", { items: [{}], offset: 99, limit: 100, total: 101, dataset_version: "v1:a" }],
-    ["no offset progress", { items: [{}], offset: 0, limit: 100, total: 101, dataset_version: "v1:a" }],
+    ["offset mismatch", { items: problems(1, 100), offset: 99, limit: 100, total: 101, dataset_version: "v1:a" }],
+    ["no offset progress", { items: problems(1, 100), offset: 0, limit: 100, total: 101, dataset_version: "v1:a" }],
+    ["existing keys only", { items: problems(1), offset: 100, limit: 100, total: 101, dataset_version: "v1:a" }],
   ])("rejects %s", async (_name, second) => {
-    mockPages([{ items: Array(100).fill({}), offset: 0, limit: 100, total: 101, dataset_version: "v1:a" }, second]);
+    mockPages([{ items: problems(100), offset: 0, limit: 100, total: 101, dataset_version: "v1:a" }, second]);
     await expect(fetchAllLearningSamples("bogin")).rejects.toMatchObject({ code: "NEXT_MOVE_PAGE_INCONSISTENT" });
   });
   test("forwards AbortSignal", async () => {
@@ -86,5 +89,31 @@ describe("next move paging", () => {
     controller.abort();
     await expect(pending).rejects.toMatchObject({ name: "AbortError" });
     expect(fetchMock.mock.calls[0][1].signal).toBe(controller.signal);
+  });
+  test("forced retry starts again at offset zero", async () => {
+    const offsets: string[] = [];
+    vi.stubGlobal("fetch", vi.fn().mockImplementation(async (url: string) => {
+      const offset = new URL(url).searchParams.get("offset") ?? "";
+      offsets.push(offset);
+      if (offset === "100") throw new Error("page failed");
+      return { ok: true, status: 200, json: async () => ({ items: problems(100), offset: 0, limit: 100, total: 101, dataset_version: "v1:retry" }) };
+    }));
+    await expect(fetchAllLearningSamplesCached("retry-test", true)).rejects.toThrow("page failed");
+    await expect(fetchAllLearningSamplesCached("retry-test", true)).rejects.toThrow("page failed");
+    expect(offsets).toEqual(["0", "100", "0", "100"]);
+  });
+});
+
+describe("next move selection API", () => {
+  afterEach(() => vi.restoreAllMocks());
+  test("builds policy, opening, and exclusion query", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => ({ id: 7 }) });
+    vi.stubGlobal("fetch", fetchMock);
+    await fetchNextMoveProblem({ policy: "random", opening_key: "角換わり", exclude_problem_key: "v1:key" });
+    expect(fetchMock.mock.calls[0][0]).toContain("policy=random&opening_key=%E8%A7%92%E6%8F%9B%E3%82%8F%E3%82%8A&exclude_problem_key=v1%3Akey");
+  });
+  test("returns undefined for a normal 204 candidate exhaustion", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true, status: 204 }));
+    await expect(fetchNextMoveProblem({ policy: "unattempted" })).resolves.toBeUndefined();
   });
 });

@@ -427,6 +427,7 @@ export interface LearningSamplePage { items: LearningSample[]; offset: number; l
 export type NextMoveVerdict = "top" | "strong" | "listed" | "unlisted";
 export interface NextMoveProgressItem { opening_key: string; opening_name: string; total: number; answered: number; verdict_counts: Record<NextMoveVerdict, number>; top_rate: number }
 export interface NextMoveStatusItem { problem_key: string; verdict: NextMoveVerdict | null; result_id: number | null }
+export type NextMovePolicy = "random" | "unattempted";
 
 export function fetchLearningSamples(openingKey?: string, limit = 100, offset = 0, signal?: AbortSignal): Promise<LearningSamplePage> {
   const params = new URLSearchParams({ limit: String(limit), offset: String(offset) });
@@ -439,24 +440,46 @@ export function fetchNextMoveStatus(openingKey: string): Promise<{ opening_key: 
   return request(`/api/next-move/status?${new URLSearchParams({ opening_key: openingKey })}`);
 }
 
+export function fetchNextMoveProblem(options: {
+  policy: NextMovePolicy;
+  opening_key?: string;
+  exclude_problem_key?: string;
+  signal?: AbortSignal;
+}): Promise<LearningSample | undefined> {
+  const params = new URLSearchParams({ policy: options.policy });
+  if (options.opening_key) params.set("opening_key", options.opening_key);
+  if (options.exclude_problem_key) params.set("exclude_problem_key", options.exclude_problem_key);
+  return request<LearningSample | undefined>(`/api/next-move/problems/next?${params}`, { signal: options.signal });
+}
+
 export async function fetchAllLearningSamples(openingKey?: string, signal?: AbortSignal): Promise<LearningSample[]> {
   const first = await fetchLearningSamples(openingKey, 100, 0, signal);
   const expectedTotal = first.total;
   const version = first.dataset_version;
+  if (first.offset !== 0) throw new ApiError(409, "問題一覧のoffsetが一致しません", "NEXT_MOVE_PAGE_INCONSISTENT");
+  const keys = new Set(first.items.map((item) => item.problem_key));
+  if (keys.size !== first.items.length || keys.size > expectedTotal) throw new ApiError(409, "問題一覧に重複があります", "NEXT_MOVE_PAGE_INCONSISTENT");
   const items = [...first.items];
   let offset = first.offset + first.items.length;
-  while (items.length < expectedTotal) {
+  while (keys.size < expectedTotal) {
     if (first.items.length === 0 || offset <= first.offset) throw new ApiError(409, "問題一覧のページングが進みません", "NEXT_MOVE_PAGE_INCONSISTENT");
     const page = await fetchLearningSamples(openingKey, 100, offset, signal);
     if (page.total !== expectedTotal || page.dataset_version !== version || page.items.length === 0 || page.offset !== offset) {
       throw new ApiError(409, "問題一覧が取得中に更新されました", "NEXT_MOVE_PAGE_INCONSISTENT");
     }
-    items.push(...page.items);
+    const before = keys.size;
+    for (const item of page.items) {
+      if (!keys.has(item.problem_key)) {
+        keys.add(item.problem_key);
+        items.push(item);
+      }
+    }
+    if (keys.size === before) throw new ApiError(409, "新しい問題を取得できませんでした", "NEXT_MOVE_PAGE_INCONSISTENT");
     const nextOffset = page.offset + page.items.length;
     if (nextOffset <= offset) throw new ApiError(409, "問題一覧のページングが進みません", "NEXT_MOVE_PAGE_INCONSISTENT");
     offset = nextOffset;
   }
-  if (items.length !== expectedTotal) throw new ApiError(409, "問題一覧の件数が一致しません", "NEXT_MOVE_PAGE_INCONSISTENT");
+  if (keys.size !== expectedTotal) throw new ApiError(409, "問題一覧の件数が一致しません", "NEXT_MOVE_PAGE_INCONSISTENT");
   return items;
 }
 

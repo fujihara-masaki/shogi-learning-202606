@@ -111,6 +111,9 @@ async function mockNextMoveApi(
     const items = SAMPLES.filter((s) => s.opening_key === opening).map((s, index) => ({ problem_key: s.problem_key, verdict: index ? null : "top", result_id: index ? null : 1 }));
     return route.fulfill({ json: { opening_key: opening, items } });
   });
+  await page.route("**/api/next-move/problems/next**", (route) =>
+    route.fulfill({ json: SAMPLES[0] }),
+  );
   await page.route("**/api/learning-samples**", async (route) => {
     const url = new URL(route.request().url());
     requestedUrls?.push(url.pathname + url.search);
@@ -224,7 +227,8 @@ test.describe("次の一手", () => {
       const offset = Number(url.searchParams.get("offset"));
       if (offset === 0) {
         firstRequests += 1;
-        await route.fulfill({ json: { items: Array(100).fill(SAMPLES[0]), offset: 0, limit: 100, total: 101, dataset_version: "v1:retry" } });
+        const unique = Array.from({ length: 100 }, (_, index) => ({ ...SAMPLES[0], id: 1000 + index, problem_key: `v1:retry-${index}` }));
+        await route.fulfill({ json: { items: unique, offset: 0, limit: 100, total: 101, dataset_version: "v1:retry" } });
       } else await route.fulfill({ status: 500, json: { detail: "page failed" } });
     });
     await page.goto("/next-move/101");
@@ -248,6 +252,57 @@ test.describe("次の一手", () => {
     await page.goto("/next-move/1100");
     await expect(page.getByTestId("next-move-progress")).toContainText("問題 101 / 101");
   });
+
+  test("101問では100問目から101問目へ進み、101問目でだけ完了する", async ({ page }) => {
+    const many = Array.from({ length: 101 }, (_, index) => ({ ...SAMPLES[0], id: 2000 + index, problem_key: `v1:sequence-${index}` }));
+    await page.route("**/api/learning-samples**", async (route) => {
+      const url = new URL(route.request().url());
+      const match = url.pathname.match(/\/(\d+)$/);
+      if (match) return route.fulfill({ json: many[Number(match[1]) - 2000] });
+      const offset = Number(url.searchParams.get("offset") ?? 0);
+      return route.fulfill({ json: { items: many.slice(offset, offset + 100), offset, limit: 100, total: 101, dataset_version: "v1:sequence" } });
+    });
+    await page.goto("/next-move/2099");
+    await page.getByTestId("next-move-skip-button").click();
+    await expect(page).toHaveURL(/next-move\/2100/);
+    await expect(page.getByTestId("next-move-complete")).toHaveCount(0);
+    await page.getByTestId("next-move-skip-button").click();
+    await expect(page.getByTestId("next-move-complete")).toBeVisible();
+  });
+
+  for (const inconsistency of ["empty", "version"] as const) {
+    test(`${inconsistency}な途中ページから再試行成功後に101問目まで進める`, async ({ page }) => {
+      let offsetZero = 0;
+      const first = [
+        ...Array.from({ length: 99 }, (_, index) => ({ ...SAMPLES[0], id: 3000 + index, problem_key: `v1:${inconsistency}-${index}` })),
+        SAMPLES[0],
+      ];
+      await page.route("**/api/learning-samples?**", async (route) => {
+        const url = new URL(route.request().url());
+        const offset = Number(url.searchParams.get("offset") ?? 0);
+        if (offset === 0) {
+          offsetZero += 1;
+          return route.fulfill({ json: { items: first, offset: 0, limit: 100, total: 101, dataset_version: "v1:before" } });
+        }
+        if (offsetZero > 1) {
+          return route.fulfill({ json: { items: [SAMPLES[1]], offset: 100, limit: 100, total: 101, dataset_version: "v1:before" } });
+        }
+        return route.fulfill({ json: { items: inconsistency === "empty" ? [] : [{ ...SAMPLES[1], problem_key: "v1:last" }],
+          offset: 100, limit: 100, total: 101, dataset_version: inconsistency === "version" ? "v1:after" : "v1:before" } });
+      });
+      await page.goto("/next-move/101");
+      await expect(page.getByTestId("next-move-page-error")).toContainText("最後まで取得できませんでした");
+      await page.getByRole("button", { name: "offset 0から再試行" }).click();
+      await expect.poll(() => offsetZero).toBe(2);
+      await expect(page.getByTestId("next-move-page-error")).toHaveCount(0);
+      await expect(page.getByTestId("next-move-progress")).toContainText("問題 100 / 101");
+      await page.getByTestId("next-move-skip-button").click();
+      await expect(page).toHaveURL(/next-move\/102/);
+      await expect(page.getByTestId("next-move-complete")).toHaveCount(0);
+      await page.getByTestId("next-move-skip-button").click();
+      await expect(page.getByTestId("next-move-complete")).toBeVisible();
+    });
+  }
 
   test("ナビの「次の一手」が一覧・個別問題で現在位置になる", async ({ page }) => {
     await page.goto("/next-move");
@@ -471,6 +526,89 @@ test.describe("次の一手", () => {
     await expect(page.getByTestId("next-move-heading")).toBeFocused();
     // 新しい問題は未解答状態から始まる
     await expect(page.getByTestId("next-move-result")).toHaveCount(0);
+  });
+
+  for (const policy of ["random", "unattempted"] as const) {
+    test(`一覧の${policy}出題から開始し解答後もpolicyと除外キーを維持する`, async ({ page }) => {
+      const requests: URL[] = [];
+      await page.route("**/api/next-move/problems/next**", async (route) => {
+        const url = new URL(route.request().url());
+        requests.push(url);
+        await route.fulfill({ json: requests.length === 1 ? SAMPLES[0] : SAMPLES[1] });
+      });
+      await page.goto("/next-move");
+      await page.getByRole("button", { name: policy === "random" ? "ランダムに1問" : "未挑戦から1問" }).click();
+      await expect(page).toHaveURL(new RegExp(`policy=${policy}`));
+      await playMove(page, "77", "76");
+      await page.getByTestId("next-move-next-button").click();
+      await expect(page).toHaveURL(/next-move\/102/);
+      expect(requests[1].searchParams.get("policy")).toBe(policy);
+      expect(requests[1].searchParams.get("exclude_problem_key")).toBe("v1:problem-101");
+    });
+  }
+
+  test("着手前スキップは結果をPOSTせず次問題の見出しへフォーカスする", async ({ page }) => {
+    let resultPosts = 0;
+    await page.route("**/api/next-move/results", async (route) => { resultPosts += 1; await route.fulfill({ json: {} }); });
+    await page.goto("/next-move/101?policy=random&opening_key=bogin");
+    await page.route("**/api/next-move/problems/next**", (route) => route.fulfill({ json: SAMPLES[1] }));
+    await page.getByTestId("next-move-skip-button").click();
+    await expect(page).toHaveURL(/next-move\/102/);
+    await expect(page.getByTestId("next-move-heading")).toBeFocused();
+    expect(resultPosts).toBe(0);
+  });
+
+  test("1問戦型の最終問題をスキップすると操作UIを消して完了する", async ({ page }) => {
+    await page.goto("/next-move/201");
+    await page.getByTestId("next-move-skip-button").click();
+    await expect(page.getByTestId("next-move-complete")).toBeVisible();
+    await expect(page.getByTestId("shogi-board")).toHaveCount(0);
+    await expect(page.getByTestId("next-move-hint-button")).toHaveCount(0);
+    await expect(page.getByTestId("next-move-skip-button")).toHaveCount(0);
+  });
+
+  test("完了後のランダム継続は除外キーを送り、204と同一問題を処理する", async ({ page }) => {
+    let calls = 0;
+    const excludes: (string | null)[] = [];
+    await page.route("**/api/next-move/problems/next**", async (route) => {
+      calls += 1;
+      excludes.push(new URL(route.request().url()).searchParams.get("exclude_problem_key"));
+      if (calls === 1) await route.fulfill({ status: 204, body: "" });
+      else await route.fulfill({ json: SAMPLES[1] });
+    });
+    await page.goto("/next-move/102");
+    await page.getByTestId("next-move-skip-button").click();
+    await page.getByRole("button", { name: "ランダムに続ける" }).click();
+    await expect(page.getByRole("alert")).toContainText("ほかの問題はありません");
+    await page.getByRole("button", { name: "ランダムに続ける" }).click();
+    await expect(page.getByTestId("shogi-board")).toBeVisible();
+    expect(excludes).toEqual(["v1:problem-102", "v1:problem-102"]);
+  });
+
+  test("通常順次移動は1→2→3で進み、APIを使わず3問目だけで完了する", async ({ page }) => {
+    const three = [0, 1, 2].map((index) => sample(401 + index, "three", "三問", index + 1,
+      [candidate("7g7f", 1, 1, null)], INITIAL_SFEN, `v1:three-${index}`));
+    let policyCalls = 0;
+    let listCalls = 0;
+    await page.route("**/api/next-move/problems/next**", async (route) => { policyCalls += 1; await route.abort(); });
+    await page.route("**/api/learning-samples**", async (route) => {
+      const url = new URL(route.request().url());
+      const match = url.pathname.match(/\/(\d+)$/);
+      if (match) return route.fulfill({ json: three.find((item) => item.id === Number(match[1])) });
+      if (url.pathname.endsWith("/openings")) return route.fulfill({ json: [{ opening_key: "three", opening_name: "三問", sample_count: 3, first_rank: 1 }] });
+      listCalls += 1;
+      return route.fulfill({ json: { items: three, offset: 0, limit: 100, total: 3, dataset_version: "v1:three" } });
+    });
+    await page.goto("/next-move/401");
+    for (const nextId of [402, 403]) {
+      await page.getByTestId("next-move-skip-button").click();
+      await expect(page).toHaveURL(new RegExp(`/next-move/${nextId}`));
+      await expect(page.getByTestId("next-move-complete")).toHaveCount(0);
+    }
+    await page.getByTestId("next-move-skip-button").click();
+    await expect(page.getByTestId("next-move-complete")).toBeVisible();
+    expect(policyCalls).toBe(0);
+    expect(listCalls).toBe(1);
   });
 
   test("キーボードだけで着手から結果確認・次の問題まで操作できる", async ({ page }) => {

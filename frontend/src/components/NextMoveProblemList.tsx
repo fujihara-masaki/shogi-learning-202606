@@ -1,12 +1,13 @@
 // 「次の一手」一覧ページ(/next-move)の問題一覧。ページ見出し・説明は NextMovePage が持つ。
 // 出題前に答えが分かってしまわないよう、候補手・評価値・SFEN はここでは表示しない。
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import {
   fetchLearningSampleOpenings,
   fetchLearningSamples,
   fetchNextMoveProgress,
   fetchNextMoveStatus,
+  fetchNextMoveProblem,
   isNextMoveUnavailable,
   type LearningSample,
   type LearningSampleOpeningSummary,
@@ -31,11 +32,14 @@ interface SamplesState {
 const badges = { top: ["◎ 最有力", "最有力"], strong: ["○ 有力", "有力"], listed: ["△ 登録候補", "登録候補"], unlisted: ["? 未登録", "未登録"] } as const;
 
 export default function NextMoveProblemList() {
+  const navigate = useNavigate();
   const [openings, setOpenings] = useState<OpeningsState>({ loaded: false, data: [], error: null });
   const [selectedOpening, setSelectedOpening] = useState("");
   const [samples, setSamples] = useState<SamplesState>({ key: null, data: [], error: null, total: 0 });
   const [progress, setProgress] = useState<NextMoveProgressItem[]>([]);
   const [statuses, setStatuses] = useState<NextMoveStatusItem[]>([]);
+  const [selectionMessage, setSelectionMessage] = useState<string | null>(null);
+  const [selecting, setSelecting] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -88,6 +92,20 @@ export default function NextMoveProblemList() {
   const summary = progress.find((x) => x.opening_key === selectedOpening);
   const statusMap = new Map(statuses.map((x) => [x.problem_key, x.verdict]));
 
+  async function startPolicy(policy: "random" | "unattempted") {
+    setSelecting(true);
+    setSelectionMessage(null);
+    try {
+      const problem = await fetchNextMoveProblem({ policy, opening_key: selectedOpening });
+      if (problem) navigate(`/next-move/${problem.id}?policy=${policy}&opening_key=${encodeURIComponent(selectedOpening)}`);
+      else setSelectionMessage(policy === "unattempted" ? "この戦型の未挑戦問題はありません。ランダム出題で復習できます。" : "この戦型に出題できる問題はありません。");
+    } catch (e) {
+      setSelectionMessage(`問題の選択に失敗しました: ${e}`);
+    } finally {
+      setSelecting(false);
+    }
+  }
+
   return (
     <section data-testid="next-move-section">
       {openings.error && <div className="banner banner-error" role="alert">{openings.error}</div>}
@@ -111,6 +129,14 @@ export default function NextMoveProblemList() {
       {samplesLoading && <p className="muted">問題を読み込み中...</p>}
       {!samplesLoading && summary && <div className="next-move-summary" data-testid="next-move-summary">
         <strong>挑戦済み {summary.answered} / 全{summary.total}問</strong><span>最有力率 {Math.round(summary.top_rate * 100)}%</span>
+      </div>}
+      {!samplesLoading && selectedOpening && <div className="board-controls next-move-controls">
+        <button type="button" disabled={selecting} onClick={() => startPolicy("random")}>ランダムに1問</button>
+        <button type="button" disabled={selecting} onClick={() => startPolicy("unattempted")}>未挑戦から1問</button>
+      </div>}
+      {selectionMessage && <div className="banner banner-info" role="status" aria-live="polite">
+        {selectionMessage}
+        {selectionMessage.includes("未挑戦問題") && <button type="button" onClick={() => startPolicy("random")}>ランダムに続ける</button>}
       </div>}
       {!samplesLoading && samples.total > samples.data.length && <p className="muted count-note">全{samples.total}問中{samples.data.length}問を表示</p>}
       <h2>問題一覧</h2>
