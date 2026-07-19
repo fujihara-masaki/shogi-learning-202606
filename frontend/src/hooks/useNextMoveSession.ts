@@ -40,10 +40,12 @@ export function useNextMoveSession(sample: LearningSample | null): NextMoveSessi
   const [saveNotice, setSaveNotice] = useState<{key: string; text: string} | null>(null);
   const startedAt = useRef(0);
   const posting = useRef(false);
+  const attemptGeneration = useRef(0);
 
   useEffect(() => {
     startedAt.current = performance.now();
     posting.current = false;
+    attemptGeneration.current += 1;
   }, [sample?.id, sample?.problem_key]);
   const saveMessage = saveNotice && saveNotice.key === sample?.problem_key ? saveNotice.text : null;
 
@@ -71,13 +73,17 @@ export function useNextMoveSession(sample: LearningSample | null): NextMoveSessi
   const playMove = useCallback((move: Move) => {
     if (!sample || posting.current) return;
     posting.current = true;
+    const generation = attemptGeneration.current;
     setUserMoveUsi(move.usi);
     void postNextMoveResult({sample_id: sample.id, problem_key: sample.problem_key, move_usi: move.usi,
       hint_count: hintStage, elapsed_ms: Math.max(0, Math.round(performance.now() - startedAt.current))})
-      .catch((error: unknown) => setSaveNotice({key: sample.problem_key, text:
-        error instanceof ApiError && error.code === "NEXT_MOVE_PROBLEM_CHANGED"
-          ? "問題データが更新されました。再読み込みしてください。"
-          : "解答記録が保存されたか確認できませんでした。学習はそのまま続けられます。"}));
+      .catch((error: unknown) => {
+        if (generation !== attemptGeneration.current) return;
+        setSaveNotice({key: sample.problem_key, text:
+          error instanceof ApiError && error.code === "NEXT_MOVE_PROBLEM_CHANGED"
+            ? "問題データが更新されました。再読み込みしてください。"
+            : "解答記録が保存されたか確認できませんでした。学習はそのまま続けられます。"});
+      });
   }, [hintStage, sample]);
 
   const revealNextHint = useCallback(() => {
@@ -89,6 +95,7 @@ export function useNextMoveSession(sample: LearningSample | null): NextMoveSessi
     setHintStage(0);
     startedAt.current = performance.now();
     posting.current = false;
+    attemptGeneration.current += 1;
     setSaveNotice(null);
   }, []);
 

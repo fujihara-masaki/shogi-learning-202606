@@ -75,7 +75,7 @@ export function normalizeNextMoveCandidates<T extends NextMoveCandidateLike>(can
       if (b.candidate.depth === null) return -1;
       return b.candidate.depth - a.candidate.depth;
     }
-    return a.candidate.move_usi.localeCompare(b.candidate.move_usi);
+    return a.candidate.move_usi < b.candidate.move_usi ? -1 : a.candidate.move_usi > b.candidate.move_usi ? 1 : 0;
   }).map(({candidate}) => candidate);
 }
 

@@ -4,6 +4,7 @@ import {
   hintsForTopCandidate,
   judgeNextMove,
   notationForUsi,
+  normalizeNextMoveCandidates,
   positionFromSfen,
   type NextMoveCandidateLike,
 } from "./nextMove";
@@ -22,6 +23,18 @@ const CANDIDATES: NextMoveCandidateLike[] = [
 ];
 
 describe("judgeNextMove", () => {
+  it("backend共通fixtureと同じrank/score/depth/move_usi順でtop/strong/listedを判定する", () => {
+    const fixture = [
+      candidate({move_usi: "7g7f", rank: 1, score: null, depth: 9}),
+      candidate({move_usi: "2g2f", rank: 1, score: 20, depth: null}),
+      candidate({move_usi: "5g5f", rank: 1, score: 20, depth: 4}),
+      candidate({move_usi: "9g9f", rank: 4, score: 99, depth: 99}),
+    ];
+    expect(normalizeNextMoveCandidates(fixture).map((item) => item.move_usi)).toEqual(["5g5f", "2g2f", "7g7f", "9g9f"]);
+    expect(judgeNextMove("5g5f", fixture).kind).toBe("top");
+    expect(judgeNextMove("2g2f", fixture).kind).toBe("strong");
+    expect(judgeNextMove("9g9f", fixture).kind).toBe("listed");
+  });
   it("最上位候補を指した場合は top と判定し評価値差は 0", () => {
     const verdict = judgeNextMove("7g7f", CANDIDATES);
     expect(verdict.kind).toBe("top");

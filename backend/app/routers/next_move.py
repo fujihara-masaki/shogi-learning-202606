@@ -37,7 +37,7 @@ def _load(sample_id: int):
         raise error(503, str(exc), "NEXT_MOVE_DATABASE_UNAVAILABLE") from exc
     try:
         row = conn.execute("""
-          SELECT ls.*, bs.name source_name, bs.version source_version, bs.source_url
+          SELECT ls.*, bs.name source_name, bs.version source_version, bs.source_url, bs.file_sha256
           FROM learning_samples ls JOIN book_sources bs ON bs.id=ls.book_source_id WHERE ls.id=?
         """, (sample_id,)).fetchone()
         if not row:
@@ -83,7 +83,7 @@ def record_result(body: ResultInput):
                 last_source_file_sha256=excluded.last_source_file_sha256,last_seen_at=datetime('now')""",
               (current_key, stable_source_key(source), normalize_sfen(row["sfen"]),
                candidate_definition_fingerprint(candidates), PROBLEM_DEFINITION_VERSION,
-               row.get("extraction_run_key") or "unknown", ""))
+               row.get("extraction_run_key") or "unknown", row["file_sha256"]))
             cursor = conn.execute("""INSERT INTO next_move_results(
                 problem_key,opening_key_at_answer,opening_name_at_answer,move_usi,verdict,
                 candidate_rank,judgment_position,hint_count,elapsed_ms)

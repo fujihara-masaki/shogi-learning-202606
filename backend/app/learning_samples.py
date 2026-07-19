@@ -249,9 +249,9 @@ def build_learning_sample_plan(source_id: int, *, limit: int, per_opening_limit:
             extracted_at = datetime.now(timezone.utc).isoformat()
             run_metadata = {"extractor_version": EXTRACTOR_VERSION, "limit": limit,
                 "per_opening_limit": per_opening_limit, "seed": seed,
-                "source_file_sha256": source["file_sha256"]}
+                "source_file_sha256": source["file_sha256"], "extracted_at": extracted_at}
             run_key = extraction_run_key(run_metadata)
-            conn.execute("""INSERT OR REPLACE INTO extraction_runs
+            conn.execute("""INSERT INTO extraction_runs
                 (extraction_run_key,extractor_version,"limit",per_opening_limit,seed,source_file_sha256,extracted_at)
                 VALUES(?,?,?,?,?,?,?)""", (run_key, EXTRACTOR_VERSION, limit, per_opening_limit, seed,
                 source["file_sha256"], extracted_at))

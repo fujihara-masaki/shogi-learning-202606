@@ -27,17 +27,25 @@ def main() -> int:
         foreign_keys = conn.execute("PRAGMA foreign_key_check").fetchall()
         if foreign_keys: errors.append(f"foreign_key_check: {len(foreign_keys)} violation(s)")
         if not errors:
-            modern = {"extraction_runs", "database_metadata"}.issubset(tables) and "extraction_run_key" in {
-                r[1] for r in conn.execute("PRAGMA table_info(learning_samples)")}
-            if modern:
+            metadata_parts = {
+                "extraction_runs": "extraction_runs" in tables,
+                "database_metadata": "database_metadata" in tables,
+                "extraction_run_key": "extraction_run_key" in {
+                    r[1] for r in conn.execute("PRAGMA table_info(learning_samples)")},
+            }
+            present = sum(metadata_parts.values())
+            if present == len(metadata_parts):
                 missing_runs = conn.execute("""SELECT COUNT(*) FROM learning_samples ls LEFT JOIN extraction_runs er
                     ON er.extraction_run_key=ls.extraction_run_key WHERE er.extraction_run_key IS NULL""").fetchone()[0]
                 metadata = conn.execute("SELECT value FROM database_metadata WHERE key='dataset_version'").fetchone()
                 if missing_runs: errors.append(f"invalid extraction_run reference: {missing_runs}")
                 if not metadata or not str(metadata[0]).startswith("v1:"): errors.append("missing/invalid dataset_version")
                 print("schema=new")
-            else:
+            elif present == 0:
                 print("WARNING: legacy schema (extraction metadata unavailable)")
+            else:
+                errors.append("incomplete extraction metadata schema: " + ", ".join(
+                    name for name, exists in metadata_parts.items() if not exists))
             orphan_sources = conn.execute("SELECT COUNT(*) FROM learning_samples ls LEFT JOIN book_sources bs ON bs.id=ls.book_source_id WHERE bs.id IS NULL").fetchone()[0]
             orphan_positions = conn.execute("SELECT COUNT(*) FROM learning_samples ls LEFT JOIN book_positions bp ON bp.id=ls.book_position_id WHERE bp.id IS NULL").fetchone()[0]
             duplicates = conn.execute("SELECT COUNT(*) FROM (SELECT book_source_id,book_position_id FROM learning_samples GROUP BY 1,2 HAVING COUNT(*)>1)").fetchone()[0]
