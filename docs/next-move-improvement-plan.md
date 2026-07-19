@@ -1,11 +1,35 @@
-# 「次の一手」UX/UIレビューと次期改善計画
+# 「次の一手」UX/UI改善 最終設計
 
 対象: PR #30(次の一手学習モード追加)、PR #31(独立機能化)、PR #32(専用SQLite DB導入)後のコードベース
-(基準ブランチ `claude/clever-hopper-bphezm`、2026-07 時点)
+(基準コミット `aa3e8a6`、2026-07-19 時点)
 
 本ドキュメントはコード変更を伴わない調査・計画であり、実装は後続PRで行う。
 
-**本計画書は、後続の実装PR(PR-A〜PR-F)を開始するための暫定基準版である。** 実装・テストで判明した事項に応じて、各後続PRで詳細を調整できる。本PRでは全設計事項の完全確定を目的としない。
+**本書は次の一手改善の唯一の正本であり、後続の実装PR (PR-A〜PR-F) を開始できる最終設計である。** DB・API・データ整合性・PR間依存は本書を契約とする。一方、契約を変えない内部実装の詳細は各実装PRに委ねる。
+
+---
+
+## 0. 設計の読み方と確定事項
+
+### 0.1 確定する契約
+
+| 領域 | 最終設計 |
+| --- | --- |
+| DB責務 | `next_move.db` は配布可能な問題データ、`shogi.db` は端末固有の解答・進捗・将来のお気に入りを保持する。アプリ実行時は前者を読み取り専用、後者を読み書きで開く |
+| DB生成・検証 | importerおよび抽出・生成処理だけが `next_move.db` を生成・更新する。`validate_next_move_db.py` 等の検証処理は読み取り専用で整合性を検査する。アプリ実行時も検証時も、既存DBへ補完やスキーマ移行を書き込まない |
+| 問題同一性 | 永続参照は `problem_key`、画面遷移と競合検出前の検索だけは `sample_id`。出典・正規化局面・判定に使う候補定義・定義バージョンが同じ問題だけを同一視する |
+| データ世代 | `dataset_version` はDB全体の世代を表し、ページをまたぐ混在検出だけに使う。問題同一性や履歴結合には使わない |
+| 整合性 | 解答の判定・合法性・`problem_key` 一致確認はbackendが行い、成功時だけ `shogi.db` の問題参照と解答を同一トランザクションで保存する |
+| 一覧・移動 | backendで `problem_key` 重複排除後に決定的順序とページングを適用する。通常の順次移動は全ページを同一世代で取得できた場合だけ完了判定する |
+| 優先度 | P0は記録と正確な進捗・移動の土台、P1は履歴・復習と学習支援、P2は利用実績を見て判断する任意拡張。P2は実装開始条件にしない |
+
+### 0.2 現行実装との境界
+
+本書の「現行」は基準コミットの観察結果、「最終設計」は後続PRが実現する契約である。差がある箇所は不具合をこの文書PRで直したものではない。§8の担当PRと§5・§7の受け入れ条件をセットで参照する。特に、現行の行ID依存、最大100件の巡回、解答未保存、旧形式の一覧レスポンスはPR-A〜Cが段階的に置き換える。
+
+### 0.3 実装PRに委ねる事項
+
+次は契約・データ整合性・受け入れ条件を満たす限り固定しない: 内部関数名、React hook / stateの分け方、SQLをウィンドウ関数・サブクエリ等のどれで表現するか、小規模なファイル分割、fixtureの具体値、意味を変えないUI文言・余白、任意のキャッシュ・先読み・性能最適化。最適化のために `problem_key` 単位の意味、決定的順序、トランザクション境界、API契約を変える場合だけ設計変更として別途レビューする。
 
 ---
 
@@ -139,7 +163,7 @@ problem_key = "v1:" + sha256(problem_key_payload)
 
   同一局面でもソースが異なれば候補手・評価値が異なる別問題として扱う。**ファイル全体の `file_sha256` は含めない**(ファイルの一部が更新されただけで、変更のない全局面のキーが変わってしまうため)。`file_sha256` は監査用メタデータとして別途保存する。
 - `normalized_sfen`: SFENの手数(ply)フィールドを除去し、盤面・手番・持ち駒を python-shogi / tsshogi の再シリアライズで正規化する。再生成時の表記ゆれ(持ち駒の並び・空白等)でキーが変わることを防ぐ。
-- `candidate_definition_fingerprint`: その局面に登録されている候補手と、**判定に実際に使う候補順序**を局面単位でハッシュ化した値。前提として、候補の順序決定を共通関数 **`canonicalize_candidates_for_judgment(candidates)`** に一元化し、(1) API の候補返却順、(2) frontend の `judgeNextMove`、(3) backend の verdict / candidate_rank 算出、(4) fingerprint、(5) テスト、のすべてで同一実装(同一規則)を使う。
+- `candidate_definition_fingerprint`: その局面に登録されている候補手と、**判定に実際に使う候補順序**を局面単位でハッシュ化した値。前提として、候補の順序決定を共通の判定用候補正規化規則に一元化し、(1) API の候補返却順、(2) frontend の `judgeNextMove`、(3) backend の verdict / candidate_rank 算出、(4) fingerprint、(5) テスト、のすべてで同一実装(同一規則)を使う。
 
   **判定用候補順序の規則**(現行APIの ORDER BY を安定化したもの):
 
@@ -219,7 +243,7 @@ extracted_at         -- 抽出日時
 | # | 項目 | 内容 |
 | --- | --- | --- |
 | P2-1 | お気に入り | `next_move_favorites`(`problem_key` キー)+一覧絞り込み+復習タブ統合 |
-| P2-2 | 問題一覧の検索・絞り込み・ページング | 一覧の「さらに表示」(offset)、状態(未挑戦のみ等)での絞り込み。テキスト検索は問題にテキスト属性がほぼ無いため保留 |
+| P2-2 | 問題一覧UIの検索・絞り込み・ページング | P0で順次移動の正確性のために導入するAPIページングとは別に、一覧画面へ「さらに表示」(offset)、状態(未挑戦のみ等)での絞り込み。テキスト検索は問題にテキスト属性がほぼ無いため保留 |
 | P2-3 | サーバー側 sequential 出題の検討 | 出題APIに `sequential` policy(サーバー側 cursor)を追加し、一覧に出題モード切替UI(順番/ランダム/未挑戦優先)を明示する案。**P0ではクライアント側の順次移動(既存兄弟一覧の distinct problem_key 巡回)を維持する**ため、これは「順次移動のサーバーAPI化」を意味し、P0の方針と矛盾しない。必要性を後続PRで再検討 |
 | P2-4 | 候補手比較の強化 | 比較テーブル行クリックでPVを盤面再生(ミニ盤 or 既存盤の閲覧モード) |
 | P2-5 | 一覧カードの局面プレビュー | ミニ盤サムネイル(答えは漏れない=局面自体が問題)。件数が多いと描画コストがあるため遅延描画前提 |
@@ -236,9 +260,9 @@ extracted_at         -- 抽出日時
 ### P0-1 解答記録
 
 - 挑戦画面で合法手を指すと `POST /api/next-move/results` が1回呼ばれる。クライアントが送るのは `sample_id`(**一時参照**)・`problem_key`(**問題取得APIが返した値**)・`move_usi`・`hint_count`・`elapsed_ms` の5項目のみ。
-- **verdict と candidate_rank は backend 側で算出する**: backend は `sample_id` から next_move.db の現在の問題・候補手・出典メタデータを読み、`problem_key` を再算出する。**クライアントが送った `problem_key` と再算出値が一致した場合のみ**、`canonicalize_candidates_for_judgment` の結果順で `move_usi` を突き合わせて verdict・candidate_rank・judgment_position を確定し保存する。クライアント申告の判定は信用しない(フロントの判定ロジックは即時表示専用とし、候補順序・順位規則は backend と同一の共通関数規則であることをテストで担保する)。
+- **verdict と candidate_rank は backend 側で算出する**: backend は `sample_id` から next_move.db の現在の問題・候補手・出典メタデータを読み、`problem_key` を再算出する。**クライアントが送った `problem_key` と再算出値が一致した場合のみ**、共通の判定用候補正規化規則の結果順で `move_usi` を突き合わせて verdict・candidate_rank・judgment_position を確定し保存する。クライアント申告の判定は信用しない(フロントの判定ロジックは即時表示専用とし、候補順序・順位規則は backend と同一の共通関数規則であることをテストで担保する)。
 - **同順位候補がある場合の判定の意味**(candidate_rank と judgment_position の分離):
-  - `judgment_position` = `canonicalize_candidates_for_judgment` の結果順の位置(1始まり)。**top は judgment_position = 1 の候補**(現行 `judgeNextMove` の「先頭候補 = top」と同じ)。
+  - `judgment_position` = 共通の判定用候補正規化規則の結果順の位置(1始まり)。**top は judgment_position = 1 の候補**(現行 `judgeNextMove` の「先頭候補 = top」と同じ)。
   - `candidate_rank` = `effective_rank`(API表示の「第N候補」と同じ値)。同順位候補は同じ `candidate_rank` を持ち得る。
   - verdict 区分: judgment_position = 1 → `top`。それ以外は `effective_rank` ≤ 3 → `strong`、4以上 → `listed`(現行規則の維持。同 effective_rank = 1 の2番目の候補は `strong` になる)。
   - 記録には `candidate_rank`(表示順位)と `judgment_position`(判定位置)の**両方**を保存し、意味の曖昧さを残さない。
@@ -271,7 +295,7 @@ extracted_at         -- 抽出日時
 - 一覧に「ランダムに1問」「未挑戦から1問」ボタンがあり、押すと該当問題の挑戦画面へ遷移する。
 - 未挑戦問題が無い場合はその旨を表示し、ランダム出題へフォールバックできる。
 - 解答後の「次の問題」は現在の出題ポリシーを引き継ぐ(ランダムで来たら次もランダム。**一覧から普通に開いた場合の「次の問題」は従来どおりの順次移動を維持**する — P0-4参照)。
-- **通常の順次移動と新APIの役割分担**: 新しい `GET /api/next-move/problems/next` の policy は `random` / `unattempted` / `weak` のみで、順序上の現在位置を持たない。そのため**通常の「次の問題」(順次移動)は新APIへ統合せず**、既存一覧APIを使ったクライアント側の順次移動を維持する。ただし**対象戦型の全 distinct `problem_key` を取得してから現在位置と完了条件を判定する**(全ページ取得方式):
+- **通常の順次移動と新APIの役割分担**: 新しい `GET /api/next-move/problems/next` の policy は `random` / `unattempted` (P0) と `weak` (P1で追加) で、順序上の現在位置を持たない。そのため**通常の「次の問題」(順次移動)は新APIへ統合せず**、既存一覧APIを使ったクライアント側の順次移動を維持する。ただし**対象戦型の全 distinct `problem_key` を取得してから現在位置と完了条件を判定する**(全ページ取得方式):
   - 現行実装は兄弟一覧を最大100件で1回取得するだけ(`fetchLearningSamples(openingKey, 100)`、一覧APIの上限も100件)のため、101問以上ある戦型では取得済み配列の100問目を「最後」と誤認して完了表示してしまう。**取得済み配列の末尾を完了条件にしない。**
   - frontend は順次移動セッション開始時に、ページングAPI(§6: `offset`/`limit`/`total`/`dataset_version`)を `offset=0,100,200,...` と繰り返し取得して統合する。**複数リクエスト間で next_move.db が差し替わる可能性があるため、「`items` が空」だけを正常終了条件にしない**(例: 1ページ目が `total=101` で100件→差し替え発生→2ページ目が空、を成功扱いすると100/101件のまま100件目を最終問題と誤判定する)。取得の成功は**取得済み distinct `problem_key` 件数と期待 total の一致、かつ全ページの `dataset_version` 一致**で判定する:
     - 最初の正常レスポンスで `expected_total` と `expected_dataset_version` を確定し、以降の各ページの `total` が `expected_total`、`dataset_version` が `expected_dataset_version` と一致することを確認する。
@@ -429,7 +453,7 @@ ROW_NUMBER() OVER (PARTITION BY problem_key ORDER BY answered_at DESC, id DESC)
 
 - `extraction_runs` テーブルを追加する(`extraction_run_key`, `extractor_version`, `limit`, `per_opening_limit`, `seed`, `source_file_sha256`, `extracted_at`)。
 - `learning_samples` に `extraction_run_key` の参照を追加する。
-- 書き込みは**抽出ツールによる生成時のみ**(`extract_learning_samples.py` が新スキーマを生成する)。アプリ実行時の `mode=ro` 接続は維持し、実行時書き込みは一切行わない。
+- 書き込みは**importerおよび抽出・生成ツールによる生成時のみ**(`extract_learning_samples.py` 等が新スキーマを生成する)。アプリ実行時の `mode=ro` 接続は維持し、実行時書き込みは一切行わない。`validate_next_move_db.py` 等の検証処理も読み取り専用とし、既存DBに補完・修復・スキーマ移行を書き込まず、不整合は終了ステータスと診断メッセージで報告する。
 - **旧DBの後方互換を維持**する: `extraction_runs` メタデータの無い旧DBでも、`problem_key` の構成要素(`stable_source_key`・`normalized_sfen`・candidate fingerprint)は既存の `book_sources` / `book_moves` から backend が算出できるため **problem_key は完全に算出可能**。旧DBでは監査用の `extraction_run_key` のみ `"unknown"` にフォールバックする(キーには影響しない)。
 - `validate_next_move_db.py` を新旧両形式に対応させる(新形式では `extraction_runs` の整合、旧形式では不在を許容。あわせて重複 `problem_key`・メタデータ不整合の検出を追加)。
 
@@ -454,9 +478,10 @@ ROW_NUMBER() OVER (PARTITION BY problem_key ORDER BY answered_at DESC, id DESC)
 補足:
 
 - **URL namespace の方針**: 出題APIは `/api/learning-samples/next` に**しない**。既存の動的ルート `GET /api/learning-samples/{sample_id}` が先にマッチし、ルーター登録順によっては `"next"` を整数として解析しようとして 422 になり、static route に到達できないため。新規の次の一手専用APIは `results` / `progress` / `status` / `review` / `history` と同じ **`/api/next-move/*` namespace に統一**し(`/api/next-move/problems/next`)、動的ルートと衝突せず**ルーター登録順に依存しない**構成にする(OpenAPI 上も動的/静的ルートが曖昧にならない)。
-- 既存の問題一覧 `GET /api/learning-samples` と問題詳細 `GET /api/learning-samples/{id}` は互換のため**当面現行URLに残す**。役割分担: 問題一覧・詳細の読み取りと **P0での通常の順次移動(クライアント側の distinct `problem_key` 巡回)** は `/api/learning-samples`、`random` / `unattempted` / `weak` の出題開始・継続(`exclude_problem_key` による直前問題除外を含む)は `/api/next-move/problems/next`、記録・集計は `/api/next-move/*`。通常の順次移動を新APIへ強制統合しない(順次移動のサーバーAPI化は P2-3 で再検討し、行う場合は別PR)。将来一覧・詳細を `/api/next-move/problems` 系へ移す場合も、互換期間を設けて別PRで行う(本計画のスコープ外)。
+- **URL継続とレスポンス互換は別契約**: 問題一覧は既存URL `GET /api/learning-samples` を継続するが、これはレスポンス形式の後方互換を意味しない。PR-Bで一覧レスポンスを既存の配列からページオブジェクト `{items, offset, limit, total, dataset_version}` へ意図的に変更する。このローカルアプリでは外部公開APIクライアントや独立した外部スクリプトとのレスポンス互換を保証しない。問題詳細 `GET /api/learning-samples/{id}` は既存URLと既存フィールドを維持する。
+- 問題一覧・詳細の読み取りと **P0での通常の順次移動(クライアント側の distinct `problem_key` 巡回)** は `/api/learning-samples`、`random` / `unattempted` / `weak` の出題開始・継続(`exclude_problem_key` による直前問題除外を含む)は `/api/next-move/problems/next`、記録・集計は `/api/next-move/*` を使う。通常の順次移動を新APIへ強制統合しない(順次移動のサーバーAPI化は P2-3 で再検討し、行う場合は別PR)。**PR-Bでは新しいページングendpointを追加せず**、既存一覧URLに `offset` / `limit` queryと新レスポンスを導入する。`dataset_version` はレスポンス値であり、version queryは追加しない。
 - 既存 `GET /api/learning-samples` / `GET /api/learning-samples/{id}` のレスポンスに `problem_key` を追加する(backend が算出。一覧バッジ・status API との突合に使用)。
-- 候補手の返却順を `canonicalize_candidates_for_judgment` に統一する。既存の ORDER BY との差分は最終 tie-breaker のみ(`bm.id` → `move_usi`。行IDはDB再生成で変わるため安定キーの順序決定に使わない)。
+- 候補手の返却順を共通の判定用候補正規化規則に統一する。既存の ORDER BY との差分は最終 tie-breaker のみ(`bm.id` → `move_usi`。行IDはDB再生成で変わるため安定キーの順序決定に使わない)。
 - **一覧APIのページング(PR-B)**: 既存 `GET /api/learning-samples` に `offset` / `limit` / `total` / `dataset_version` を追加し、レスポンスを次の形にする:
 
   ```json
@@ -466,6 +491,15 @@ ROW_NUMBER() OVER (PARTITION BY problem_key ORDER BY answered_at DESC, id DESC)
   - `total` は `learning_samples` の行数ではなく、**現在の resolver における distinct `problem_key` 数**。
   - 各 item には順次移動に必要な `sample_id`・`problem_key`・`opening_key`・`sample_rank`(決定的な並び順情報)を含める。
   - **backend 側の処理順序**: (1) resolver 構築 → (2) `problem_key` 単位で代表 sample へ重複排除 → (3) 決定的順序付け(`sample_rank` 昇順 → `problem_key` 昇順。全ページで一貫)→ (4) `offset` / `limit` 適用 → (5) 同一DB生成物全体の `dataset_version` を付与。DBの生行をページングしてからクライアントで重複排除する方式は**採らない**(同一 `problem_key` の重複行がページ境界をまたぐと、ページ件数と `total` の意味が崩れるため)。
+
+#### API共通レスポンス・エラー契約
+
+- 新規 `/api/next-move/*` のエラー本文は `{"detail": "利用者向け説明", "code": "安定した機械判定コード"}` とする。frontend は分岐に `code`、表示に `detail` を使い、未知の `code` でも一般エラーへフォールバックする。FastAPI標準の入力検証エラーは既存の422形式を維持できるが、上表で定義した業務エラーはこの共通形を返す。
+- 正常な作成は200、候補なしは204 (本文なし)。存在しない `sample_id` は404 `NEXT_MOVE_PROBLEM_NOT_FOUND`、表示後に問題定義が変わった場合は409 `NEXT_MOVE_PROBLEM_CHANGED`、USI構文不正は422 `NEXT_MOVE_MOVE_FORMAT_INVALID`、局面上の違法手は422 `NEXT_MOVE_ILLEGAL_MOVE`、問題DBの未配置・不正・空は503 `NEXT_MOVE_DATABASE_UNAVAILABLE` とする。予期しない障害は内部情報を露出せず500とする。
+- 409 / 422 / 503、および**トランザクションcommit前**に発生した500では、トランザクションをrollbackし、`next_move_problem_refs` と `next_move_results` をどちらも変更しない。問題参照upsertと解答INSERTは `shogi.db` の単一トランザクションで行い、片方だけを保存しない。
+- commit成功後のレスポンス生成、middleware、通信経路で障害が起きた場合、クライアントが500または通信エラーを受け取っても解答は保存済みの可能性がある。frontendは500・通信エラーに対して解答POSTを自動再送しない(結果表示を維持し、記録状態が不明である旨を案内できる)。
+- 将来自動再送を導入する場合は、重複記録を防ぐidempotency keyをリクエストと保存処理のAPI契約へ追加してから行う。本設計のP0〜P2にはidempotency keyおよび自動再送を含めない。
+- 一覧URLの継続はレスポンス互換を保証しない。PR-Bではbackendの一覧レスポンス変更と、リポジトリ内の全frontend呼び出し元・型・unit test・E2Eの更新を同時に行う。backendだけ、またはfrontendだけが旧形式のまま混在する状態を完成扱いにせず、両方の全テストがgreenの一体変更としてマージする。問題詳細APIは既存URLと既存フィールドを維持する。
 
 ### フロントエンド
 
@@ -478,7 +512,7 @@ ROW_NUMBER() OVER (PARTITION BY problem_key ORDER BY answered_at DESC, id DESC)
 | `src/components/NextMoveResultPanel.tsx` | 用語ヘルプ | P1-4 |
 | `src/pages/HistoryPage.tsx` | 次の一手セクション | P1-1 |
 | `src/pages/ReviewPage.tsx` | 次の一手タブ | P1-2 |
-| `src/shogi/nextMove.ts` | 判定用候補順序を共通規則(`canonicalize_candidates_for_judgment` 相当)に合わせる、verdict→バッジ表示のマッピング等の純関数追加 | P0-1 / P0-2 |
+| `src/shogi/nextMove.ts` | 判定用候補順序を共通規則(共通の判定用候補正規化規則)に合わせる、verdict→バッジ表示のマッピング等の純関数追加 | P0-1 / P0-2 |
 | `src/index.css` | バッジ・サマリー・完了メッセージのスタイル(360px確認込み) | 各PR |
 
 ### テスト
@@ -510,7 +544,7 @@ ROW_NUMBER() OVER (PARTITION BY problem_key ORDER BY answered_at DESC, id DESC)
   - (b) ソースファイルの**無関係な局面だけ**が変更(追加・削除・修正)されても、対象問題の `problem_key` は一致する(`file_sha256` がキーに影響しないこと)。
   - (c) 対象局面の**候補手・候補順位・判定順のいずれかが変わる**と `problem_key` が変わる(fingerprint 検出)。判定順に影響しない変更ではキーが変わらない。特に以下を検証する:
     - 同じ `move_usi` 配列・同じ並びでも、`effective_rank` が変わる(例: `sort_order` の変更で 3→4)と fingerprint と `problem_key` が変わる。
-    - 同じ `effective_rank` の候補が複数ある場合、`canonicalize_candidates_for_judgment` によって判定順が決定的になる(score降順→depth降順→move_usi昇順。NULL は非NULLの後)。
+    - 同じ `effective_rank` の候補が複数ある場合、共通の判定用候補正規化規則によって判定順が決定的になる(score降順→depth降順→move_usi昇順。NULL は非NULLの後)。
     - **score または depth の変更で同順位候補の順序が入れ替わる**と、`judgment_position` の対応が変わり fingerprint と `problem_key` が変わる。
     - score / depth が変わっても**候補順が変わらなければ** fingerprint は変わらない。
     - DB の行ID・挿入順が変わっても、同じ候補定義・同じ判定順なら fingerprint は一致する。
@@ -553,7 +587,12 @@ ROW_NUMBER() OVER (PARTITION BY problem_key ORDER BY answered_at DESC, id DESC)
   - 一覧・ランダム出題・未挑戦優先・復習で同一 `problem_key` が重複表示・重複出題されない。
   - 代表 sample の選択が DB の行順・挿入順に依存せず決定的である(選択規則: 最新抽出実行 → `sample_rank` 昇順 → `sample_id` 昇順)。
   - 同一 `problem_key` 内で現在メタデータ(`opening_key` 等)が競合する fixture で、表示が決定的(代表 sample の値)になり、`validate_next_move_db.py` が警告を出す。
-- 一覧APIのページング(backend):
+- 一覧APIのページングとPR-Bの移行契約(backend / repository内client):
+  - `GET /api/learning-samples` のURLは変えず、backendのレスポンスが配列から `{items, offset, limit, total, dataset_version}` のページオブジェクトへ変わる。
+  - 新しいページングendpointおよびversion queryを追加しない。`dataset_version` はレスポンスで返す。
+  - リポジトリ内検索と型チェックにより、旧配列レスポンスを前提とするfrontend呼び出し元・型・unit test・E2Eが残っていないことを確認する。
+  - frontendの型、画面、unit test、E2Eをbackend変更と同じPR-Bで新形式へ更新し、PR-B完了時にbackend・frontendの全テストをgreenにする。片側だけの移行は完了としない。
+  - `GET /api/learning-samples/{sample_id}` は既存URLと問題詳細の既存フィールドを維持し、既存の詳細APIテストを変更後も通す。
   - `total` が `learning_samples` 行数ではなく distinct `problem_key` 数になる。
   - 同一DBの複数ページで `dataset_version` が一致し、DB再生成時には `database_metadata.dataset_version` が変わる。
   - 旧形式DBではファイルSHA-256 fallbackが同一ファイルで安定し、旧DB差し替え時に変化する。
@@ -565,7 +604,7 @@ ROW_NUMBER() OVER (PARTITION BY problem_key ORDER BY answered_at DESC, id DESC)
   - 旧形式DB(メタデータ無し)では `extraction_run_key` が `"unknown"` にフォールバックする。
   - アプリ実行中に next_move.db への書き込みが一切発生しない(`mode=ro` の担保)。
   - 抽出ツール(`extract_learning_samples.py`)が新スキーマを生成する。
-  - `validate_next_move_db.py` が新旧形式を判定し、それぞれで検証が通る。
+  - `validate_next_move_db.py` が新旧形式を読み取り専用で判定し、それぞれで検証が通る。検証前後でDBファイルのSHA-256と内容が変化せず、不整合時にも補完・修復・スキーマ移行を書き込まない。
 - `move_usi` の合法性検証(422系):
   - USI 構文が不正な手は 422(`NEXT_MOVE_MOVE_FORMAT_INVALID`)となり、`next_move_results`・`next_move_problem_refs` のどちらにも書き込まれない。
   - 空きマスからの移動など局面上の違法手は 422(`NEXT_MOVE_ILLEGAL_MOVE`)となる。
@@ -596,7 +635,7 @@ ROW_NUMBER() OVER (PARTITION BY problem_key ORDER BY answered_at DESC, id DESC)
 
 - バッジ/進捗表示の純関数、ポリシー付き「次の問題」選択ロジック、経過時間の丸め。
 - `judgeNextMove` が判定用候補順序の共通規則(同順位は score降順→depth降順→move_usi昇順、NULLは後)に従うこと(backend側テストと同一の共通fixtureを使用)。
-- `client.ts`: 503 detail の抽出、409(`NEXT_MOVE_PROBLEM_CHANGED`)の構造化エラーの取り出し、記録API失敗時に例外を伝播させないこと。
+- `client.ts`: 503 detail の抽出、409(`NEXT_MOVE_PROBLEM_CHANGED`)の構造化エラーの取り出し、記録API失敗時に例外を伝播させないこと。500・通信エラー時に解答POSTを自動再送せず、保存済みか不明な状態として扱うこと。
 - 全ページ取得ヘルパーの終了条件(モックレスポンスで決定的に検証):
   - `total=101`、同一 `dataset_version` の1ページ目100件+2ページ目1件 → 正常完了(`loaded_count == expected_total` かつ世代一致)。
   - `total=101`、1ページ目100件+2ページ目が**空配列** → 失敗扱い(空ページを正常終了にしない。100件目を完了扱いしない)。
@@ -636,17 +675,26 @@ ROW_NUMBER() OVER (PARTITION BY problem_key ORDER BY answered_at DESC, id DESC)
 
 ## 8. PR構成(実装フェーズ)
 
-依存関係順。各PRは単独でテスト green を維持する。
+依存関係順。各PRは単独でテスト green を維持する。P2はどのP0/P1 PRの開始・完了もブロックしない。
+
+| PR | 開始条件 | 完了ゲート |
+| --- | --- | --- |
+| A | 本設計の承認 | problem key、DB新旧互換、競合・合法性・原子的保存のbackend/frontend/E2E受け入れ条件がgreen |
+| B | Aマージ | 一覧URLを維持したページオブジェクト移行、全repository内client・型・unit/E2Eの同時更新、詳細API互換、distinct集計・同一世代ページングを含むbackend/frontend全テストがgreen |
+| C | A・Bマージ | random/unattempted、スキップ、順次完了、途中取得失敗・世代変更の再試行テストがgreen |
+| D | 本設計の承認 (A〜Cと並行可。競合時はrebase) | 503原因別案内、復旧導線、着手後だけの用語説明、a11yテストがgreen |
+| E | A〜Cマージ | 履歴・復習・weak・均等出題、削除済み問題と分類変更の整合性テストがgreen |
+| F以降 | 対応するP0/P1と必要性の確認 | 各PRで独立した仕様・性能・a11y受け入れ条件を定義。未実施でもP0/P1は完了可能 |
 
 1. **PR-A: 解答記録の基盤**(P0-1)
-   - `problem_key` の定義・算出(stable_source_key・normalized_sfen・candidate_definition_fingerprint・problem_definition_version)、**canonical serialization 共通関数**(キー辞書順・UTF-8・NFC・null/空文字区別。golden test 付き)、判定用候補順序の共通関数 `canonicalize_candidates_for_judgment`(API返却順・frontend判定・backend判定・fingerprint で同一実装。APIの最終 tie-breaker を `bm.id`→`move_usi` に変更)、抽出ツール側の `extraction_runs` メタデータ保存(`extract_learning_samples.py` / `validate_next_move_db.py` 対応)。
+   - `problem_key` の定義・算出(stable_source_key・normalized_sfen・candidate_definition_fingerprint・problem_definition_version)、**canonical serialization 共通関数**(キー辞書順・UTF-8・NFC・null/空文字区別。golden test 付き)、判定用候補正規化規則(API返却順・frontend判定・backend判定・fingerprint で同一規則。APIの最終 tie-breaker を `bm.id`→`move_usi` に変更)、抽出ツール側の `extraction_runs` メタデータ保存(`extract_learning_samples.py` / `validate_next_move_db.py` 対応)。
    - **shogi.db 側と next_move.db 生成側の両方を本PRに含める**: shogi.db スキーマ追加(`next_move_problem_refs` + `next_move_results` + latest検索用インデックス)と、next_move.db 生成スキーマの更新(`extraction_runs` + `learning_samples.extraction_run_key` + `database_metadata.dataset_version`。旧DB後方互換・旧形式DBのファイルSHA-256 fallback・validate 新旧対応込み)。最新解答選択(`answered_at DESC, id DESC`)の共通クエリ/ヘルパーもここで定義し、後続PR(B/E)の status・progress・review はこれを使う。`POST /api/next-move/results`(`problem_key` 照合 409 → SFEN復元による `move_usi` 合法性検証 422 → 合法時のみ backend で verdict・candidate_rank を算出・保存)、learning-samples レスポンスへの `problem_key` 追加、セッションでの自動記録と409時の再読み込み案内(UI変更は最小)。
    - README の安定キー方針の更新(下記ドキュメント欄参照)。
    - backend/frontend/E2E テスト(problem_key 安定性・fingerprint 検出・DB差し替え409を含む)。ここが全ての土台。
 2. **PR-B: 進捗表示と一覧の改善**(P0-2、P1-5の見出し階層)
-   - `progress`/`status` API と分類 resolver(`problem_key`→現在の代表 sample_id / opening_key / opening_name。**distinct `problem_key` 基準**の集計・重複排除・代表 sample の決定的選択)、**一覧APIのページング**(`offset`/`limit`/`total`/`dataset_version`。backend で重複排除→順序付け→ページング。`total` は distinct `problem_key` 数、`dataset_version` は同一DB生成物全体の世代ID)、一覧バッジ・サマリー・件数注記、挑戦画面の「X / Y」修正(distinct `problem_key` 数ベース)。
+   - `progress`/`status` API と分類 resolver(`problem_key`→現在の代表 sample_id / opening_key / opening_name。**distinct `problem_key` 基準**の集計・重複排除・代表 sample の決定的選択)、**既存一覧URLのページオブジェクト移行**(`offset`/`limit`/`total`/`dataset_version`。新endpoint・version queryは追加しない。backendで重複排除→順序付け→ページング)、リポジトリ内の全frontend呼び出し元・型・unit test・E2Eの同時更新、問題詳細URL・既存フィールドの維持、一覧バッジ・サマリー・件数注記、挑戦画面の「X / Y」修正。backend/frontendの全テストgreenを一体の完了条件とする。
 3. **PR-C: 出題ポリシーとスキップ**(P0-3、P0-4)
-   - 出題API `GET /api/next-move/problems/next`(次の一手専用 namespace。既存の動的ルート `/api/learning-samples/{sample_id}` と衝突せず登録順に非依存。distinct `problem_key` 候補集合+`exclude_problem_key` 除外+候補なし時の204)は **random / unattempted / weak の出題開始・継続に使用**。**通常の「次の問題」(順次移動)はクライアント側巡回を維持**し、**PR-Bのページング(`offset`/`limit`/`total`/`dataset_version`)に依存して全ページ取得**で対象戦型の全 distinct `problem_key` を統合してから、現在キー位置基準の前進・最終 distinct キーでの完了表示に改める(`(index+1) % length` と「取得済み配列末尾=最後」の判定を廃止。途中失敗・世代不一致時は完了扱いにせず取得済み一覧を破棄して再試行導線)。ランダム/未挑戦優先ボタン、スキップ、完了状態(204時・最終問題到達時の表示)。frontend(`client.ts`)は random 系で新URLを使用し、表示中の `problem_key` を送る。E2Eは順次移動の完了到達(101件fixture含む)と、random 系操作が新URLを経由することを確認。READMEの「既知の制限」更新。
+   - 出題API `GET /api/next-move/problems/next`(次の一手専用 namespace。既存の動的ルート `/api/learning-samples/{sample_id}` と衝突せず登録順に非依存。distinct `problem_key` 候補集合+`exclude_problem_key` 除外+候補なし時の204)は **PR-Cでは random / unattempted、PR-Eで追加する weak の出題開始・継続に使用**。**通常の「次の問題」(順次移動)はクライアント側巡回を維持**し、**PR-Bのページング(`offset`/`limit`/`total`/`dataset_version`)に依存して全ページ取得**で対象戦型の全 distinct `problem_key` を統合してから、現在キー位置基準の前進・最終 distinct キーでの完了表示に改める(`(index+1) % length` と「取得済み配列末尾=最後」の判定を廃止。途中失敗・世代不一致時は完了扱いにせず取得済み一覧を破棄して再試行導線)。ランダム/未挑戦優先ボタン、スキップ、完了状態(204時・最終問題到達時の表示)。frontend(`client.ts`)は random 系で新URLを使用し、表示中の `problem_key` を送る。E2Eは順次移動の完了到達(101件fixture含む)と、random 系操作が新URLを経由することを確認。READMEの「既知の制限」更新。
 4. **PR-D: DB異常案内と用語説明**(P0-5、P1-4)
    - 503 detail 表示+復旧手順、評価値/PVヘルプ。小さく独立しているためA〜Cと並行可能(P0-5のみ先行切り出しも可)。
 5. **PR-E: 履歴・復習統合**(P1-1、P1-2、P1-3)
@@ -671,3 +719,15 @@ ROW_NUMBER() OVER (PARTITION BY problem_key ORDER BY answered_at DESC, id DESC)
 - テキスト検索: 問題に検索可能なテキスト属性がほぼ無く、戦型フィルタで代替できる。
 - 一覧のミニ盤サムネイル・PV盤面再生: 価値はあるが描画コストと実装量が大きい。
 - 定跡学習(固定データ)のDB化や次の一手との内部統合: 別テーマとして切り離す。
+
+
+---
+
+## 10. 文書自己レビュー結果
+
+- 正本は本ファイルだけとし、分割文書やREADMEへの設計複製は作らない。将来の分割は文量が保守を妨げた場合の非ブロッカー候補に留める。
+- 現行backend・frontend・DB生成/検証処理・README・pytest/vitest/Playwright構成と照合し、現行との差は§1、採用設計は§4〜§6、担当PRは§8、テスト可能な条件は§5・§7に対応付けた。
+- `shogi.db` / `next_move.db`、`problem_key` / `sample_id` / `dataset_version`、現在分類 / 解答時スナップショット、APIページング / P2の一覧UIページングの役割を分離した。
+- DB差し替え、重複行、同時刻解答、途中ページの世代変更、違法手、削除済み問題について、誤結合または部分書き込みを防ぐ契約とテストを記載した。検証処理はread-onlyとし、500はcommit前のrollback保証とcommit後の保存済み可能性を区別した。
+- 内部名やSQL・React構成は固定せず、P2と任意最適化をP0/P1のブロッカーから除外した。
+- この設計PRではアプリケーションコード、テスト、DB、生成・検証スクリプト、依存関係、CI、設定を変更しない。
