@@ -427,7 +427,24 @@ export interface LearningSamplePage { items: LearningSample[]; offset: number; l
 export type NextMoveVerdict = "top" | "strong" | "listed" | "unlisted";
 export interface NextMoveProgressItem { opening_key: string; opening_name: string; total: number; answered: number; verdict_counts: Record<NextMoveVerdict, number>; top_rate: number }
 export interface NextMoveStatusItem { problem_key: string; verdict: NextMoveVerdict | null; result_id: number | null }
-export type NextMovePolicy = "random" | "unattempted";
+export type NextMovePolicy = "random" | "unattempted" | "weak";
+export interface NextMoveHistoryResult {
+  id: number; problem_key: string; move_usi: string; verdict: NextMoveVerdict;
+  candidate_rank: number | null; elapsed_ms: number; answered_at: string;
+  opening_key: string; opening_name: string; sample_id: number | null;
+  available: boolean; unavailable_reason: string | null;
+}
+export interface NextMoveHistoryResponse { total_answers: number; verdict_counts: Record<NextMoveVerdict, number>; top_rate: number; recent_results: NextMoveHistoryResult[] }
+export interface NextMoveReviewItem {
+  problem_key: string; sample_id: number | null; opening_key: string; opening_name: string;
+  verdict: "listed" | "unlisted"; move_usi: string; answered_at: string;
+  result_id: number; available: boolean; unavailable_reason: string | null;
+}
+export function fetchNextMoveHistory(): Promise<NextMoveHistoryResponse> { return request("/api/next-move/history"); }
+export function fetchNextMoveReview(): Promise<{ items: NextMoveReviewItem[] }> { return request("/api/next-move/review"); }
+export function nextMoveVerdictLabel(verdict: NextMoveVerdict): string {
+  return ({ top: "◎ 最有力", strong: "○ 有力", listed: "△ 登録候補", unlisted: "? 未登録" })[verdict];
+}
 
 export function fetchLearningSamples(openingKey?: string, limit = 100, offset = 0, signal?: AbortSignal): Promise<LearningSamplePage> {
   const params = new URLSearchParams({ limit: String(limit), offset: String(offset) });

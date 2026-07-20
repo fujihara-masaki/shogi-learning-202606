@@ -1,15 +1,19 @@
 // 復習画面: 間違えた問題一覧とお気に入り問題一覧。
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { fetchProblems, fetchReviewProblems, type TsumeProblem } from "../api/client";
+import { fetchNextMoveProblem, fetchNextMoveReview, fetchProblems, fetchReviewProblems, nextMoveVerdictLabel, type NextMoveReviewItem, type TsumeProblem } from "../api/client";
+import { useNavigate } from "react-router-dom";
 
-type Tab = "wrong" | "favorite";
+type Tab = "wrong" | "favorite" | "next-move";
 
 export default function ReviewPage() {
   const [tab, setTab] = useState<Tab>("wrong");
   const [wrongProblems, setWrongProblems] = useState<TsumeProblem[]>([]);
   const [favoriteProblems, setFavoriteProblems] = useState<TsumeProblem[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [nextMoveProblems, setNextMoveProblems] = useState<NextMoveReviewItem[]>([]);
+  const [nextMoveError, setNextMoveError] = useState<string | null>(null);
+  const navigate = useNavigate();
 
   const load = useCallback(async () => {
     try {
@@ -30,8 +34,17 @@ export default function ReviewPage() {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     load();
   }, [load]);
+  useEffect(() => {
+    fetchNextMoveReview().then((data) => setNextMoveProblems(data.items))
+      .catch((e) => setNextMoveError(`次の一手復習の取得に失敗しました: ${e}`));
+  }, []);
 
   const list = tab === "wrong" ? wrongProblems : favoriteProblems;
+
+  async function startWeak() {
+    const problem = await fetchNextMoveProblem({ policy: "weak" });
+    if (problem) navigate(`/next-move/${problem.id}?policy=weak`);
+  }
 
   return (
     <div className="review-page" data-testid="review-page">
@@ -54,8 +67,19 @@ export default function ReviewPage() {
         >
           お気に入り ({favoriteProblems.length})
         </button>
+        <button type="button" className={tab === "next-move" ? "active" : ""}
+          aria-pressed={tab === "next-move"} onClick={() => setTab("next-move")}>
+          次の一手 ({nextMoveProblems.length})
+        </button>
       </div>
-      {list.length === 0 ? (
+      {tab === "next-move" ? <section aria-labelledby="next-move-review-heading">
+        <h2 id="next-move-review-heading">次の一手</h2>
+        {nextMoveError && <div className="banner banner-error" role="alert">{nextMoveError}</div>}
+        <button type="button" onClick={startWeak} disabled={nextMoveProblems.every((p) => !p.available)}>復習対象から1問</button>
+        {nextMoveProblems.length === 0 ? <p className="muted" role="status">復習対象の次の一手はありません。</p> :
+          <div className="table-scroll"><table className="data-table"><thead><tr><th>戦型</th><th>最新判定</th><th>指した手</th><th>日時</th><th></th></tr></thead>
+          <tbody>{nextMoveProblems.map((p) => <tr key={p.problem_key}><td>{p.opening_name}</td><td>{nextMoveVerdictLabel(p.verdict)}</td><td>{p.move_usi}</td><td>{p.answered_at}</td><td>{p.available && p.sample_id != null ? <Link className="button-link" to={`/next-move/${p.sample_id}?policy=weak`}>再挑戦</Link> : <span className="muted">利用不可: {p.unavailable_reason}</span>}</td></tr>)}</tbody></table></div>}
+      </section> : list.length === 0 ? (
         <p className="muted">
           {tab === "wrong"
             ? "間違えた問題はありません。"

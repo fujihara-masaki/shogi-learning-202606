@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test, vi } from "vitest";
-import { fetchAllLearningSamples, fetchAllLearningSamplesCached, fetchLearningSamples, fetchNextMoveProblem, fetchProblems, fetchTsumeTags } from "./client";
+import { fetchAllLearningSamples, fetchAllLearningSamplesCached, fetchLearningSamples, fetchNextMoveHistory, fetchNextMoveProblem, fetchNextMoveReview, fetchProblems, fetchTsumeTags, nextMoveVerdictLabel } from "./client";
 
 describe("tsume API client", () => {
   afterEach(() => {
@@ -115,5 +115,22 @@ describe("next move selection API", () => {
   test("returns undefined for a normal 204 candidate exhaustion", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true, status: 204 }));
     await expect(fetchNextMoveProblem({ policy: "unattempted" })).resolves.toBeUndefined();
+  });
+  test("supports a weak all-openings query", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 204 });
+    vi.stubGlobal("fetch", fetchMock);
+    await fetchNextMoveProblem({ policy: "weak", exclude_problem_key: "v1:old" });
+    expect(fetchMock.mock.calls[0][0]).toContain("policy=weak&exclude_problem_key=v1%3Aold");
+    expect(fetchMock.mock.calls[0][0]).not.toContain("opening_key");
+  });
+  test("fetches history and review independently and maps verdict labels", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => ({ items: [] }) });
+    vi.stubGlobal("fetch", fetchMock);
+    await fetchNextMoveHistory(); await fetchNextMoveReview();
+    expect(fetchMock.mock.calls.map((call) => call[0])).toEqual([
+      "http://localhost:8000/api/next-move/history", "http://localhost:8000/api/next-move/review",
+    ]);
+    expect(nextMoveVerdictLabel("top")).toBe("◎ 最有力");
+    expect(nextMoveVerdictLabel("unlisted")).toBe("? 未登録");
   });
 });

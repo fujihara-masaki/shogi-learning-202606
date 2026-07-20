@@ -54,6 +54,23 @@ def test_unattempted_and_problem_key_exclusion():
                                exclude_problem_key="v1:a", rng=random.Random(0)) is None
 
 
+def test_weak_uses_only_latest_listed_or_unlisted():
+    problems = [{"problem_key": f"v1:{key}", "opening_key": "a"} for key in "abcde"]
+    latest = {"v1:a": {"verdict": "top"}, "v1:b": {"verdict": "strong"},
+              "v1:c": {"verdict": "listed"}, "v1:d": {"verdict": "unlisted"}}
+    choices = {select_next_problem(problems, policy="weak", latest=latest,
+                                   rng=random.Random(seed))["problem_key"] for seed in range(5)}
+    assert choices == {"v1:c", "v1:d"}
+
+
+def test_all_openings_are_chosen_before_problem_count():
+    problems = ([{"problem_key": f"v1:a{i}", "opening_key": "a"} for i in range(10)]
+                + [{"problem_key": "v1:b", "opening_key": "b"}])
+    # Seed 0 chooses opening b. Direct choice over eleven problems would not.
+    assert select_next_problem(problems, policy="random", latest={},
+                               rng=random.Random(0))["opening_key"] == "b"
+
+
 def test_selection_api_random_opening_exclude_and_detail_contract(client):
     ids = _seed_policy_data()
     all_items = client.get("/api/learning-samples?limit=100").json()["items"]

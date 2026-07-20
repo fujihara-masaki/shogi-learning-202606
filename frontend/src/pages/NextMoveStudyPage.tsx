@@ -45,7 +45,7 @@ function NextMoveStudyContent({ id }: { id: string | undefined }) {
   const location = useLocation();
   const query = new URLSearchParams(location.search);
   const queryPolicy = query.get("policy");
-  const policy: NextMovePolicy | null = queryPolicy === "random" || queryPolicy === "unattempted" ? queryPolicy : null;
+  const policy: NextMovePolicy | null = queryPolicy === "random" || queryPolicy === "unattempted" || queryPolicy === "weak" ? queryPolicy : null;
   const policyOpeningKey = query.get("opening_key") || undefined;
 
   const sample = sampleState.id === sampleId ? sampleState.sample : null;
@@ -149,10 +149,10 @@ function NextMoveStudyContent({ id }: { id: string | undefined }) {
     if (policy) {
       setMovingNext(true);
       try {
-        const next = await fetchNextMoveProblem({ policy, opening_key: policyOpeningKey ?? sample.opening_key,
+        const next = await fetchNextMoveProblem({ policy, opening_key: policyOpeningKey,
           exclude_problem_key: sample.problem_key });
         if (!next) setCompleted(true);
-        else navigate(`/next-move/${next.id}?policy=${policy}&opening_key=${encodeURIComponent(policyOpeningKey ?? sample.opening_key)}`,
+        else navigate(`/next-move/${next.id}?policy=${policy}${policyOpeningKey ? `&opening_key=${encodeURIComponent(policyOpeningKey)}` : ""}`,
           { state: { autoFocusHeading: true } });
       } catch (e) {
         setNextError(e);
