@@ -4,7 +4,7 @@ from __future__ import annotations
 import sqlite3
 import logging
 import random
-from typing import Literal
+from typing import Literal, Callable
 
 import shogi
 from fastapi import APIRouter, HTTPException
@@ -114,32 +114,51 @@ def _current_problems(opening_key: str | None = None):
         conn.close()
 
 
+def choose_opening(problems: list[dict], rng: Callable | random.Random | random.SystemRandom):
+    """Choose an opening with equal weight, irrespective of its problem count."""
+    keys = sorted({problem.get("opening_key", "") for problem in problems})
+    return rng.choice(keys) if keys else None
+
+
+def choose_problem(problems: list[dict], rng: Callable | random.Random | random.SystemRandom):
+    """Choose one distinct resolved problem from an already filtered opening."""
+    return rng.choice(problems) if problems else None
+
+
 def select_next_problem(problems: list[dict], *, policy: str, latest: dict,
                         exclude_problem_key: str | None = None,
+                        opening_key: str | None = None,
                         rng: random.Random | random.SystemRandom = random.SystemRandom()):
     """Select from resolved (therefore distinct) problems; injectable RNG keeps tests deterministic."""
     candidates = [p for p in problems if p["problem_key"] != exclude_problem_key]
     if policy == "unattempted":
         candidates = [p for p in candidates if p["problem_key"] not in latest]
-    return rng.choice(candidates) if candidates else None
+    elif policy == "weak":
+        candidates = [p for p in candidates
+                      if (result := latest.get(p["problem_key"])) is not None
+                      and result["verdict"] in ("listed", "unlisted")]
+    if not candidates:
+        return None
+    selected_opening = opening_key or choose_opening(candidates, rng)
+    return choose_problem([p for p in candidates if p.get("opening_key", "") == selected_opening], rng)
 
 
 @router.get("/problems/next")
-def next_problem(policy: Literal["random", "unattempted"], opening_key: str | None = None,
+def next_problem(policy: Literal["random", "unattempted", "weak"], opening_key: str | None = None,
                  exclude_problem_key: str | None = None):
     problems = _current_problems(opening_key)
     if exclude_problem_key and not exclude_problem_key.startswith("v1:"):
         logger.warning("Ignoring malformed exclude_problem_key: %s", exclude_problem_key)
         exclude_problem_key = None
     latest: dict = {}
-    if policy == "unattempted":
+    if policy in ("unattempted", "weak"):
         history = get_connection()
         try:
             latest = latest_next_move_results(history, [p["problem_key"] for p in problems])
         finally:
             history.close()
     selected = select_next_problem(problems, policy=policy, latest=latest,
-                                   exclude_problem_key=exclude_problem_key)
+                                   exclude_problem_key=exclude_problem_key, opening_key=opening_key)
     if selected is None:
         from fastapi import Response
         return Response(status_code=204)
@@ -180,3 +199,70 @@ def status(opening_key: str):
     return {"opening_key": opening_key, "items": [{"problem_key": p["problem_key"],
         "verdict": latest[p["problem_key"]]["verdict"] if p["problem_key"] in latest else None,
         "result_id": latest[p["problem_key"]]["id"] if p["problem_key"] in latest else None} for p in problems]}
+
+
+def _current_problem_map() -> dict[str, dict]:
+    """Best-effort current metadata; history must survive a missing distribution DB."""
+    try:
+        return {problem["problem_key"]: problem for problem in _current_problems()}
+    except HTTPException as exc:
+        if exc.status_code == 503:
+            return {}
+        raise
+
+
+@router.get("/history")
+def history(limit: int = 20):
+    limit = max(1, min(limit, 100))
+    current = _current_problem_map()
+    conn = get_connection()
+    try:
+        counts = {name: 0 for name in ("top", "strong", "listed", "unlisted")}
+        for row in conn.execute("SELECT verdict, COUNT(*) count FROM next_move_results GROUP BY verdict"):
+            if row["verdict"] in counts:
+                counts[row["verdict"]] = row["count"]
+        total = sum(counts.values())
+        rows = conn.execute(
+            "SELECT * FROM next_move_results ORDER BY answered_at DESC, id DESC LIMIT ?", (limit,)
+        ).fetchall()
+    finally:
+        conn.close()
+    recent = []
+    for row in rows:
+        item = dict(row)
+        problem = current.get(row["problem_key"])
+        item.update(
+            opening_key=problem["opening_key"] if problem else row["opening_key_at_answer"],
+            opening_name=problem["opening_name"] if problem else row["opening_name_at_answer"],
+            sample_id=problem["id"] if problem else None,
+            available=problem is not None,
+            unavailable_reason=None if problem else "現在の問題データには存在しません",
+        )
+        recent.append(item)
+    return {"total_answers": total, "verdict_counts": counts,
+            "top_rate": counts["top"] / total if total else 0, "recent_results": recent}
+
+
+@router.get("/review")
+def review():
+    current = _current_problem_map()
+    conn = get_connection()
+    try:
+        keys = [row["problem_key"] for row in conn.execute("SELECT DISTINCT problem_key FROM next_move_results")]
+        latest = latest_next_move_results(conn, keys)
+    finally:
+        conn.close()
+    items = []
+    for key, row in latest.items():
+        if row["verdict"] not in ("listed", "unlisted"):
+            continue
+        problem = current.get(key)
+        items.append({"problem_key": key, "sample_id": problem["id"] if problem else None,
+            "opening_key": problem["opening_key"] if problem else row["opening_key_at_answer"],
+            "opening_name": problem["opening_name"] if problem else row["opening_name_at_answer"],
+            "verdict": row["verdict"], "move_usi": row["move_usi"],
+            "answered_at": row["answered_at"], "result_id": row["id"],
+            "available": problem is not None,
+            "unavailable_reason": None if problem else "現在の問題データには存在しません"})
+    items.sort(key=lambda item: (item["answered_at"], item["result_id"]), reverse=True)
+    return {"items": items}
