@@ -485,7 +485,13 @@ test.describe("次の一手", () => {
       json: { detail: "ランダム出題用DBを開けません" },
     }));
     await page.goto("/next-move");
-    await page.getByRole("button", { name: "ランダムに1問" }).click();
+    const nextMoveSection = page.getByTestId("next-move-section");
+    const randomButton = nextMoveSection.getByRole("button", {
+      name: "ランダムに1問",
+      exact: true,
+    });
+    await expect(randomButton).toBeVisible();
+    await randomButton.click();
     await expect(page.getByTestId("next-move-db-recovery")).toContainText("ランダム出題用DBを開けません");
 
     await page.getByTestId("next-move-opening-filter").selectOption("shikenbisha");
