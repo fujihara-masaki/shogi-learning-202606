@@ -134,7 +134,9 @@ def select_next_problem(problems: list[dict], *, policy: str, latest: dict,
     if policy == "unattempted":
         candidates = [p for p in candidates if p["problem_key"] not in latest]
     elif policy == "weak":
-        candidates = [p for p in candidates if latest.get(p["problem_key"], {}).get("verdict") in ("listed", "unlisted")]
+        candidates = [p for p in candidates
+                      if (result := latest.get(p["problem_key"])) is not None
+                      and result["verdict"] in ("listed", "unlisted")]
     if not candidates:
         return None
     selected_opening = opening_key or choose_opening(candidates, rng)

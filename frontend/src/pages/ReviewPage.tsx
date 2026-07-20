@@ -1,8 +1,10 @@
 // 復習画面: 間違えた問題一覧とお気に入り問題一覧。
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { fetchNextMoveProblem, fetchNextMoveReview, fetchProblems, fetchReviewProblems, nextMoveVerdictLabel, type NextMoveReviewItem, type TsumeProblem } from "../api/client";
+import { ApiError, fetchNextMoveProblem, fetchNextMoveReview, fetchProblems, fetchReviewProblems, isNextMoveUnavailable, nextMoveVerdictLabel, type NextMoveReviewItem, type TsumeProblem } from "../api/client";
 import { useNavigate } from "react-router-dom";
+import { NextMoveDatabaseError } from "../components/NextMoveDatabaseError";
+import { errorMessage } from "../components/nextMoveError";
 
 type Tab = "wrong" | "favorite" | "next-move";
 
@@ -13,6 +15,9 @@ export default function ReviewPage() {
   const [error, setError] = useState<string | null>(null);
   const [nextMoveProblems, setNextMoveProblems] = useState<NextMoveReviewItem[]>([]);
   const [nextMoveError, setNextMoveError] = useState<string | null>(null);
+  const [startingWeak, setStartingWeak] = useState(false);
+  const [weakStartError, setWeakStartError] = useState<unknown | null>(null);
+  const [weakStartStatus, setWeakStartStatus] = useState<string | null>(null);
   const navigate = useNavigate();
 
   const load = useCallback(async () => {
@@ -42,8 +47,17 @@ export default function ReviewPage() {
   const list = tab === "wrong" ? wrongProblems : favoriteProblems;
 
   async function startWeak() {
-    const problem = await fetchNextMoveProblem({ policy: "weak" });
-    if (problem) navigate(`/next-move/${problem.id}?policy=weak`);
+    if (startingWeak) return;
+    setStartingWeak(true); setWeakStartError(null); setWeakStartStatus(null);
+    try {
+      const problem = await fetchNextMoveProblem({ policy: "weak" });
+      if (problem) navigate(`/next-move/${problem.id}?policy=weak`);
+      else setWeakStartStatus("出題できる復習対象がありません。");
+    } catch (error) {
+      setWeakStartError(error);
+    } finally {
+      setStartingWeak(false);
+    }
   }
 
   return (
@@ -75,7 +89,13 @@ export default function ReviewPage() {
       {tab === "next-move" ? <section aria-labelledby="next-move-review-heading">
         <h2 id="next-move-review-heading">次の一手</h2>
         {nextMoveError && <div className="banner banner-error" role="alert">{nextMoveError}</div>}
-        <button type="button" onClick={startWeak} disabled={nextMoveProblems.every((p) => !p.available)}>復習対象から1問</button>
+        <button type="button" onClick={startWeak} disabled={startingWeak}>
+          {startingWeak ? "問題を選択中..." : "復習対象から1問"}
+        </button>
+        {weakStartStatus && <p role="status" aria-live="polite">{weakStartStatus}</p>}
+        {weakStartError instanceof ApiError && isNextMoveUnavailable(weakStartError)
+          ? <NextMoveDatabaseError error={weakStartError} />
+          : Boolean(weakStartError) && <div className="banner banner-error" role="alert">{errorMessage(weakStartError, "復習問題の取得に失敗しました")}</div>}
         {nextMoveProblems.length === 0 ? <p className="muted" role="status">復習対象の次の一手はありません。</p> :
           <div className="table-scroll"><table className="data-table"><thead><tr><th>戦型</th><th>最新判定</th><th>指した手</th><th>日時</th><th></th></tr></thead>
           <tbody>{nextMoveProblems.map((p) => <tr key={p.problem_key}><td>{p.opening_name}</td><td>{nextMoveVerdictLabel(p.verdict)}</td><td>{p.move_usi}</td><td>{p.answered_at}</td><td>{p.available && p.sample_id != null ? <Link className="button-link" to={`/next-move/${p.sample_id}?policy=weak`}>再挑戦</Link> : <span className="muted">利用不可: {p.unavailable_reason}</span>}</td></tr>)}</tbody></table></div>}

@@ -142,6 +142,85 @@ async function playMove(page: Page, from: string, to: string) {
   await board.locator(`[data-square="${to}"]`).click();
 }
 
+test("履歴に次の一手と既存の詰め将棋・タイムアタック履歴を表示する", async ({ page }) => {
+  await page.route("**/api/stats", (route) => route.fulfill({ json: { overall: { total_answers: 1, total_correct: 1, total_wrong: 0, accuracy: 1, avg_elapsed_ms: 1000 }, by_mate_length: {}, recent_results: [{ id: 1, problem_id: 1, title: "1手詰", mate_length: 1, is_correct: true, elapsed_ms: 1000, mistake_count: 0, answered_at: "2026-01-01" }] } }));
+  await page.route("**/api/time-attack/results", (route) => route.fulfill({ json: [{ id: 1, mode: "normal", mate_length: 1, total_questions: 5, correct_count: 5, mistake_count: 0, elapsed_ms: 5000, played_at: "2026-01-02" }] }));
+  await page.route("**/api/next-move/history", (route) => route.fulfill({ json: { total_answers: 2, verdict_counts: { top: 1, strong: 0, listed: 1, unlisted: 0 }, top_rate: 0.5, recent_results: [{ id: 2, problem_key: "v1:a", move_usi: "7g7f", verdict: "listed", candidate_rank: 4, elapsed_ms: 1200, answered_at: "2026-01-03", opening_key: "bogin", opening_name: "棒銀", sample_id: 101, available: true, unavailable_reason: null }] } }));
+  await page.goto("/history");
+  await expect(page.getByRole("heading", { name: "次の一手" })).toBeVisible();
+  await expect(page.getByTestId("history-page")).toContainText("総解答数: 2");
+  await expect(page.getByTestId("history-page")).toContainText("△ 登録候補");
+  await expect(page.getByRole("heading", { name: "成績サマリー" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "タイムアタック履歴" })).toBeVisible();
+});
+
+test("復習の次の一手タブは再挑戦・利用不可・空状態・キーボード操作に対応する", async ({ page }) => {
+  await page.route("**/api/review-problems", (route) => route.fulfill({ json: [] }));
+  await page.route("**/api/tsume-problems**", (route) => route.fulfill({ json: [] }));
+  await page.route("**/api/next-move/review", (route) => route.fulfill({ json: { items: [
+    { problem_key: "v1:a", sample_id: 101, opening_key: "bogin", opening_name: "棒銀", verdict: "listed", move_usi: "7g7f", answered_at: "2026-01-01", result_id: 1, available: true, unavailable_reason: null },
+    { problem_key: "v1:b", sample_id: null, opening_key: "old", opening_name: "旧戦型", verdict: "unlisted", move_usi: "2g2f", answered_at: "2026-01-02", result_id: 2, available: false, unavailable_reason: "現在の問題データには存在しません" },
+  ] } }));
+  await page.goto("/review");
+  const tab = page.getByRole("button", { name: /次の一手/ });
+  await tab.focus(); await page.keyboard.press("Enter");
+  await expect(page.getByText("△ 登録候補")).toBeVisible();
+  await expect(page.getByText("? 未登録")).toBeVisible();
+  await expect(page.getByText(/利用不可/)).toBeVisible();
+  await expect(page.getByRole("link", { name: "再挑戦" })).toHaveCount(1);
+  await expect(page.getByRole("link", { name: "再挑戦" })).toHaveAttribute("href", "/next-move/101?policy=weak");
+});
+
+test("weak開始と継続は全戦型のままpolicyとexcludeだけを送る", async ({ page }) => {
+  const requests: string[] = [];
+  await mockNextMoveApi(page);
+  await page.route("**/api/review-problems", (route) => route.fulfill({ json: [] }));
+  await page.route("**/api/tsume-problems**", (route) => route.fulfill({ json: [] }));
+  await page.route("**/api/next-move/review", (route) => route.fulfill({ json: { items: [{ problem_key: "v1:problem-101", sample_id: 101, opening_key: "bogin", opening_name: "棒銀", verdict: "listed", move_usi: "7g7f", answered_at: "2026-01-01", result_id: 1, available: true, unavailable_reason: null }] } }));
+  await page.route("**/api/next-move/problems/next**", async (route) => {
+    requests.push(route.request().url());
+    await route.fulfill({ json: requests.length === 1 ? SAMPLES[0] : SAMPLES[3] });
+  });
+  await page.goto("/review"); await page.getByRole("button", { name: /次の一手/ }).click();
+  await page.getByRole("button", { name: "復習対象から1問" }).click();
+  await expect(page).toHaveURL(/\/next-move\/101\?policy=weak$/);
+  await page.getByTestId("next-move-skip-button").click();
+  await expect(page).toHaveURL(/\/next-move\/201\?policy=weak$/);
+  expect(requests[0]).toContain("policy=weak"); expect(requests[0]).not.toContain("opening_key");
+  expect(requests[1]).toContain("exclude_problem_key=v1%3Aproblem-101"); expect(requests[1]).not.toContain("opening_key");
+});
+
+test("次の一手開始の204・API失敗と復習0件を表示し360pxで横スクロールしない", async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 800 });
+  await mockNextMoveApi(page);
+  await page.route("**/api/next-move/problems/next**", (route) => route.fulfill({ status: 204 }));
+  await page.goto("/next-move"); await page.getByRole("button", { name: "全戦型からランダムに1問" }).click();
+  await expect(page.getByRole("status")).toContainText("出題できる問題がありません");
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
+  await page.route("**/api/review-problems", (route) => route.fulfill({ json: [] }));
+  await page.route("**/api/tsume-problems**", (route) => route.fulfill({ json: [] }));
+  await page.route("**/api/next-move/review", (route) => route.fulfill({ json: { items: [] } }));
+  await page.goto("/review"); await page.getByRole("button", { name: /次の一手/ }).click();
+  await expect(page.getByText("復習対象の次の一手はありません。")).toBeVisible();
+});
+
+test("開始API失敗をalertで表示し、復習対象は再読み込み時の最新結果を反映する", async ({ page }) => {
+  await mockNextMoveApi(page);
+  await page.route("**/api/next-move/problems/next**", (route) => route.fulfill({ status: 500, json: { detail: "選択失敗" } }));
+  await page.goto("/next-move"); await page.getByRole("button", { name: "全戦型からランダムに1問" }).click();
+  await expect(page.getByRole("alert")).toContainText("選択失敗");
+  await expect(page.getByRole("button", { name: "全戦型からランダムに1問" })).toBeEnabled();
+
+  let latestIsTop = false;
+  await page.route("**/api/review-problems", (route) => route.fulfill({ json: [] }));
+  await page.route("**/api/tsume-problems**", (route) => route.fulfill({ json: [] }));
+  await page.route("**/api/next-move/review", (route) => route.fulfill({ json: { items: latestIsTop ? [] : [{ problem_key: "v1:a", sample_id: 101, opening_key: "bogin", opening_name: "棒銀", verdict: "listed", move_usi: "7g7f", answered_at: "2026-01-01", result_id: 1, available: true, unavailable_reason: null }] } }));
+  await page.goto("/review"); await page.getByRole("button", { name: /次の一手/ }).click();
+  await expect(page.getByText("△ 登録候補")).toBeVisible();
+  latestIsTop = true; await page.reload(); await page.getByRole("button", { name: /次の一手/ }).click();
+  await expect(page.getByText("復習対象の次の一手はありません。")).toBeVisible();
+});
+
 // APIをモックせず、小規模専用DBと実backendを通す。
 test("専用DBから次の一手一覧と出典を取得できる", async ({ page }) => {
   await page.goto("/next-move");
