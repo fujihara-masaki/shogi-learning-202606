@@ -147,7 +147,11 @@ test("履歴に次の一手と既存の詰め将棋・タイムアタック履�
   await page.route("**/api/time-attack/results", (route) => route.fulfill({ json: [{ id: 1, mode: "normal", mate_length: 1, total_questions: 5, correct_count: 5, mistake_count: 0, elapsed_ms: 5000, played_at: "2026-01-02" }] }));
   await page.route("**/api/next-move/history", (route) => route.fulfill({ json: { total_answers: 2, verdict_counts: { top: 1, strong: 0, listed: 1, unlisted: 0 }, top_rate: 0.5, recent_results: [{ id: 2, problem_key: "v1:a", move_usi: "7g7f", verdict: "listed", candidate_rank: 4, elapsed_ms: 1200, answered_at: "2026-01-03", opening_key: "bogin", opening_name: "棒銀", sample_id: 101, available: true, unavailable_reason: null }] } }));
   await page.goto("/history");
-  await expect(page.getByRole("heading", { name: "次の一手" })).toBeVisible();
+  await expect(page.getByRole("heading", {
+    name: "次の一手",
+    level: 2,
+    exact: true,
+  })).toBeVisible();
   await expect(page.getByTestId("history-page")).toContainText("総解答数: 2");
   await expect(page.getByTestId("history-page")).toContainText("△ 登録候補");
   await expect(page.getByRole("heading", { name: "成績サマリー" })).toBeVisible();
