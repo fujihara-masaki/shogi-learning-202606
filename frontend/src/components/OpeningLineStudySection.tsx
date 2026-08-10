@@ -1,5 +1,4 @@
-// 定跡学習トップの「定跡手順を学ぶ」セクション。
-// 戦型カテゴリ・戦型一覧・関連定跡ライン・学習できる定跡ラインをまとめる。
+// 定跡学習トップの、戦型を入口にした手順選択セクション。
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import {
@@ -13,7 +12,40 @@ import {
   type OpeningTagSummary,
   type OpeningType,
 } from "../api/client";
-import { OPENING_LINES, countMainLineMoves } from "../shogi/openings";
+import { OPENING_LINES, countMainLineMoves, type OpeningLine } from "../shogi/openings";
+import { availableOpeningLineCount, expandedImportedLinesForType, importedLinesForType } from "./openingTypeLines";
+
+// static lineにも学習入口となる戦型を明示する。API/DBのlineと同じカード内に表示する。
+const STATIC_OPENING_TYPE_NAMES: Record<string, string> = {
+  "static-rook-rapid-attack": "相掛かり",
+  "yagura-foundation": "矢倉",
+  "fourth-file-rook": "四間飛車",
+};
+
+function staticLinesForType(type: OpeningType): OpeningLine[] {
+  return OPENING_LINES.filter((line) => STATIC_OPENING_TYPE_NAMES[line.id] === type.name_ja);
+}
+
+interface OpeningCatalogErrors {
+  tags: string | null;
+  categories: string | null;
+  types: string | null;
+  openings: string | null;
+  typeLines: string | null;
+}
+
+const EMPTY_CATALOG_ERRORS: OpeningCatalogErrors = {
+  tags: null,
+  categories: null,
+  types: null,
+  openings: null,
+  typeLines: null,
+};
+
+interface MatchingLinesResult {
+  tag: string;
+  lines: OpeningSummary[];
+}
 
 export default function OpeningLineStudySection() {
   const [tags, setTags] = useState<OpeningTagSummary[]>([]);
@@ -21,162 +53,224 @@ export default function OpeningLineStudySection() {
   const [categories, setCategories] = useState<OpeningCategory[]>([]);
   const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(null);
   const [openingTypes, setOpeningTypes] = useState<OpeningType[]>([]);
-  const [imported, setImported] = useState<OpeningSummary[]>([]);
+  const [matchingLinesResult, setMatchingLinesResult] = useState<MatchingLinesResult | null>(null);
+  const [loadingMatchingLines, setLoadingMatchingLines] = useState(true);
   const [selectedType, setSelectedType] = useState<OpeningType | null>(null);
   const [typeLines, setTypeLines] = useState<OpeningSummary[]>([]);
-  const [error, setError] = useState<string | null>(null);
+  const [loadingTypeLines, setLoadingTypeLines] = useState(false);
+  const [errors, setErrors] = useState<OpeningCatalogErrors>(EMPTY_CATALOG_ERRORS);
 
   useEffect(() => {
     let cancelled = false;
-    Promise.all([
-      fetchOpeningTags(),
-      fetchOpenings(selectedTag || undefined),
-      fetchOpeningCategories(),
-      fetchOpeningTypes(selectedCategoryId ?? undefined),
-    ])
-      .then(([tagList, openingList, categoryList, typeList]) => {
+    fetchOpeningTags()
+      .then((tagList) => {
         if (cancelled) return;
         setTags(tagList);
-        setImported(openingList);
-        setCategories(categoryList);
-        setOpeningTypes(typeList);
-        setError(null);
+        setErrors((current) => ({ ...current, tags: null }));
       })
-      .catch((e) => {
-        if (!cancelled) setError(`定跡データの取得に失敗しました: ${e}`);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [selectedTag, selectedCategoryId]);
+      .catch((e) => { if (!cancelled) setErrors((current) => ({ ...current, tags: `タグの取得に失敗しました: ${e}` })); });
+    return () => { cancelled = true; };
+  }, []);
 
   useEffect(() => {
-    if (!selectedType || selectedType.opening_line_count === 0) return;
+    let cancelled = false;
+    fetchOpeningCategories()
+      .then((categoryList) => {
+        if (cancelled) return;
+        setCategories(categoryList);
+        setErrors((current) => ({ ...current, categories: null }));
+      })
+      .catch((e) => { if (!cancelled) setErrors((current) => ({ ...current, categories: `カテゴリの取得に失敗しました: ${e}` })); });
+    return () => { cancelled = true; };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchOpeningTypes(selectedCategoryId ?? undefined)
+      .then((typeList) => {
+        if (cancelled) return;
+        setOpeningTypes(typeList);
+        setErrors((current) => ({ ...current, types: null }));
+      })
+      .catch((e) => {
+        if (cancelled) return;
+        setErrors((current) => ({ ...current, types: `戦型一覧の取得に失敗しました: ${e}` }));
+      });
+    return () => { cancelled = true; };
+  }, [selectedCategoryId]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const requestedTag = selectedTag;
+    fetchOpenings(requestedTag || undefined)
+      .then((lines) => {
+        if (cancelled) return;
+        setMatchingLinesResult({ tag: requestedTag, lines });
+        setLoadingMatchingLines(false);
+        setErrors((current) => ({ ...current, openings: null }));
+      })
+      .catch((e) => {
+        if (cancelled) return;
+        setLoadingMatchingLines(false);
+        setErrors((current) => ({ ...current, openings: `学習手順の取得に失敗しました: ${e}` }));
+      });
+    return () => { cancelled = true; };
+  }, [selectedTag]);
+
+  const matchingLines = useMemo(
+    () => !loadingMatchingLines && matchingLinesResult?.tag === selectedTag ? matchingLinesResult.lines : [],
+    [loadingMatchingLines, matchingLinesResult, selectedTag],
+  );
+
+  useEffect(() => {
+    if (!selectedType) return;
+    if (selectedType.opening_line_count === 0) return;
     let cancelled = false;
     fetchOpeningTypeLines(selectedType.id)
       .then((lines) => {
-        if (!cancelled) setTypeLines(lines);
+        if (cancelled) return;
+        setTypeLines(lines);
+        setErrors((current) => ({ ...current, typeLines: null }));
       })
       .catch((e) => {
-        if (!cancelled) setError(`関連定跡ラインの取得に失敗しました: ${e}`);
+        if (!cancelled) setErrors((current) => ({ ...current, typeLines: `学習手順の取得に失敗しました: ${e}` }));
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingTypeLines(false);
       });
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, [selectedType]);
+
+  const visibleTypes = useMemo(() => {
+    if (!selectedTag) return openingTypes;
+    return openingTypes.filter((type) => importedLinesForType(type, matchingLines).length > 0);
+  }, [matchingLines, openingTypes, selectedTag]);
+  const errorMessages = Object.values(errors).filter((message): message is string => message !== null);
 
   function resetSelectedTypeLines() {
     setSelectedType(null);
     setTypeLines([]);
-  }
-
-  function handleTagChange(tag: string) {
-    setSelectedTag(tag);
-    resetSelectedTypeLines();
-  }
-
-  function handleCategorySelect(categoryId: number | null) {
-    setSelectedCategoryId(categoryId);
-    resetSelectedTypeLines();
+    setLoadingTypeLines(false);
+    setErrors((current) => ({ ...current, typeLines: null }));
   }
 
   function handleTypeLinesClick(type: OpeningType) {
+    if (selectedType?.id === type.id) {
+      resetSelectedTypeLines();
+      return;
+    }
+    setErrors((current) => ({ ...current, typeLines: null }));
     setSelectedType(type);
     setTypeLines([]);
+    setLoadingTypeLines(type.opening_line_count > 0);
   }
 
-  const hasImported = imported.length > 0;
-  const staticOpenings = useMemo(() => (selectedTag || selectedCategoryId ? [] : OPENING_LINES), [selectedTag, selectedCategoryId]);
+  const selectedStaticLines = selectedType && !selectedTag ? staticLinesForType(selectedType) : [];
+  const selectedImportedLines = selectedType
+    ? expandedImportedLinesForType(selectedType, typeLines, matchingLines, Boolean(selectedTag))
+    : [];
 
   return (
     <section data-testid="opening-line-study-section">
-      <h2>定跡手順を学ぶ</h2>
-      <p className="muted">戦型を選び、定跡の手順を一手ずつ盤面でなぞって覚えるモードです。</p>
-      {error && <div className="banner banner-error" role="alert">{error}</div>}
+      <h2>戦型から学ぶ</h2>
+      <p className="muted">戦型を選び、その戦型の手順を一手ずつ盤面でなぞって覚えましょう。</p>
+      {errorMessages.length > 0 && (
+        <div className="banner banner-error" role="alert">
+          {errorMessages.map((message) => <p key={message}>{message}</p>)}
+        </div>
+      )}
 
-      <div className="filter-bar">
-        <select value={selectedTag} onChange={(e) => handleTagChange(e.target.value)} aria-label="戦型タグ">
-          <option value="">定跡タグ: すべて</option>
-          {tags.map((tag) => (
-            <option key={tag.tag} value={tag.tag}>{tag.label} ({tag.count})</option>
-          ))}
-        </select>
-      </div>
-
-      <section>
-        <h3>戦型カテゴリ</h3>
-        <div className="opening-category-grid" data-testid="opening-category-list">
-          <button className={!selectedCategoryId ? "opening-category-card active" : "opening-category-card"} aria-pressed={!selectedCategoryId} onClick={() => handleCategorySelect(null)} type="button">
-            <strong>すべて</strong><span>全カテゴリの戦型を表示</span>
-          </button>
+      <section className="opening-filters" aria-labelledby="opening-filter-heading">
+        <div>
+          <h3 id="opening-filter-heading">戦型を探す</h3>
+          <p className="muted">カテゴリやタグで戦型一覧を絞り込めます。</p>
+        </div>
+        <div className="opening-category-filter" data-testid="opening-category-list" role="group" aria-label="カテゴリで絞り込む">
+          <button className={selectedCategoryId === null ? "active" : ""} aria-pressed={selectedCategoryId === null} onClick={() => { setSelectedCategoryId(null); resetSelectedTypeLines(); }} type="button">すべて</button>
           {categories.map((category) => (
-            <button key={category.id} className={selectedCategoryId === category.id ? "opening-category-card active" : "opening-category-card"} aria-pressed={selectedCategoryId === category.id} onClick={() => handleCategorySelect(category.id)} type="button" data-testid="opening-category-card">
-              <strong>{category.name_ja}</strong><span>{category.description}</span>
+            <button key={category.id} className={selectedCategoryId === category.id ? "active" : ""} aria-pressed={selectedCategoryId === category.id} onClick={() => { setSelectedCategoryId(category.id); resetSelectedTypeLines(); }} type="button" data-testid="opening-category-card">
+              {category.name_ja}
             </button>
           ))}
         </div>
+        <label className="opening-tag-filter">
+          <span>タグでさらに絞り込む</span>
+          <select value={selectedTag} onChange={(e) => { setLoadingMatchingLines(true); setMatchingLinesResult(null); setSelectedTag(e.target.value); resetSelectedTypeLines(); }}>
+            <option value="">すべてのタグ</option>
+            {tags.map((tag) => <option key={tag.tag} value={tag.tag}>{tag.label} ({tag.count})</option>)}
+          </select>
+        </label>
       </section>
 
-      <section>
-        <h3>戦型一覧</h3>
-        <div className="opening-list" data-testid="opening-type-list">
-          {openingTypes.map((type) => (
-            <article key={type.id} className="opening-card" data-testid="opening-type-card">
-              <div>
-                <p className="opening-category">{type.category_name_ja}</p>
-                <h4 data-testid="opening-type-card-title">{type.name_ja}</h4>
-                <p>{type.description_short}</p>
-                <p className="muted">かな: {type.name_kana} / English: {type.name_en}</p>
-                <p className="muted">出典: {type.source_name} / ライセンス: {type.license}</p>
-              </div>
-              {type.opening_line_count > 0 ? (
-                <button type="button" className="primary-link" onClick={() => handleTypeLinesClick(type)}>
-                  関連定跡ラインを見る ({type.opening_line_count})
-                </button>
-              ) : <strong className="muted">定跡手順は準備中</strong>}
-            </article>
-          ))}
-        </div>
-      </section>
-
-      {selectedType && (
-        <section>
-          <h3>{selectedType.name_ja}の関連定跡ライン</h3>
-          <div className="opening-list" data-testid="opening-type-line-list">
-            {typeLines.map((opening) => (
-              <article key={`type-${opening.id}`} className="opening-card" data-testid="opening-type-line-card">
+      {errors.types ? (
+        <section aria-labelledby="static-opening-fallback-heading" data-testid="opening-static-fallback">
+          <h3 id="static-opening-fallback-heading">基本の学習手順</h3>
+          <p className="muted">戦型一覧を読み込めないため、基本の手順を表示しています。</p>
+          <div className="opening-list">
+            {OPENING_LINES.map((opening) => (
+              <article key={opening.id} className="opening-card" data-testid="opening-static-fallback-card">
                 <div>
-                  <p className="opening-category">{opening.opening_type}</p>
+                  <p className="opening-category">{opening.category}</p>
                   <h4 data-testid="opening-card-title">{opening.name}</h4>
-                  <p className="muted">手数: {opening.move_count}手</p>
-                  {opening.source.license_name && <p className="muted">ライセンス: {opening.source.license_name}</p>}
+                  <p>{opening.description}</p>
+                  <p className="muted">{countMainLineMoves(opening)}手</p>
                 </div>
                 <Link className="primary-link" to={`/openings/${opening.id}`}>学習する</Link>
               </article>
             ))}
-            {typeLines.length === 0 && <p className="muted">関連定跡ラインを読み込み中です。</p>}
           </div>
         </section>
-      )}
-
-      <section>
-        <h3>学習できる定跡ライン</h3>
-        <div className="opening-list" data-testid="opening-list">
-          {imported.map((opening) => (
-            <article key={`imported-${opening.id}`} className="opening-card" data-testid="opening-card">
-              <div><p className="opening-category">{opening.opening_type}</p><h4 data-testid="opening-card-title">{opening.name}</h4><p>インポート済み定跡ライン</p><p className="muted">手数: {opening.move_count}手</p>{opening.source.license_name && <p className="muted">ライセンス: {opening.source.license_name}</p>}</div>
-              <Link className="primary-link" to={`/openings/${opening.id}`}>学習する</Link>
-            </article>
-          ))}
-          {!hasImported && staticOpenings.map((opening) => (
-            <article key={opening.id} className="opening-card" data-testid="opening-card">
-              <div><p className="opening-category">{opening.category}</p><h4 data-testid="opening-card-title">{opening.name}</h4><p>{opening.description}</p><p className="muted">手数: {countMainLineMoves(opening)}手</p></div>
-              <Link className="primary-link" to={`/openings/${opening.id}`}>学習する</Link>
-            </article>
-          ))}
-          {!hasImported && staticOpenings.length === 0 && <p className="muted">該当する定跡ラインはありません。定跡手順は準備中です。</p>}
+      ) : (
+      <section aria-labelledby="opening-types-heading">
+        <h3 id="opening-types-heading">戦型一覧</h3>
+        <p className="muted">学びたい戦型を選んでください。</p>
+        <div className="opening-list" data-testid="opening-type-list">
+          {visibleTypes.map((type) => {
+            const staticCount = selectedTag ? 0 : staticLinesForType(type).length;
+            const availableCount = availableOpeningLineCount(type, matchingLines, Boolean(selectedTag), staticCount);
+            const isExpanded = selectedType?.id === type.id;
+            return (
+              <article key={type.id} className={`opening-card opening-type-card${isExpanded ? " active" : ""}`} data-testid="opening-type-card">
+                <div>
+                  <p className="opening-category">{type.category_name_ja}</p>
+                  <h4 data-testid="opening-type-card-title">{type.name_ja}</h4>
+                  <p>{type.description_short}</p>
+                  {availableCount > 0
+                    ? <p className="opening-availability available"><strong>{availableCount}つの手順を学べます</strong></p>
+                    : <p className="opening-availability pending"><strong>定跡手順は準備中</strong></p>}
+                </div>
+                {availableCount > 0 && (
+                  <button type="button" className="primary-link" aria-expanded={isExpanded} aria-controls={`opening-type-lines-${type.id}`} onClick={() => handleTypeLinesClick(type)}>
+                    {isExpanded ? "手順を閉じる" : "手順を見る"}
+                  </button>
+                )}
+                {isExpanded && (
+                  <div id={`opening-type-lines-${type.id}`} className="opening-type-lines" data-testid="opening-type-line-list">
+                    <h5>{type.name_ja}の学習手順</h5>
+                    {loadingTypeLines && <p className="muted" role="status">手順を読み込み中です。</p>}
+                    {!loadingTypeLines && [...selectedImportedLines, ...selectedStaticLines].map((opening) => {
+                      const isStatic = "description" in opening;
+                      const id = String(opening.id);
+                      return (
+                        <div key={id} className="opening-line-item" data-testid="opening-type-line-card">
+                          <div>
+                            <strong data-testid="opening-card-title">{opening.name}</strong>
+                            <span className="muted">{isStatic ? opening.description : `${opening.move_count}手`}</span>
+                            {isStatic && <span className="muted">{countMainLineMoves(opening)}手</span>}
+                          </div>
+                          <Link className="primary-link" to={`/openings/${id}`}>学習する</Link>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </article>
+            );
+          })}
+          {visibleTypes.length === 0 && !errors.openings && !loadingMatchingLines && <p className="muted" data-testid="opening-types-empty">条件に合う戦型はありません。</p>}
         </div>
       </section>
+      )}
     </section>
   );
 }
