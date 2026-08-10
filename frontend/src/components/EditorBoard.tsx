@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { editorPieceToVisual } from "../appearance/adapters";
 import {
   HAND_PIECES,
   PIECE_LABEL,
@@ -8,6 +9,8 @@ import {
   type EditorPiece,
   type EditorPosition,
 } from "../shogi/editor";
+import BoardSurface from "./shogi/BoardSurface";
+import PieceFace from "./shogi/PieceFace";
 
 interface Props {
   position: EditorPosition;
@@ -98,7 +101,11 @@ export default function EditorBoard({ position, onChange }: Props) {
                   aria-label={`${color === "b" ? "先手" : "後手"}の${PIECE_LABEL[code]}を配置`}
                   onClick={() => setTool({ kind: "piece", piece: { color, code } })}
                 >
-                  {PIECE_LABEL[code]}
+                  <PieceFace
+                    piece={editorPieceToVisual({ color, code })}
+                    kingGlyph="all-gyoku"
+                    variant="plain"
+                  />
                 </button>
               ))}
             </div>
@@ -112,7 +119,7 @@ export default function EditorBoard({ position, onChange }: Props) {
           ))}
         </div>
         <div className="board-row-container">
-          <div className="board-grid editor-grid">
+          <BoardSurface className="board-grid editor-grid">
             {position.board.map((row, rowIndex) =>
               row.map((piece, colIndex) => (
                 <button
@@ -128,18 +135,16 @@ export default function EditorBoard({ position, onChange }: Props) {
                   onClick={() => click(rowIndex, colIndex)}
                 >
                   {piece && (
-                    <span
-                      className={`piece-face ${piece.color === "w" ? "piece-white" : ""} ${
-                        PIECE_LABEL[piece.code].length > 1 ? "piece-narrow" : ""
-                      }`}
-                    >
-                      {pieceText(piece)}
-                    </span>
+                    <PieceFace
+                      piece={editorPieceToVisual(piece)}
+                      kingGlyph="all-gyoku"
+                      variant="board"
+                    />
                   )}
                 </button>
               )),
             )}
-          </div>
+          </BoardSurface>
           <div className="rank-coords">
             {RANKS.map((rank) => (
               <span key={rank}>{rank}</span>
