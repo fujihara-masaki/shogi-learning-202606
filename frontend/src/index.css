@@ -243,7 +243,7 @@ select {
   padding-left: 3px;
 }
 
-.board-grid {
+.board-surface {
   background: var(--board-bg);
   border: 2px solid var(--board-line);
 }

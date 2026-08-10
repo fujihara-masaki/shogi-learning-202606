@@ -113,6 +113,13 @@ async function playGoldDrop(page: Page, square: string) {
   await board.locator(`[data-square="${square}"]`).click();
 }
 
+async function dragGoldDrop(page: Page, square: string) {
+  const board = page.getByTestId("shogi-board");
+  await board.getByRole("button", { name: "金" }).dragTo(
+    board.locator(`[data-square="${square}"]`),
+  );
+}
+
 test.beforeEach(async ({ request }) => {
   await cleanupE2eProblems(request);
 });
@@ -194,7 +201,7 @@ test("tsume page plays an existing one-move problem and shows wrong/correct feed
   await playGoldDrop(page, "42");
   await expect(page.getByTestId("tsume-feedback")).toContainText("不正解");
   await page.getByRole("button", { name: "もう一度" }).click();
-  await playGoldDrop(page, "52");
+  await dragGoldDrop(page, "52");
   await expect(page.getByTestId("tsume-feedback")).toContainText("正解");
 });
 
@@ -216,8 +223,14 @@ test("board editor can generate and restore SFEN", async ({ page }) => {
   const editor = page.getByTestId("editor-board");
   await editor.getByRole("button", { name: "玉" }).first().click();
   await page.getByTestId("editor-square-5-1").click();
+  await expect(page.getByTestId("editor-square-5-1")).toHaveText("玉");
   await editor.getByRole("button", { name: "角" }).first().click();
   await page.getByTestId("editor-square-4-3").click();
+  await editor.getByRole("button", { name: "移動" }).click();
+  await page.getByTestId("editor-square-4-3").click();
+  await page.getByTestId("editor-square-4-4").click();
+  await expect(page.getByTestId("editor-square-4-3")).toHaveText("");
+  await expect(page.getByTestId("editor-square-4-4")).toHaveText("角");
   await page.getByRole("button", { name: "現在の局面からSFEN生成" }).click();
   const sfen = page.getByLabel("SFEN");
   await expect(sfen).toHaveValue(/k|K|B/);
@@ -236,6 +249,7 @@ test("solution recorder writes, undoes, and resets USI moves", async ({ page }) 
   await page.getByRole("button", { name: "この局面から手順記録を開始" }).click();
 
   const recorder = page.getByTestId("solution-recorder");
+  await expect(page.getByTestId("recorder-square-5-1")).toHaveText("玉");
   await recorder.getByRole("button", { name: "金" }).click();
   await page.getByTestId("recorder-square-5-2").click();
   await expect(page.getByLabel("solution_moves")).toHaveValue(ONE_MOVE_SOLUTION);
@@ -248,6 +262,10 @@ test("solution recorder writes, undoes, and resets USI moves", async ({ page }) 
   await page.getByTestId("recorder-square-5-2").click();
   await page.getByRole("button", { name: "記録リセット" }).click();
   await expect(page.getByLabel("solution_moves")).toHaveValue("");
+
+  await page.getByTestId("recorder-square-4-3").click();
+  await page.getByTestId("recorder-square-4-2").click();
+  await expect(page.getByLabel("solution_moves")).toHaveValue("4c4b");
 });
 
 test("creates a new problem, plays it, edits it, and deletes it", async ({ page }) => {
@@ -684,11 +702,20 @@ test("board shows turn indicator and supports keyboard play with Escape cancel",
   const board = page.getByTestId("shogi-board");
   await expect(board).toBeVisible();
   await expect(page.getByTestId("turn-indicator")).toContainText("▲先手");
+  await expect(board.getByRole("grid", { name: "将棋盤" })).toHaveCount(1);
+  await expect(board.getByRole("row")).toHaveCount(9);
+  const cells = board.getByRole("gridcell");
+  await expect(cells).toHaveCount(81);
+  await expect(board.locator('[role="gridcell"][data-square]')).toHaveCount(81);
+  expect(new Set(await cells.evaluateAll((items) => items.map((item) => item.getAttribute("data-square")))).size).toBe(81);
+  await expect(board.locator('[role="gridcell"][tabindex="0"]')).toHaveCount(1);
+  await expect(board.locator('[role="gridcell"][tabindex="-1"]')).toHaveCount(80);
 
   // Enter キーで持ち駒の金を選択できる
   const gold = board.getByRole("button", { name: "金" });
   await gold.press("Enter");
   await expect(gold).toHaveAttribute("aria-pressed", "true");
+  await expect(board.locator(".hand-piece.selected")).toHaveCount(1);
   await expect(board.locator(".board-cell.target")).not.toHaveCount(0);
 
   // 持ち駒ボタンにフォーカスが残ったままでも Escape で選択解除できる
@@ -696,13 +723,13 @@ test("board shows turn indicator and supports keyboard play with Escape cancel",
   await expect(gold).toHaveAttribute("aria-pressed", "false");
   await expect(board.locator(".board-cell.target")).toHaveCount(0);
 
-  // 矢印キーで 5五 → 5二 へ移動し Enter で着手して正解になる
-  await gold.press("Enter");
+  // Space で再選択し、矢印キーで 5五 → 5二 へ移動してSpaceで着手する
+  await gold.press("Space");
   await board.locator('[data-square="55"]').focus();
   await page.keyboard.press("ArrowUp");
   await page.keyboard.press("ArrowUp");
   await page.keyboard.press("ArrowUp");
-  await page.keyboard.press("Enter");
+  await page.keyboard.press("Space");
   await expect(page.getByTestId("tsume-feedback")).toContainText("正解");
 });
 

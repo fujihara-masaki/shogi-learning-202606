@@ -4,6 +4,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { ImmutablePosition, Move } from "tsshogi";
 import { Color, Piece, PieceType, Square, handPieceTypes } from "tsshogi";
+import { tsshogiPieceToVisual } from "../appearance/adapters";
+import BoardSurface from "./shogi/BoardSurface";
+import PieceFace from "./shogi/PieceFace";
 
 const PIECE_KANJI: Record<string, string> = {
   pawn: "歩",
@@ -40,24 +43,6 @@ function squareLabel(sq: Square): string {
 
 function colorLabel(color: Color): string {
   return color === Color.BLACK ? "先手" : "後手";
-}
-
-interface PieceFaceProps {
-  piece: Piece;
-  flipped: boolean;
-}
-
-/** 駒1枚の見た目。画像駒に差し替える場合はここを変更する。 */
-function PieceFace({ piece, flipped }: PieceFaceProps) {
-  const text =
-    piece.type === PieceType.KING && piece.color === Color.BLACK ? "王" : PIECE_KANJI[piece.type];
-  const upsideDown = (piece.color === Color.WHITE) !== flipped;
-  const cls = [
-    "piece-face",
-    upsideDown ? "piece-white" : "piece-black",
-    text.length > 1 ? "piece-narrow" : "",
-  ].join(" ");
-  return <span className={cls}>{text}</span>;
 }
 
 type Selection =
@@ -304,7 +289,12 @@ export default function ShogiBoard({
                 onDragStart={() => handleHandActivate(color, pt)}
                 onClick={() => handleHandActivate(color, pt)}
               >
-                <PieceFace piece={new Piece(color, pt)} flipped={flipped} />
+                <PieceFace
+                  piece={tsshogiPieceToVisual(new Piece(color, pt))}
+                  flipped={flipped}
+                  kingGlyph="black-ou-white-gyoku"
+                  variant="hand"
+                />
                 {count > 1 && <span className="hand-count" aria-hidden="true">{count}</span>}
               </button>
             );
@@ -331,7 +321,7 @@ export default function ShogiBoard({
           ))}
         </div>
         <div className="board-row-container">
-          <div
+          <BoardSurface
             className="board-grid"
             role="grid"
             aria-label="将棋盤"
@@ -390,7 +380,12 @@ export default function ShogiBoard({
                           onDragStart={() => handleSquareActivate(sq)}
                           className="piece-holder"
                         >
-                          <PieceFace piece={piece} flipped={flipped} />
+                          <PieceFace
+                            piece={tsshogiPieceToVisual(piece)}
+                            flipped={flipped}
+                            kingGlyph="black-ou-white-gyoku"
+                            variant="board"
+                          />
                         </span>
                       )}
                       {isTarget && !piece && <span className="target-dot" />}
@@ -399,7 +394,7 @@ export default function ShogiBoard({
                 })}
               </div>
             ))}
-          </div>
+          </BoardSurface>
           <div className="rank-coords" aria-hidden="true">
             {ranks.map((r) => (
               <span key={r}>{RANK_KANJI[r - 1]}</span>
