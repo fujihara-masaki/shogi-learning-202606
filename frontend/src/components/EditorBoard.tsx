@@ -1,5 +1,7 @@
 import { useMemo, useState } from "react";
 import { editorPieceToVisual } from "../appearance/adapters";
+import { developmentThemeOverrides } from "../appearance/developmentThemes";
+import type { BoardThemeId, PieceThemeId } from "../appearance/types";
 import {
   HAND_PIECES,
   PIECE_LABEL,
@@ -15,6 +17,8 @@ import PieceFace from "./shogi/PieceFace";
 interface Props {
   position: EditorPosition;
   onChange: (next: EditorPosition) => void;
+  pieceTheme?: PieceThemeId;
+  boardTheme?: BoardThemeId;
 }
 
 type Tool = { kind: "piece"; piece: EditorPiece } | { kind: "erase" } | { kind: "move" };
@@ -26,7 +30,10 @@ function pieceText(piece: EditorPiece) {
   return PIECE_LABEL[piece.code];
 }
 
-export default function EditorBoard({ position, onChange }: Props) {
+export default function EditorBoard({ position, onChange, pieceTheme, boardTheme }: Props) {
+  const developmentThemes = developmentThemeOverrides();
+  pieceTheme ??= developmentThemes.pieceTheme ?? "text-standard";
+  boardTheme ??= developmentThemes.boardTheme ?? "board-standard";
   const [tool, setTool] = useState<Tool>({
     kind: "piece",
     piece: { color: "b", code: "P" },
@@ -102,6 +109,7 @@ export default function EditorBoard({ position, onChange }: Props) {
                   onClick={() => setTool({ kind: "piece", piece: { color, code } })}
                 >
                   <PieceFace
+                    pieceTheme={pieceTheme}
                     piece={editorPieceToVisual({ color, code })}
                     kingGlyph="all-gyoku"
                     variant="plain"
@@ -119,7 +127,7 @@ export default function EditorBoard({ position, onChange }: Props) {
           ))}
         </div>
         <div className="board-row-container">
-          <BoardSurface className="board-grid editor-grid">
+          <BoardSurface className="board-grid editor-grid" boardTheme={boardTheme}>
             {position.board.map((row, rowIndex) =>
               row.map((piece, colIndex) => (
                 <button
@@ -136,6 +144,7 @@ export default function EditorBoard({ position, onChange }: Props) {
                 >
                   {piece && (
                     <PieceFace
+                      pieceTheme={pieceTheme}
                       piece={editorPieceToVisual(piece)}
                       kingGlyph="all-gyoku"
                       variant="board"

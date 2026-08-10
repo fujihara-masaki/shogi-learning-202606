@@ -211,6 +211,85 @@ test("tsume page plays an existing one-move problem and shows wrong/correct feed
   await expect(page.getByTestId("tsume-feedback")).toContainText("正解");
 });
 
+test("Shogi Images theme renders assets, highlights, flip, and interactions", async ({ page, request }, testInfo) => {
+  const title = `${E2E_PREFIX} image theme ${Date.now()}`;
+  const problem = await createE2eProblem(request, title, {
+    initial_sfen: "4k4/9/5+B3/9/9/9/9/9/4K4 b G 1",
+  });
+  await page.goto("/tsume?pieceTheme=shogi-images-hitomoji&boardTheme=shogi-images-light");
+  await page.getByTestId("difficulty-filter").getByRole("button", { name: "1手詰", exact: true }).click();
+  await page.getByRole("combobox").selectOption("e2e");
+  await page.getByTestId(`problem-select-${problem.id}`).click();
+
+  const board = page.getByTestId("shogi-board");
+  const surface = board.locator('[data-board-theme="shogi-images-light"]');
+  await expect(surface.getByRole("gridcell")).toHaveCount(81);
+  await expect(surface).toHaveCSS("background-image", /boards\/shogi-images-light\/board\.png/);
+  await expect(surface.locator('img[src*="black/horse.png"]')).toHaveCount(1);
+  await expect(surface.locator('img[src*="black/ou.png"]')).toHaveCount(1);
+  await expect(surface.locator('img[src*="white/gyoku.png"]')).toHaveCount(1);
+  await expect(board.getByRole("button", { name: /持ち駒 金/ }).locator('img[src*="black/gold.png"]')).toHaveCount(1);
+
+  const gold = board.getByRole("button", { name: /持ち駒 金/ });
+  await gold.click();
+  const target = surface.locator('[data-square="52"]');
+  await expect(target).toHaveClass(/target/);
+  await expect(target).not.toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
+  await gold.press("Escape");
+  await expect(target).not.toHaveClass(/target/);
+  await gold.focus();
+  await gold.press("Enter");
+  await target.click();
+  await expect(target).toHaveClass(/last-move/);
+  await expect(target).not.toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
+  await expect(page.getByTestId("tsume-feedback")).toContainText("正解");
+  await page.getByRole("button", { name: "もう一度" }).click();
+  await dragGoldDrop(page, "52");
+  await expect(page.getByTestId("tsume-feedback")).toContainText("正解");
+
+  await page.getByRole("button", { name: "盤面反転" }).click();
+  await expect(surface.locator('img[src*="white/ou.png"]')).toHaveCount(1);
+  await expect(surface.locator('img[src*="black/gyoku.png"]')).toHaveCount(1);
+  const cells = await surface.getByRole("gridcell").evaluateAll((items) => items.map((item) => {
+    const rect = item.getBoundingClientRect();
+    return [rect.width, rect.height];
+  }));
+  expect(new Set(cells.map(([width, height]) => `${width}:${height}`))).toHaveSize(1);
+  await testInfo.attach("shogi-images-board.png", { body: await board.screenshot(), contentType: "image/png" });
+});
+
+test("Shogi Images board retains selected and both last-move highlights", async ({ page }) => {
+  await page.goto("/openings/static-rook-rapid-attack?pieceTheme=shogi-images-hitomoji&boardTheme=shogi-images-light");
+  const surface = page.getByTestId("shogi-board").locator('[data-board-theme="shogi-images-light"]');
+  const from = surface.locator('[data-square="77"]');
+  const to = surface.locator('[data-square="76"]');
+  await from.click();
+  await expect(from).toHaveClass(/selected/);
+  await expect(from).not.toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
+  await to.click();
+  await expect(from).toHaveClass(/last-move-from/);
+  await expect(to).toHaveClass(/last-move/);
+  await expect(from).not.toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
+  await expect(to).not.toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
+});
+
+test("Shogi Images 404 falls back to text and keeps the board operable", async ({ page, request }) => {
+  const problem = await createE2eProblem(request, `${E2E_PREFIX} image fallback ${Date.now()}`);
+  await page.route("**/assets/shogi/**", (route) => route.fulfill({ status: 404 }));
+  await page.goto("/tsume?pieceTheme=shogi-images-hitomoji&boardTheme=shogi-images-light");
+  await page.getByTestId("difficulty-filter").getByRole("button", { name: "1手詰", exact: true }).click();
+  await page.getByRole("combobox").selectOption("e2e");
+  await page.getByTestId(`problem-select-${problem.id}`).click();
+
+  const board = page.getByTestId("shogi-board");
+  const surface = board.locator('[data-board-theme="shogi-images-light"]');
+  await expect(board.getByRole("button", { name: /持ち駒 金/ })).toContainText("金");
+  await expect(surface).toHaveCSS("background-color", "rgb(220, 179, 92)");
+  await expect(surface.locator('[data-square="52"]')).toHaveCSS("border-style", "solid");
+  await dragGoldDrop(page, "52");
+  await expect(page.getByTestId("tsume-feedback")).toContainText("正解");
+});
+
 test("problem editor renders the board editor and required fields", async ({ page }) => {
   await page.goto("/problem-editor");
   await expect(page.getByRole("heading", { name: "詰め将棋問題作成" })).toBeVisible();
@@ -222,6 +301,22 @@ test("problem editor renders the board editor and required fields", async ({ pag
   await expect(page.getByRole("button", { name: "現在の局面からSFEN生成" })).toBeVisible();
   await expect(page.getByRole("button", { name: "SFENを盤面へ反映" })).toBeVisible();
   await expect(page.getByRole("button", { name: "この局面から手順記録を開始" })).toBeVisible();
+});
+
+test("Shogi Images theme renders EditorBoard and SolutionRecorder with all-gyoku policy", async ({ page }) => {
+  const query = "?pieceTheme=shogi-images-hitomoji&boardTheme=shogi-images-light";
+  await page.goto(`/problem-editor${query}`);
+  const editor = page.getByTestId("editor-board");
+  await expect(editor.locator('[data-board-theme="shogi-images-light"]')).toHaveCount(1);
+  await expect(editor.getByRole("button", { name: "先手の玉を配置" }).locator('img[src*="black/gyoku.png"]')).toHaveCount(1);
+  await expect(editor.getByRole("button", { name: "後手の玉を配置" }).locator('img[src*="white/gyoku.png"]')).toHaveCount(1);
+
+  await page.getByLabel("SFEN").fill(ONE_MOVE_SFEN);
+  await page.getByRole("button", { name: "SFENを盤面へ反映" }).click();
+  await page.getByRole("button", { name: "この局面から手順記録を開始" }).click();
+  const recorder = page.getByTestId("solution-recorder");
+  await expect(recorder.locator('[data-board-theme="shogi-images-light"]')).toHaveCount(1);
+  await expect(recorder.locator('img[src*="white/gyoku.png"]')).toHaveCount(1);
 });
 
 test("board editor can generate and restore SFEN", async ({ page }) => {

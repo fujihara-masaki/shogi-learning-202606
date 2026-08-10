@@ -244,8 +244,18 @@ select {
 }
 
 .board-surface {
-  background: var(--board-bg);
-  border: 2px solid var(--board-line);
+  background-color: var(--board-fallback-color, var(--board-bg));
+  border: 2px solid var(--board-line-color, var(--board-line));
+}
+
+.board-surface[data-board-theme="shogi-images-light"] {
+  background-image: var(--board-background-image);
+  background-size: 100% 100%;
+  background-position: center;
+}
+
+.board-surface[data-board-theme="shogi-images-light"] .board-cell {
+  border-color: var(--board-line-color, var(--board-line));
 }
 
 /* ShogiBoard は role="row" の行ラッパーを持つ(APG Grid パターン) */
@@ -314,6 +324,16 @@ select {
   line-height: 1;
   display: inline-block;
 }
+
+.piece-image {
+  width: 88%;
+  height: 88%;
+  object-fit: contain;
+  pointer-events: none;
+  user-select: none;
+}
+
+.piece-image-rotated { transform: rotate(180deg); }
 
 .piece-face.piece-narrow {
   font-size: calc(var(--cell-size) * 0.36);
