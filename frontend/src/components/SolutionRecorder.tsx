@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { editorPieceToVisual } from "../appearance/adapters";
+import { developmentThemeOverrides } from "../appearance/developmentThemes";
 import type { BoardThemeId, PieceThemeId } from "../appearance/types";
 import {
   HAND_PIECES,
@@ -29,7 +30,10 @@ type Selection =
 const FILES = [9, 8, 7, 6, 5, 4, 3, 2, 1];
 const RANKS = ["一", "二", "三", "四", "五", "六", "七", "八", "九"];
 
-export default function SolutionRecorder({ initialPosition, onMovesChange, pieceTheme = "text-standard", boardTheme = "board-standard" }: Props) {
+export default function SolutionRecorder({ initialPosition, onMovesChange, pieceTheme, boardTheme }: Props) {
+  const developmentThemes = developmentThemeOverrides();
+  pieceTheme ??= developmentThemes.pieceTheme ?? "text-standard";
+  boardTheme ??= developmentThemes.boardTheme ?? "board-standard";
   const [position, setPosition] = useState(() => clonePosition(initialPosition));
   const [selection, setSelection] = useState<Selection | null>(null);
   const [promoteNext, setPromoteNext] = useState(false);

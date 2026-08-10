@@ -103,16 +103,19 @@ export default function TsumePage() {
 
   const visibleProblems = problems;
 
-  const selectProblem = (id: number | null) => {
-    if (id === null) {
-      searchParams.delete("problem");
-      setSearchParams(searchParams, { replace: true });
-    } else {
-      setSearchParams({ problem: String(id) }, { replace: true });
-      const problem = problems.find((p) => p.id === id);
-      if (problem) setSelectedProblem(problem);
-    }
-  };
+const selectProblem = (id: number | null) => {
+  const nextParams = new URLSearchParams(searchParams);
+
+  if (id === null) {
+    nextParams.delete("problem");
+  } else {
+    nextParams.set("problem", String(id));
+    const problem = problems.find((p) => p.id === id);
+    if (problem) setSelectedProblem(problem);
+  }
+
+  setSearchParams(nextParams, { replace: true });
+};
 
   const pickRandom = () => {
     if (visibleProblems.length === 0) return;

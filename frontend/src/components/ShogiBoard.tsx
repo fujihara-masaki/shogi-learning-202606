@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { ImmutablePosition, Move } from "tsshogi";
 import { Color, Piece, PieceType, Square, handPieceTypes } from "tsshogi";
 import { tsshogiPieceToVisual } from "../appearance/adapters";
+import { developmentThemeOverrides } from "../appearance/developmentThemes";
 import type { BoardThemeId, PieceThemeId } from "../appearance/types";
 import BoardSurface from "./shogi/BoardSurface";
 import PieceFace from "./shogi/PieceFace";
@@ -76,9 +77,12 @@ export default function ShogiBoard({
   lastMoveTo,
   lastMoveFrom = null,
   onUserMove,
-  pieceTheme = "text-standard",
-  boardTheme = "board-standard",
+  pieceTheme,
+  boardTheme,
 }: ShogiBoardProps) {
+  const developmentThemes = developmentThemeOverrides();
+  pieceTheme ??= developmentThemes.pieceTheme ?? "text-standard";
+  boardTheme ??= developmentThemes.boardTheme ?? "board-standard";
   const [selection, setSelection] = useState<Selection | null>(null);
   const [pendingPromotion, setPendingPromotion] = useState<PendingPromotion | null>(null);
   // roving tabindex: 盤面全体で 1 つの Tab ストップを持ち、矢印キーでフォーカスセルを移す。

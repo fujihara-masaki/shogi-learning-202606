@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { editorPieceToVisual } from "../appearance/adapters";
+import { developmentThemeOverrides } from "../appearance/developmentThemes";
 import type { BoardThemeId, PieceThemeId } from "../appearance/types";
 import {
   HAND_PIECES,
@@ -29,7 +30,10 @@ function pieceText(piece: EditorPiece) {
   return PIECE_LABEL[piece.code];
 }
 
-export default function EditorBoard({ position, onChange, pieceTheme = "text-standard", boardTheme = "board-standard" }: Props) {
+export default function EditorBoard({ position, onChange, pieceTheme, boardTheme }: Props) {
+  const developmentThemes = developmentThemeOverrides();
+  pieceTheme ??= developmentThemes.pieceTheme ?? "text-standard";
+  boardTheme ??= developmentThemes.boardTheme ?? "board-standard";
   const [tool, setTool] = useState<Tool>({
     kind: "piece",
     piece: { color: "b", code: "P" },
