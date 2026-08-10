@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { OpeningSummary, OpeningType } from "../api/client";
-import { availableOpeningLineCount, importedLinesForType } from "./openingTypeLines";
+import { availableOpeningLineCount, expandedImportedLinesForType, importedLinesForType } from "./openingTypeLines";
 
 function openingType(overrides: Partial<OpeningType> = {}): OpeningType {
   return {
@@ -35,5 +35,31 @@ describe("opening type line grouping", () => {
 
     expect(availableOpeningLineCount(type, taggedLines, true, 0)).toBe(2);
     expect(importedLinesForType(type, taggedLines)).toHaveLength(2);
+  });
+
+  it("filters expanded lines by API-matched IDs rather than legacy JSON tags", () => {
+    const type = openingType();
+    const fetchedTypeLines = [
+      line(1, 10, []), // opening_tagsでは一致するがlegacy JSONにはタグがないケース
+      line(2, 10, ["attack"]),
+      line(3, 10, ["attack"]),
+    ];
+    const apiMatchingLines = [line(1, 10, [])];
+
+    const expanded = expandedImportedLinesForType(type, fetchedTypeLines, apiMatchingLines, true);
+
+    expect(expanded.map((item) => item.id)).toEqual([1]);
+    expect(expanded).toHaveLength(availableOpeningLineCount(type, apiMatchingLines, true, 0));
+    expect(expandedImportedLinesForType(type, fetchedTypeLines, apiMatchingLines, false).map((item) => item.id))
+      .toEqual([1, 2, 3]);
+  });
+
+  it("keeps an API-matched null line under the unclassified type", () => {
+    const unclassified = openingType({ id: 99, category_name_ja: "未分類", name_ja: "未分類", opening_line_count: 0 });
+    const apiMatchingLines = [line(4, null, [])];
+
+    expect(expandedImportedLinesForType(unclassified, [], apiMatchingLines, true).map((item) => item.id))
+      .toEqual([4]);
+    expect(availableOpeningLineCount(unclassified, apiMatchingLines, true, 0)).toBe(1);
   });
 });

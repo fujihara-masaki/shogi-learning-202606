@@ -13,7 +13,7 @@ import {
   type OpeningType,
 } from "../api/client";
 import { OPENING_LINES, countMainLineMoves, type OpeningLine } from "../shogi/openings";
-import { availableOpeningLineCount, importedLinesForType } from "./openingTypeLines";
+import { availableOpeningLineCount, expandedImportedLinesForType, importedLinesForType } from "./openingTypeLines";
 
 // static lineにも学習入口となる戦型を明示する。API/DBのlineと同じカード内に表示する。
 const STATIC_OPENING_TYPE_NAMES: Record<string, string> = {
@@ -99,11 +99,8 @@ export default function OpeningLineStudySection() {
   }
 
   const selectedStaticLines = selectedType && !selectedTag ? staticLinesForType(selectedType) : [];
-  const filteredTypeLines = selectedTag
-    ? typeLines.filter((line) => line.tags.includes(selectedTag))
-    : typeLines;
-  const selectedUnclassifiedLines = selectedType
-    ? importedLinesForType(selectedType, matchingLines).filter((line) => line.opening_type_id === null)
+  const selectedImportedLines = selectedType
+    ? expandedImportedLinesForType(selectedType, typeLines, matchingLines, Boolean(selectedTag))
     : [];
 
   return (
@@ -161,7 +158,7 @@ export default function OpeningLineStudySection() {
                   <div id={`opening-type-lines-${type.id}`} className="opening-type-lines" data-testid="opening-type-line-list">
                     <h5>{type.name_ja}の学習手順</h5>
                     {loadingTypeLines && <p className="muted" role="status">手順を読み込み中です。</p>}
-                    {!loadingTypeLines && [...filteredTypeLines, ...selectedUnclassifiedLines, ...selectedStaticLines].map((opening) => {
+                    {!loadingTypeLines && [...selectedImportedLines, ...selectedStaticLines].map((opening) => {
                       const isStatic = "description" in opening;
                       const id = String(opening.id);
                       return (

@@ -12,6 +12,21 @@ export function importedLinesForType(type: OpeningType, lines: OpeningSummary[])
   ));
 }
 
+export function expandedImportedLinesForType(
+  type: OpeningType,
+  fetchedTypeLines: OpeningSummary[],
+  matchingLines: OpeningSummary[],
+  tagSelected: boolean,
+): OpeningSummary[] {
+  const matchedIds = tagSelected ? new Set(matchingLines.map((line) => line.id)) : null;
+  const linkedLines = matchedIds
+    ? fetchedTypeLines.filter((line) => matchedIds.has(line.id))
+    : fetchedTypeLines;
+  const unclassifiedLines = importedLinesForType(type, matchingLines)
+    .filter((line) => line.opening_type_id === null);
+  return [...linkedLines, ...unclassifiedLines];
+}
+
 export function availableOpeningLineCount(
   type: OpeningType,
   matchingLines: OpeningSummary[],
