@@ -47,8 +47,8 @@ const additionalPlayableOpenings = [
 
 const allPlayableOpenings = [...majorPlayableOpenings, ...additionalPlayableOpenings];
 
-function openingCardByExactTitle(page: Page, title: string) {
-  return page.getByTestId("opening-card").filter({
+function openingLineByExactTitle(page: Page, title: string) {
+  return page.getByTestId("opening-type-line-card").filter({
     has: page.getByTestId("opening-card-title").getByText(title, { exact: true }),
   });
 }
@@ -57,6 +57,13 @@ function openingTypeCardByExactTitle(page: Page, title: string) {
   return page.getByTestId("opening-type-card").filter({
     has: page.getByTestId("opening-type-card-title").getByText(title, { exact: true }),
   });
+}
+
+async function showOpeningTypeLines(page: Page, typeName: string) {
+  const card = openingTypeCardByExactTitle(page, typeName);
+  await card.getByRole("button", { name: "手順を見る" }).click();
+  await expect(card.getByTestId("opening-type-line-list")).toBeVisible();
+  return card;
 }
 
 async function cleanupE2eProblems(request: APIRequestContext) {
@@ -142,7 +149,8 @@ test("desktop nav separates 定跡学習 and 次の一手 with current-page stat
   await expect(page.getByTestId("opening-line-study-section")).toBeVisible();
 
   // 個別の定跡学習画面(/openings/:id)でも「定跡学習」が現在位置になる
-  await openingCardByExactTitle(page, "棒銀").getByRole("link", { name: "学習する" }).click();
+  await showOpeningTypeLines(page, "棒銀");
+  await openingLineByExactTitle(page, "棒銀").getByRole("link", { name: "学習する" }).click();
   await expect(page.getByTestId("opening-study-page")).toBeVisible();
   await expect(openingsLink).toHaveAttribute("aria-current", "page");
   await expect(nextMoveLink).not.toHaveAttribute("aria-current", "page");
@@ -256,7 +264,7 @@ test("creates a new problem, plays it, edits it, and deletes it", async ({ page 
 
 
 
-test("opening page shows opening categories and representative types", async ({ page }) => {
+test("opening page uses filters to find opening types and distinguishes availability", async ({ page }) => {
   await page.goto("/openings");
   await expect(page.getByTestId("opening-category-list")).toContainText("相居飛車");
   await expect(page.getByTestId("opening-category-list")).toContainText("対抗型");
@@ -266,7 +274,8 @@ test("opening page shows opening categories and representative types", async ({ 
 
   await page.getByTestId("opening-category-card").filter({ hasText: "奇襲・B級戦法" }).click();
   await expect(page.getByTestId("opening-type-list")).toContainText("嬉野流");
-  await expect(openingTypeCardByExactTitle(page, "嬉野流").getByRole("button", { name: /関連定跡ラインを見る/ })).toBeVisible();
+  await expect(openingTypeCardByExactTitle(page, "嬉野流")).toContainText(/つの手順を学べます|定跡手順は準備中/);
+  await expect(page.getByRole("heading", { name: "学習できる定跡ライン" })).toHaveCount(0);
 });
 
 
@@ -276,17 +285,38 @@ test("major opening types show related playable lines", async ({ page }) => {
   for (const openingName of allPlayableOpenings) {
     const card = openingTypeCardByExactTitle(page, openingName);
     await expect(card).toHaveCount(1);
-    await expect(card.getByRole("button", { name: /関連定跡ラインを見る/ })).toBeVisible();
+    await expect(card.getByRole("button", { name: "手順を見る" })).toBeVisible();
+    await expect(card).toContainText("つの手順を学べます");
   }
+});
+
+test("opening type cards expose imported and static lines while keeping empty types visible", async ({ page }) => {
+  await page.goto("/openings");
+  await expect(openingTypeCardByExactTitle(page, "未分類")).toContainText("定跡手順は準備中");
+
+  await showOpeningTypeLines(page, "矢倉");
+  const staticLine = openingLineByExactTitle(page, "矢倉の出だし");
+  await expect(staticLine).toBeVisible();
+  await staticLine.getByRole("link", { name: "学習する" }).click();
+  await expect(page).toHaveURL(/\/openings\/yagura-foundation$/);
+  await expect(page.getByTestId("opening-study-page")).toBeVisible();
+});
+
+test("opening tag is an auxiliary filter for opening types", async ({ page }) => {
+  await page.goto("/openings");
+  await page.getByLabel("タグでさらに絞り込む").selectOption("bougin");
+  await expect(openingTypeCardByExactTitle(page, "棒銀")).toBeVisible();
+  await expect(openingTypeCardByExactTitle(page, "四間飛車")).toHaveCount(0);
 });
 
 
 test("opening list navigates to a seeded opening study page", async ({ page }) => {
   await page.goto("/openings");
   await expect(page.getByRole("heading", { name: "定跡学習" })).toBeVisible();
-  const bouginCard = openingCardByExactTitle(page, "棒銀");
-  await expect(bouginCard).toHaveCount(1);
-  await bouginCard.getByRole("link", { name: "学習する" }).click();
+  await showOpeningTypeLines(page, "棒銀");
+  const bouginLine = openingLineByExactTitle(page, "棒銀");
+  await expect(bouginLine).toHaveCount(1);
+  await bouginLine.getByRole("link", { name: "学習する" }).click();
   await expect(page.getByTestId("opening-study-page")).toBeVisible();
   await expect(page.getByTestId("opening-current-move")).toContainText("7g7f");
 });
@@ -371,7 +401,8 @@ test("time attack setup starts and displays a problem", async ({ page }) => {
 
 test("seeded opening replay controls move forward, backward, reset, and finish", async ({ page }) => {
   await page.goto("/openings");
-  await openingCardByExactTitle(page, "中飛車").getByRole("link", { name: "学習する" }).click();
+  await showOpeningTypeLines(page, "中飛車");
+  await openingLineByExactTitle(page, "中飛車").getByRole("link", { name: "学習する" }).click();
   await expect(page.getByTestId("opening-current-move")).toContainText("7g7f");
 
   const replayButtons = page.locator(".opening-replay-controls button");
