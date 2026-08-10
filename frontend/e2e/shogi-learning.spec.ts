@@ -371,18 +371,14 @@ test("closing type lines clears only the stale type-line error", async ({ page }
 });
 
 test("same-tag refetch failure does not revive an earlier successful result", async ({ page }) => {
-  let bouginAttempts = 0;
-  let untaggedAttempts = 0;
+  let failBougin = false;
+  let failUntagged = false;
   await page.route("**/api/openings**", async (route) => {
     const url = new URL(route.request().url());
     if (url.pathname !== "/api/openings") return route.fallback();
-    if (url.searchParams.get("tag") === "bougin") {
-      bouginAttempts += 1;
-      if (bouginAttempts === 2) return route.fulfill({ status: 503, json: { detail: "tagged lines unavailable" } });
-      return route.fallback();
-    }
-    untaggedAttempts += 1;
-    if (untaggedAttempts === 2) return route.fulfill({ status: 503, json: { detail: "untagged lines unavailable" } });
+    const tag = url.searchParams.get("tag");
+    if (tag === "bougin" && failBougin) return route.fulfill({ status: 503, json: { detail: "tagged lines unavailable" } });
+    if (!tag && failUntagged) return route.fulfill({ status: 503, json: { detail: "untagged lines unavailable" } });
     return route.fallback();
   });
   await page.goto("/openings");
@@ -392,13 +388,17 @@ test("same-tag refetch failure does not revive an earlier successful result", as
   await tagFilter.selectOption("bougin");
   await expect(openingTypeCardByExactTitle(page, "棒銀")).toBeVisible();
 
+  failUntagged = true;
   await tagFilter.selectOption("");
   await expect(page.getByRole("alert")).toContainText("学習手順の取得に失敗しました");
+  failUntagged = false;
+  failBougin = true;
   await tagFilter.selectOption("bougin");
   await expect(page.getByRole("alert")).toContainText("学習手順の取得に失敗しました");
   await expect(page.getByTestId("opening-type-card")).toHaveCount(0);
   await expect(page.getByTestId("opening-types-empty")).toHaveCount(0);
 
+  failBougin = false;
   await tagFilter.selectOption("");
   await expect(page.getByRole("alert")).toHaveCount(0);
   await tagFilter.selectOption("bougin");
