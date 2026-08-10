@@ -355,6 +355,21 @@ test("opening type catalog clears only its error after a successful retry", asyn
   await expect(page.getByRole("alert")).toHaveCount(0);
 });
 
+test("closing type lines clears only the stale type-line error", async ({ page }) => {
+  await page.route("**/api/openings/tags", (route) => route.fulfill({ status: 503, json: { detail: "tags unavailable" } }));
+  await page.route("**/api/opening-types/*/lines", (route) => route.fulfill({ status: 503, json: { detail: "lines unavailable" } }));
+  await page.goto("/openings");
+
+  await showOpeningTypeLines(page, "矢倉");
+  const alert = page.getByRole("alert");
+  await expect(alert).toContainText("タグの取得に失敗しました");
+  await expect(alert).toContainText("学習手順の取得に失敗しました");
+
+  await openingTypeCardByExactTitle(page, "矢倉").getByRole("button", { name: "手順を閉じる" }).click();
+  await expect(alert).toContainText("タグの取得に失敗しました");
+  await expect(alert).not.toContainText("学習手順の取得に失敗しました");
+});
+
 
 test("opening list navigates to a seeded opening study page", async ({ page }) => {
   await page.goto("/openings");

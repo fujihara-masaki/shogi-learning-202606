@@ -134,6 +134,7 @@ export default function OpeningLineStudySection() {
     setSelectedType(null);
     setTypeLines([]);
     setLoadingTypeLines(false);
+    setErrors((current) => ({ ...current, typeLines: null }));
   }
 
   function handleTypeLinesClick(type: OpeningType) {
@@ -141,6 +142,7 @@ export default function OpeningLineStudySection() {
       resetSelectedTypeLines();
       return;
     }
+    setErrors((current) => ({ ...current, typeLines: null }));
     setSelectedType(type);
     setTypeLines([]);
     setLoadingTypeLines(type.opening_line_count > 0);
