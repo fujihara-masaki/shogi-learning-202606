@@ -26,6 +26,22 @@ function staticLinesForType(type: OpeningType): OpeningLine[] {
   return OPENING_LINES.filter((line) => STATIC_OPENING_TYPE_NAMES[line.id] === type.name_ja);
 }
 
+interface OpeningCatalogErrors {
+  tags: string | null;
+  categories: string | null;
+  types: string | null;
+  openings: string | null;
+  typeLines: string | null;
+}
+
+const EMPTY_CATALOG_ERRORS: OpeningCatalogErrors = {
+  tags: null,
+  categories: null,
+  types: null,
+  openings: null,
+  typeLines: null,
+};
+
 export default function OpeningLineStudySection() {
   const [tags, setTags] = useState<OpeningTagSummary[]>([]);
   const [selectedTag, setSelectedTag] = useState("");
@@ -36,22 +52,29 @@ export default function OpeningLineStudySection() {
   const [selectedType, setSelectedType] = useState<OpeningType | null>(null);
   const [typeLines, setTypeLines] = useState<OpeningSummary[]>([]);
   const [loadingTypeLines, setLoadingTypeLines] = useState(false);
-  const [typeCatalogFailed, setTypeCatalogFailed] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [errors, setErrors] = useState<OpeningCatalogErrors>(EMPTY_CATALOG_ERRORS);
 
   useEffect(() => {
     let cancelled = false;
     fetchOpeningTags()
-      .then((tagList) => { if (!cancelled) setTags(tagList); })
-      .catch((e) => { if (!cancelled) setError(`タグの取得に失敗しました: ${e}`); });
+      .then((tagList) => {
+        if (cancelled) return;
+        setTags(tagList);
+        setErrors((current) => ({ ...current, tags: null }));
+      })
+      .catch((e) => { if (!cancelled) setErrors((current) => ({ ...current, tags: `タグの取得に失敗しました: ${e}` })); });
     return () => { cancelled = true; };
   }, []);
 
   useEffect(() => {
     let cancelled = false;
     fetchOpeningCategories()
-      .then((categoryList) => { if (!cancelled) setCategories(categoryList); })
-      .catch((e) => { if (!cancelled) setError(`カテゴリの取得に失敗しました: ${e}`); });
+      .then((categoryList) => {
+        if (cancelled) return;
+        setCategories(categoryList);
+        setErrors((current) => ({ ...current, categories: null }));
+      })
+      .catch((e) => { if (!cancelled) setErrors((current) => ({ ...current, categories: `カテゴリの取得に失敗しました: ${e}` })); });
     return () => { cancelled = true; };
   }, []);
 
@@ -61,12 +84,11 @@ export default function OpeningLineStudySection() {
       .then((typeList) => {
         if (cancelled) return;
         setOpeningTypes(typeList);
-        setTypeCatalogFailed(false);
+        setErrors((current) => ({ ...current, types: null }));
       })
       .catch((e) => {
         if (cancelled) return;
-        setTypeCatalogFailed(true);
-        setError(`戦型一覧の取得に失敗しました: ${e}`);
+        setErrors((current) => ({ ...current, types: `戦型一覧の取得に失敗しました: ${e}` }));
       });
     return () => { cancelled = true; };
   }, [selectedCategoryId]);
@@ -74,8 +96,12 @@ export default function OpeningLineStudySection() {
   useEffect(() => {
     let cancelled = false;
     fetchOpenings(selectedTag || undefined)
-      .then((lines) => { if (!cancelled) setMatchingLines(lines); })
-      .catch((e) => { if (!cancelled) setError(`学習手順の取得に失敗しました: ${e}`); });
+      .then((lines) => {
+        if (cancelled) return;
+        setMatchingLines(lines);
+        setErrors((current) => ({ ...current, openings: null }));
+      })
+      .catch((e) => { if (!cancelled) setErrors((current) => ({ ...current, openings: `学習手順の取得に失敗しました: ${e}` })); });
     return () => { cancelled = true; };
   }, [selectedTag]);
 
@@ -85,10 +111,12 @@ export default function OpeningLineStudySection() {
     let cancelled = false;
     fetchOpeningTypeLines(selectedType.id)
       .then((lines) => {
-        if (!cancelled) setTypeLines(lines);
+        if (cancelled) return;
+        setTypeLines(lines);
+        setErrors((current) => ({ ...current, typeLines: null }));
       })
       .catch((e) => {
-        if (!cancelled) setError(`学習手順の取得に失敗しました: ${e}`);
+        if (!cancelled) setErrors((current) => ({ ...current, typeLines: `学習手順の取得に失敗しました: ${e}` }));
       })
       .finally(() => {
         if (!cancelled) setLoadingTypeLines(false);
@@ -100,6 +128,7 @@ export default function OpeningLineStudySection() {
     if (!selectedTag) return openingTypes;
     return openingTypes.filter((type) => importedLinesForType(type, matchingLines).length > 0);
   }, [matchingLines, openingTypes, selectedTag]);
+  const errorMessages = Object.values(errors).filter((message): message is string => message !== null);
 
   function resetSelectedTypeLines() {
     setSelectedType(null);
@@ -126,7 +155,11 @@ export default function OpeningLineStudySection() {
     <section data-testid="opening-line-study-section">
       <h2>戦型から学ぶ</h2>
       <p className="muted">戦型を選び、その戦型の手順を一手ずつ盤面でなぞって覚えましょう。</p>
-      {error && <div className="banner banner-error" role="alert">{error}</div>}
+      {errorMessages.length > 0 && (
+        <div className="banner banner-error" role="alert">
+          {errorMessages.map((message) => <p key={message}>{message}</p>)}
+        </div>
+      )}
 
       <section className="opening-filters" aria-labelledby="opening-filter-heading">
         <div>
@@ -150,7 +183,7 @@ export default function OpeningLineStudySection() {
         </label>
       </section>
 
-      {typeCatalogFailed ? (
+      {errors.types ? (
         <section aria-labelledby="static-opening-fallback-heading" data-testid="opening-static-fallback">
           <h3 id="static-opening-fallback-heading">基本の学習手順</h3>
           <p className="muted">戦型一覧を読み込めないため、基本の手順を表示しています。</p>

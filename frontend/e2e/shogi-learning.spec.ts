@@ -333,6 +333,28 @@ test("tag catalog failure does not hide opening types or duplicate static fallba
   await expect(openingLineByExactTitle(page, "矢倉の出だし")).toHaveCount(1);
 });
 
+test("opening type catalog clears only its error after a successful retry", async ({ page }) => {
+  await page.route("**/api/opening-types**", async (route) => {
+    const url = new URL(route.request().url());
+    if (url.searchParams.has("category_id")) {
+      await route.fulfill({ status: 503, json: { detail: "temporary catalog error" } });
+    } else {
+      await route.fallback();
+    }
+  });
+  await page.goto("/openings");
+  await expect(page.getByTestId("opening-type-list")).toContainText("矢倉");
+
+  await page.getByTestId("opening-category-card").filter({ hasText: "相居飛車" }).click();
+  await expect(page.getByRole("alert")).toContainText("戦型一覧の取得に失敗しました");
+  await expect(page.getByTestId("opening-static-fallback")).toBeVisible();
+
+  await page.getByRole("group", { name: "カテゴリで絞り込む" }).getByRole("button", { name: "すべて" }).click();
+  await expect(page.getByTestId("opening-type-list")).toContainText("矢倉");
+  await expect(page.getByTestId("opening-static-fallback")).toHaveCount(0);
+  await expect(page.getByRole("alert")).toHaveCount(0);
+});
+
 
 test("opening list navigates to a seeded opening study page", async ({ page }) => {
   await page.goto("/openings");
