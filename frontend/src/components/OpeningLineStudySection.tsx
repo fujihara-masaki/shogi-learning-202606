@@ -13,6 +13,7 @@ import {
   type OpeningType,
 } from "../api/client";
 import { OPENING_LINES, countMainLineMoves, type OpeningLine } from "../shogi/openings";
+import { availableOpeningLineCount, importedLinesForType } from "./openingTypeLines";
 
 // static lineにも学習入口となる戦型を明示する。API/DBのlineと同じカード内に表示する。
 const STATIC_OPENING_TYPE_NAMES: Record<string, string> = {
@@ -31,7 +32,7 @@ export default function OpeningLineStudySection() {
   const [categories, setCategories] = useState<OpeningCategory[]>([]);
   const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(null);
   const [openingTypes, setOpeningTypes] = useState<OpeningType[]>([]);
-  const [taggedLines, setTaggedLines] = useState<OpeningSummary[] | null>(null);
+  const [matchingLines, setMatchingLines] = useState<OpeningSummary[]>([]);
   const [selectedType, setSelectedType] = useState<OpeningType | null>(null);
   const [typeLines, setTypeLines] = useState<OpeningSummary[]>([]);
   const [loadingTypeLines, setLoadingTypeLines] = useState(false);
@@ -43,14 +44,14 @@ export default function OpeningLineStudySection() {
       fetchOpeningTags(),
       fetchOpeningCategories(),
       fetchOpeningTypes(selectedCategoryId ?? undefined),
-      selectedTag ? fetchOpenings(selectedTag) : Promise.resolve(null),
+      fetchOpenings(selectedTag || undefined),
     ])
       .then(([tagList, categoryList, typeList, matchingLines]) => {
         if (cancelled) return;
         setTags(tagList);
         setCategories(categoryList);
         setOpeningTypes(typeList);
-        setTaggedLines(matchingLines);
+        setMatchingLines(matchingLines);
         setError(null);
       })
       .catch((e) => {
@@ -77,10 +78,9 @@ export default function OpeningLineStudySection() {
   }, [selectedType]);
 
   const visibleTypes = useMemo(() => {
-    if (!taggedLines) return openingTypes;
-    const typeIds = new Set(taggedLines.map((line) => line.opening_type_id).filter((id): id is number => id !== null));
-    return openingTypes.filter((type) => typeIds.has(type.id));
-  }, [openingTypes, taggedLines]);
+    if (!selectedTag) return openingTypes;
+    return openingTypes.filter((type) => importedLinesForType(type, matchingLines).length > 0);
+  }, [matchingLines, openingTypes, selectedTag]);
 
   function resetSelectedTypeLines() {
     setSelectedType(null);
@@ -102,6 +102,9 @@ export default function OpeningLineStudySection() {
   const filteredTypeLines = selectedTag
     ? typeLines.filter((line) => line.tags.includes(selectedTag))
     : typeLines;
+  const selectedUnclassifiedLines = selectedType
+    ? importedLinesForType(selectedType, matchingLines).filter((line) => line.opening_type_id === null)
+    : [];
 
   return (
     <section data-testid="opening-line-study-section">
@@ -137,7 +140,7 @@ export default function OpeningLineStudySection() {
         <div className="opening-list" data-testid="opening-type-list">
           {visibleTypes.map((type) => {
             const staticCount = selectedTag ? 0 : staticLinesForType(type).length;
-            const availableCount = type.opening_line_count + staticCount;
+            const availableCount = availableOpeningLineCount(type, matchingLines, Boolean(selectedTag), staticCount);
             const isExpanded = selectedType?.id === type.id;
             return (
               <article key={type.id} className={`opening-card opening-type-card${isExpanded ? " active" : ""}`} data-testid="opening-type-card">
@@ -158,7 +161,7 @@ export default function OpeningLineStudySection() {
                   <div id={`opening-type-lines-${type.id}`} className="opening-type-lines" data-testid="opening-type-line-list">
                     <h5>{type.name_ja}の学習手順</h5>
                     {loadingTypeLines && <p className="muted" role="status">手順を読み込み中です。</p>}
-                    {!loadingTypeLines && [...filteredTypeLines, ...selectedStaticLines].map((opening) => {
+                    {!loadingTypeLines && [...filteredTypeLines, ...selectedUnclassifiedLines, ...selectedStaticLines].map((opening) => {
                       const isStatic = "description" in opening;
                       const id = String(opening.id);
                       return (
