@@ -309,6 +309,30 @@ test("opening tag is an auxiliary filter for opening types", async ({ page }) =>
   await expect(openingTypeCardByExactTitle(page, "四間飛車")).toHaveCount(0);
 });
 
+test("opening catalog failure keeps static study lines reachable", async ({ page }) => {
+  await page.route("**/api/opening-types", (route) => route.fulfill({ status: 503, json: { detail: "catalog unavailable" } }));
+  await page.goto("/openings");
+
+  await expect(page.getByRole("alert")).toContainText("戦型一覧の取得に失敗しました");
+  const fallback = page.getByTestId("opening-static-fallback");
+  await expect(fallback.getByTestId("opening-static-fallback-card")).toHaveCount(3);
+  await expect(page.getByTestId("opening-type-list")).toHaveCount(0);
+  await fallback.getByTestId("opening-static-fallback-card").filter({ hasText: "矢倉の出だし" }).getByRole("link", { name: "学習する" }).click();
+  await expect(page).toHaveURL(/\/openings\/yagura-foundation$/);
+  await expect(page.getByTestId("opening-study-page")).toBeVisible();
+});
+
+test("tag catalog failure does not hide opening types or duplicate static fallback", async ({ page }) => {
+  await page.route("**/api/openings/tags", (route) => route.fulfill({ status: 503, json: { detail: "tags unavailable" } }));
+  await page.goto("/openings");
+
+  await expect(page.getByRole("alert")).toContainText("タグの取得に失敗しました");
+  await expect(page.getByTestId("opening-type-list")).toContainText("矢倉");
+  await expect(page.getByTestId("opening-static-fallback")).toHaveCount(0);
+  await showOpeningTypeLines(page, "矢倉");
+  await expect(openingLineByExactTitle(page, "矢倉の出だし")).toHaveCount(1);
+});
+
 
 test("opening list navigates to a seeded opening study page", async ({ page }) => {
   await page.goto("/openings");
