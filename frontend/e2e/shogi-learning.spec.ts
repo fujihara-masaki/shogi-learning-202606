@@ -115,9 +115,15 @@ async function playGoldDrop(page: Page, square: string) {
 
 async function dragGoldDrop(page: Page, square: string) {
   const board = page.getByTestId("shogi-board");
-  await board.getByRole("button", { name: "金" }).dragTo(
-    board.locator(`[data-square="${square}"]`),
-  );
+  const source = board.getByRole("button", { name: "金" });
+  const target = board.locator(`[data-square="${square}"]`);
+
+  await source.hover();
+  await page.mouse.down();
+  await target.hover();
+  await expect(target).toHaveClass(/target/);
+  await target.hover();
+  await page.mouse.up();
 }
 
 test.beforeEach(async ({ request }) => {
