@@ -130,7 +130,7 @@ test("home presents learning subjects separately from cross-cutting tools", asyn
   for (const name of ["復習", "学習記録", "作成"])
     await expect(tools.getByRole("link", { name })).toBeVisible();
   await expect(learning.getByRole("link", { name: "復習" })).toHaveCount(0);
-  await expect(learning.getByRole("link", { name: "タイムアタック" })).toHaveCount(0);
+  await expect(learning.getByRole("link", { name: "タイムアタック", exact: true })).toHaveCount(0);
 });
 
 test("tsume modes contain only tsume-specific navigation", async ({ page }) => {
@@ -159,7 +159,7 @@ test("main and mobile navigation use the new hierarchy", async ({ page }) => {
   await page.goto("/more");
   for (const name of ["復習", "学習記録", "作成", "データ出典"])
     await expect(page.getByTestId("more-page").getByRole("link", { name })).toBeVisible();
-  await expect(page.getByTestId("more-page").getByRole("link", { name: "タイムアタック" })).toHaveCount(0);
+  await expect(page.getByTestId("more-page").getByRole("link", { name: "タイムアタック", exact: true })).toHaveCount(0);
 });
 
 test("desktop nav separates 定跡学習 and 次の一手 with current-page state", async ({ page }) => {
@@ -283,8 +283,8 @@ test("creates a new problem, plays it, edits it, and deletes it", async ({ page 
   await page.locator(".problem-item.active").getByRole("button", { name: "削除" }).click();
   await page.getByRole("link", { name: "詰め将棋" }).click();
   await expect(page.getByText(editedTitle)).toHaveCount(0);
-  await page.getByRole("link", { name: "履歴" }).click();
-  await expect(page.getByTestId("history-page")).toContainText("履歴");
+  await page.getByRole("link", { name: "学習記録" }).click();
+  await expect(page.getByRole("heading", { name: "学習記録", exact: true })).toBeVisible();
   await page.getByRole("link", { name: "復習" }).click();
   await expect(page.getByTestId("review-page")).toContainText("復習");
 });
@@ -769,7 +769,7 @@ test.describe("mobile layout (360px)", () => {
     ).toBe(true);
     await nav.getByRole("link", { name: "その他" }).click();
     await expect(page.getByTestId("more-page")).toBeVisible();
-    for (const name of ["復習", "タイムアタック", "履歴", "問題作成", "データ出典"]) {
+    for (const name of ["復習", "学習記録", "作成", "データ出典"]) {
       await expect(
         page.getByTestId("more-page").getByRole("heading", { name, exact: true }),
       ).toBeVisible();
