@@ -118,12 +118,12 @@ async function dragGoldDrop(page: Page, square: string) {
   const source = board.getByRole("button", { name: "金" });
   const target = board.locator(`[data-square="${square}"]`);
 
-  await source.hover();
-  await page.mouse.down();
-  await target.hover();
+  await expect(source).toHaveAttribute("draggable", "true");
+  const dataTransfer = await page.evaluateHandle(() => new DataTransfer());
+  await source.dispatchEvent("dragstart", { dataTransfer });
   await expect(target).toHaveClass(/target/);
-  await target.hover();
-  await page.mouse.up();
+  await target.dispatchEvent("dragover", { dataTransfer });
+  await target.dispatchEvent("drop", { dataTransfer });
 }
 
 test.beforeEach(async ({ request }) => {
