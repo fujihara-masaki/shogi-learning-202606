@@ -42,13 +42,19 @@ const EMPTY_CATALOG_ERRORS: OpeningCatalogErrors = {
   typeLines: null,
 };
 
+interface MatchingLinesResult {
+  tag: string;
+  lines: OpeningSummary[];
+}
+
 export default function OpeningLineStudySection() {
   const [tags, setTags] = useState<OpeningTagSummary[]>([]);
   const [selectedTag, setSelectedTag] = useState("");
   const [categories, setCategories] = useState<OpeningCategory[]>([]);
   const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(null);
   const [openingTypes, setOpeningTypes] = useState<OpeningType[]>([]);
-  const [matchingLines, setMatchingLines] = useState<OpeningSummary[]>([]);
+  const [matchingLinesResult, setMatchingLinesResult] = useState<MatchingLinesResult | null>(null);
+  const [loadingMatchingLines, setLoadingMatchingLines] = useState(true);
   const [selectedType, setSelectedType] = useState<OpeningType | null>(null);
   const [typeLines, setTypeLines] = useState<OpeningSummary[]>([]);
   const [loadingTypeLines, setLoadingTypeLines] = useState(false);
@@ -95,15 +101,26 @@ export default function OpeningLineStudySection() {
 
   useEffect(() => {
     let cancelled = false;
-    fetchOpenings(selectedTag || undefined)
+    const requestedTag = selectedTag;
+    fetchOpenings(requestedTag || undefined)
       .then((lines) => {
         if (cancelled) return;
-        setMatchingLines(lines);
+        setMatchingLinesResult({ tag: requestedTag, lines });
+        setLoadingMatchingLines(false);
         setErrors((current) => ({ ...current, openings: null }));
       })
-      .catch((e) => { if (!cancelled) setErrors((current) => ({ ...current, openings: `学習手順の取得に失敗しました: ${e}` })); });
+      .catch((e) => {
+        if (cancelled) return;
+        setLoadingMatchingLines(false);
+        setErrors((current) => ({ ...current, openings: `学習手順の取得に失敗しました: ${e}` }));
+      });
     return () => { cancelled = true; };
   }, [selectedTag]);
+
+  const matchingLines = useMemo(
+    () => matchingLinesResult?.tag === selectedTag ? matchingLinesResult.lines : [],
+    [matchingLinesResult, selectedTag],
+  );
 
   useEffect(() => {
     if (!selectedType) return;
@@ -178,7 +195,7 @@ export default function OpeningLineStudySection() {
         </div>
         <label className="opening-tag-filter">
           <span>タグでさらに絞り込む</span>
-          <select value={selectedTag} onChange={(e) => { setSelectedTag(e.target.value); resetSelectedTypeLines(); }}>
+          <select value={selectedTag} onChange={(e) => { setLoadingMatchingLines(true); setSelectedTag(e.target.value); resetSelectedTypeLines(); }}>
             <option value="">すべてのタグ</option>
             {tags.map((tag) => <option key={tag.tag} value={tag.tag}>{tag.label} ({tag.count})</option>)}
           </select>
@@ -250,7 +267,7 @@ export default function OpeningLineStudySection() {
               </article>
             );
           })}
-          {visibleTypes.length === 0 && <p className="muted" data-testid="opening-types-empty">条件に合う戦型はありません。</p>}
+          {visibleTypes.length === 0 && !errors.openings && !loadingMatchingLines && <p className="muted" data-testid="opening-types-empty">条件に合う戦型はありません。</p>}
         </div>
       </section>
       )}
