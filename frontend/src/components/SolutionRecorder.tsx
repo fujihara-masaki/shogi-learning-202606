@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { editorPieceToVisual } from "../appearance/adapters";
+import type { BoardThemeId, PieceThemeId } from "../appearance/types";
 import {
   HAND_PIECES,
   PIECE_LABEL,
@@ -17,6 +18,8 @@ import PieceFace from "./shogi/PieceFace";
 interface Props {
   initialPosition: EditorPosition;
   onMovesChange: (solutionMoves: string[], opponentMoves: string[]) => void;
+  pieceTheme?: PieceThemeId;
+  boardTheme?: BoardThemeId;
 }
 
 type Selection =
@@ -26,7 +29,7 @@ type Selection =
 const FILES = [9, 8, 7, 6, 5, 4, 3, 2, 1];
 const RANKS = ["一", "二", "三", "四", "五", "六", "七", "八", "九"];
 
-export default function SolutionRecorder({ initialPosition, onMovesChange }: Props) {
+export default function SolutionRecorder({ initialPosition, onMovesChange, pieceTheme = "text-standard", boardTheme = "board-standard" }: Props) {
   const [position, setPosition] = useState(() => clonePosition(initialPosition));
   const [selection, setSelection] = useState<Selection | null>(null);
   const [promoteNext, setPromoteNext] = useState(false);
@@ -156,6 +159,7 @@ export default function SolutionRecorder({ initialPosition, onMovesChange }: Pro
                     onClick={() => clickHand(color, code)}
                   >
                     <PieceFace
+                      pieceTheme={pieceTheme}
                       piece={editorPieceToVisual({ color, code })}
                       kingGlyph="all-gyoku"
                       variant="plain"
@@ -174,7 +178,7 @@ export default function SolutionRecorder({ initialPosition, onMovesChange }: Pro
             ))}
           </div>
           <div className="board-row-container">
-            <BoardSurface className="board-grid editor-grid">
+            <BoardSurface className="board-grid editor-grid" boardTheme={boardTheme}>
               {position.board.map((row, rowIndex) =>
                 row.map((piece, colIndex) => (
                   <button
@@ -195,6 +199,7 @@ export default function SolutionRecorder({ initialPosition, onMovesChange }: Pro
                   >
                     {piece && (
                       <PieceFace
+                        pieceTheme={pieceTheme}
                         piece={editorPieceToVisual(piece)}
                         kingGlyph="all-gyoku"
                         variant="board"

@@ -1,5 +1,17 @@
 # Third-party notices
 
+## Shogi Images {#shogi-images}
+
+The appearance theme is designed for the official Shogi Images distributions
+“一文字駒” (regular, non-Gothic) and “盤 - 木材（明）”. The official distribution
+page is <https://shogi-extend.com/shogi-images/> and describes the materials as
+dedicated to the public domain under [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/).
+
+- License/provenance review date: 2026-08-10
+- Intended files: the original PNG piece and board images, without modification or format conversion
+- Attribution is not required by CC0; this notice is retained for provenance.
+- The build environment could not access the distribution host, so no Shogi Images binary asset is included by this change. The image themes therefore exercise their per-piece/CSS fallback until the verified originals can be obtained; no substitute asset was used.
+
 ## `tokuhirom/tanuki-tsume-shogi`
 
 This application can import tsume-shogi puzzle data from [`tokuhirom/tanuki-tsume-shogi`](https://github.com/tokuhirom/tanuki-tsume-shogi), specifically `puzzles/1.json`, `puzzles/3.json`, and `puzzles/5.json`.
