@@ -1,35 +1,30 @@
 import { Link } from "react-router-dom";
 
-const MENU = [
-  { to: "/tsume", title: "詰め将棋", desc: "1手詰〜5手詰の問題に挑戦", enabled: true },
-  { to: "/time-attack", title: "タイムアタック", desc: "連続出題でタイムを計測", enabled: true },
-  { to: "/review", title: "復習", desc: "間違えた問題・お気に入りに再挑戦", enabled: true },
-  { to: "/openings", title: "定跡学習", desc: "定跡の手順を一手ずつ盤面でなぞって覚える", enabled: true },
-  { to: "/next-move", title: "次の一手", desc: "実戦形の局面を見て、自分ならどう指すかを考える", enabled: true },
-  { to: "/history", title: "履歴", desc: "解答履歴とタイムアタック結果", enabled: true },
-  { to: "/problem-editor", title: "問題作成", desc: "盤面エディタで詰め将棋問題を作成・編集", enabled: true },
+const LEARNING = [
+  { to: "/tsume", title: "詰め将棋", desc: "問題を解く・タイムアタックで終盤力を鍛える" },
+  { to: "/openings", title: "定跡学習", desc: "定跡の手順を一手ずつ盤面でなぞって覚える" },
+  { to: "/next-move", title: "次の一手", desc: "実戦形の局面を見て、自分ならどう指すかを考える" },
 ];
 
+const TOOLS = [
+  { to: "/review", title: "復習", desc: "間違えた詰め将棋や次の一手に再挑戦" },
+  { to: "/history", title: "学習記録", desc: "詰め将棋などの解答履歴と学習結果を確認" },
+  { to: "/problem-editor", title: "作成", desc: "詰め将棋問題を作成・編集" },
+];
+
+function CardGroup({ items }: { items: typeof LEARNING }) {
+  return <div className="home-menu">{items.map((item) => (
+    <Link key={item.to} to={item.to} className="home-card">
+      <h3>{item.title}</h3><p>{item.desc}</p>
+    </Link>
+  ))}</div>;
+}
+
 export default function HomePage() {
-  return (
-    <div className="home-page">
-      <h1>将棋学習アプリ</h1>
-      <p className="muted">詰め将棋・定跡学習・次の一手で、序盤から終盤まで将棋の力を鍛えましょう。</p>
-      <div className="home-menu">
-        {MENU.map((item) =>
-          item.enabled ? (
-            <Link key={item.to} to={item.to} className="home-card">
-              <h2>{item.title}</h2>
-              <p>{item.desc}</p>
-            </Link>
-          ) : (
-            <div key={item.to} className="home-card disabled">
-              <h2>{item.title}</h2>
-              <p>{item.desc}</p>
-            </div>
-          ),
-        )}
-      </div>
-    </div>
-  );
+  return <div className="home-page">
+    <h1>将棋学習アプリ</h1>
+    <p className="muted">序盤から終盤まで、学びたいテーマを選びましょう。</p>
+    <section aria-labelledby="learning-heading"><h2 id="learning-heading">学習対象</h2><CardGroup items={LEARNING} /></section>
+    <section className="home-tools" aria-labelledby="tools-heading"><h2 id="tools-heading">学習を支える機能</h2><CardGroup items={TOOLS} /></section>
+  </div>;
 }

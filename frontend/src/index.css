@@ -134,11 +134,6 @@ select {
   color: #fff;
 }
 
-/* 「その他」はモバイル下部ナビ専用 */
-.app-nav .nav-more {
-  display: none;
-}
-
 /* 短縮ラベル(「定跡」)はモバイル下部ナビ専用。display:noneの側はアクセシビリティツリーからも除外される。 */
 .app-nav .nav-label-short {
   display: none;
@@ -150,6 +145,27 @@ select {
   padding: 12px 16px 48px;
 }
 
+.tsume-mode-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: -4px 0 20px;
+  border-bottom: 1px solid #d8d2c4;
+}
+
+.tsume-mode-nav a {
+  min-height: 44px;
+  padding: 10px 14px 8px;
+  color: var(--accent);
+  text-decoration: none;
+  border-bottom: 3px solid transparent;
+}
+
+.tsume-mode-nav a.active {
+  border-bottom-color: var(--accent);
+  font-weight: 700;
+}
+
 /* ---- ホーム ---- */
 .home-menu {
   display: grid;
@@ -157,6 +173,10 @@ select {
   gap: 16px;
   margin-top: 16px;
 }
+
+.home-page section { margin-top: 28px; }
+.home-page section h2 { margin-bottom: 0; }
+.home-page .home-tools .home-menu { max-width: 760px; }
 
 .home-card {
   display: block;
@@ -177,7 +197,7 @@ select {
   opacity: 0.5;
 }
 
-.home-card h2 {
+.home-card h2, .home-card h3 {
   margin: 0 0 6px;
 }
 

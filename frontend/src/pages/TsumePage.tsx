@@ -11,6 +11,7 @@ import {
   type TsumeTagSummary,
 } from "../api/client";
 import TsumePlayer from "../components/TsumePlayer";
+import TsumeModeNav from "../components/TsumeModeNav";
 import type { SessionOutcome } from "../hooks/useTsumeSession";
 
 const PROBLEM_PAGE_SIZE = 50;
@@ -160,6 +161,7 @@ export default function TsumePage() {
   return (
     <div className="tsume-page">
       <h1>詰め将棋</h1>
+      <TsumeModeNav />
       {error && <div className="banner banner-error" role="alert">{error}</div>}
       <div className="filter-bar">
         <div className="segmented" data-testid="difficulty-filter">

@@ -121,18 +121,45 @@ test.afterEach(async ({ request }) => {
   await cleanupE2eProblems(request);
 });
 
-test("home shows the main feature links", async ({ page }) => {
+test("home presents learning subjects separately from cross-cutting tools", async ({ page }) => {
   await page.goto("/");
-  await expect(page.getByRole("heading", { name: "将棋学習アプリ" })).toBeVisible();
-  for (const name of ["詰め将棋", "タイムアタック", "復習", "履歴", "定跡学習", "次の一手", "問題作成", "データ出典"]) {
-    await expect(page.getByRole("link", { name }).first()).toBeVisible();
+  const learning = page.getByRole("region", { name: "学習対象" });
+  const tools = page.getByRole("region", { name: "学習を支える機能" });
+  for (const name of ["詰め将棋", "定跡学習", "次の一手"])
+    await expect(learning.getByRole("link", { name })).toBeVisible();
+  for (const name of ["復習", "学習記録", "作成"])
+    await expect(tools.getByRole("link", { name })).toBeVisible();
+  await expect(learning.getByRole("link", { name: "復習" })).toHaveCount(0);
+  await expect(learning.getByRole("link", { name: "タイムアタック", exact: true })).toHaveCount(0);
+});
+
+test("tsume modes contain only tsume-specific navigation", async ({ page }) => {
+  for (const [path, current] of [["/tsume", "問題を解く"], ["/time-attack", "タイムアタック"]]) {
+    await page.goto(path);
+    const modes = page.getByRole("navigation", { name: "詰め将棋の学習モード" });
+    for (const name of ["問題を解く", "タイムアタック"])
+      await expect(modes.getByRole("link", { name, exact: true })).toBeVisible();
+    await expect(modes.getByRole("link", { name: "復習", exact: true })).toHaveCount(0);
+    await expect(modes.getByRole("link", { name: current, exact: true })).toHaveAttribute("aria-current", "page");
   }
-  // 定跡学習と次の一手は別カードとして表示され、説明から学習方法の違いが分かる
-  const menu = page.locator(".home-menu");
-  await expect(menu.getByRole("heading", { name: "定跡学習", exact: true })).toBeVisible();
-  await expect(menu.getByRole("heading", { name: "次の一手", exact: true })).toBeVisible();
-  await expect(menu).toContainText("なぞって覚える");
-  await expect(menu).toContainText("自分ならどう指すか");
+  await page.goto("/review");
+  await expect(page.getByRole("navigation", { name: "詰め将棋の学習モード" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: /間違えた問題/ })).toBeVisible();
+  await expect(page.getByRole("button", { name: /お気に入り/ })).toBeVisible();
+  await expect(page.getByRole("button", { name: /次の一手/ })).toBeVisible();
+});
+
+test("main and mobile navigation use the new hierarchy", async ({ page }) => {
+  await page.goto("/");
+  const nav = page.getByRole("navigation", { name: "メインナビゲーション" });
+  await expect(nav.getByRole("link", { name: "学習記録" })).toBeAttached();
+  await expect(nav.getByRole("link", { name: "作成", exact: true })).toBeAttached();
+  await expect(nav.getByRole("link", { name: "復習", exact: true })).toBeAttached();
+  await expect(nav.getByRole("link", { name: "タイムアタック", exact: true })).toHaveCount(0);
+  await page.goto("/more");
+  for (const name of ["復習", "学習記録", "作成", "データ出典"])
+    await expect(page.getByTestId("more-page").getByRole("link", { name })).toBeVisible();
+  await expect(page.getByTestId("more-page").getByRole("link", { name: "タイムアタック", exact: true })).toHaveCount(0);
 });
 
 test("desktop nav separates 定跡学習 and 次の一手 with current-page state", async ({ page }) => {
@@ -173,7 +200,7 @@ test("tsume page plays an existing one-move problem and shows wrong/correct feed
 
 test("problem editor renders the board editor and required fields", async ({ page }) => {
   await page.goto("/problem-editor");
-  await expect(page.getByRole("heading", { name: "盤面エディタ・問題作成" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "詰め将棋問題作成" })).toBeVisible();
   await expect(page.getByTestId("editor-board")).toBeVisible();
   await expect(page.getByRole("link", { name: "＋ 新規作成" })).toBeVisible();
   for (const label of ["title", "mate_length", "difficulty", "tags", "solution_moves", "opponent_moves", "explanation"]) {
@@ -256,8 +283,8 @@ test("creates a new problem, plays it, edits it, and deletes it", async ({ page 
   await page.locator(".problem-item.active").getByRole("button", { name: "削除" }).click();
   await page.getByRole("link", { name: "詰め将棋" }).click();
   await expect(page.getByText(editedTitle)).toHaveCount(0);
-  await page.getByRole("link", { name: "履歴" }).click();
-  await expect(page.getByTestId("history-page")).toContainText("履歴");
+  await page.getByRole("link", { name: "学習記録" }).click();
+  await expect(page.getByRole("heading", { name: "学習記録", exact: true })).toBeVisible();
   await page.getByRole("link", { name: "復習" }).click();
   await expect(page.getByTestId("review-page")).toContainText("復習");
 });
@@ -742,7 +769,7 @@ test.describe("mobile layout (360px)", () => {
     ).toBe(true);
     await nav.getByRole("link", { name: "その他" }).click();
     await expect(page.getByTestId("more-page")).toBeVisible();
-    for (const name of ["復習", "タイムアタック", "履歴", "問題作成", "データ出典"]) {
+    for (const name of ["復習", "学習記録", "作成", "データ出典"]) {
       await expect(
         page.getByTestId("more-page").getByRole("heading", { name, exact: true }),
       ).toBeVisible();

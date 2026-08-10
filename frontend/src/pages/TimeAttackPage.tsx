@@ -8,6 +8,7 @@ import {
   type TsumeProblem,
 } from "../api/client";
 import ShogiBoard from "../components/ShogiBoard";
+import TsumeModeNav from "../components/TsumeModeNav";
 import { useTsumeSession, type SessionOutcome } from "../hooks/useTsumeSession";
 
 type Phase = "setup" | "playing" | "finished";
@@ -154,6 +155,7 @@ export default function TimeAttackPage() {
   return (
     <div className="time-attack-page">
       <h1>タイムアタック</h1>
+      <TsumeModeNav />
       {error && <div className="banner banner-error" role="alert">{error}</div>}
 
       {phase === "setup" && (
