@@ -118,8 +118,8 @@ export default function OpeningLineStudySection() {
   }, [selectedTag]);
 
   const matchingLines = useMemo(
-    () => matchingLinesResult?.tag === selectedTag ? matchingLinesResult.lines : [],
-    [matchingLinesResult, selectedTag],
+    () => !loadingMatchingLines && matchingLinesResult?.tag === selectedTag ? matchingLinesResult.lines : [],
+    [loadingMatchingLines, matchingLinesResult, selectedTag],
   );
 
   useEffect(() => {
@@ -195,7 +195,7 @@ export default function OpeningLineStudySection() {
         </div>
         <label className="opening-tag-filter">
           <span>タグでさらに絞り込む</span>
-          <select value={selectedTag} onChange={(e) => { setLoadingMatchingLines(true); setSelectedTag(e.target.value); resetSelectedTypeLines(); }}>
+          <select value={selectedTag} onChange={(e) => { setLoadingMatchingLines(true); setMatchingLinesResult(null); setSelectedTag(e.target.value); resetSelectedTypeLines(); }}>
             <option value="">すべてのタグ</option>
             {tags.map((tag) => <option key={tag.tag} value={tag.tag}>{tag.label} ({tag.count})</option>)}
           </select>

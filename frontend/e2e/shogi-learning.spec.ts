@@ -370,22 +370,30 @@ test("closing type lines clears only the stale type-line error", async ({ page }
   await expect(alert).not.toContainText("学習手順の取得に失敗しました");
 });
 
-test("failed tag line request does not reuse stale matches and recovers with fresh results", async ({ page }) => {
+test("same-tag refetch failure does not revive an earlier successful result", async ({ page }) => {
   let bouginAttempts = 0;
+  let untaggedAttempts = 0;
   await page.route("**/api/openings**", async (route) => {
     const url = new URL(route.request().url());
-    if (url.pathname !== "/api/openings" || url.searchParams.get("tag") !== "bougin") return route.fallback();
-    bouginAttempts += 1;
-    if (bouginAttempts === 1) {
-      await route.fulfill({ status: 503, json: { detail: "tagged lines unavailable" } });
-    } else {
-      await route.fallback();
+    if (url.pathname !== "/api/openings") return route.fallback();
+    if (url.searchParams.get("tag") === "bougin") {
+      bouginAttempts += 1;
+      if (bouginAttempts === 2) return route.fulfill({ status: 503, json: { detail: "tagged lines unavailable" } });
+      return route.fallback();
     }
+    untaggedAttempts += 1;
+    if (untaggedAttempts === 2) return route.fulfill({ status: 503, json: { detail: "untagged lines unavailable" } });
+    return route.fallback();
   });
   await page.goto("/openings");
   await expect(page.getByTestId("opening-type-card")).not.toHaveCount(0);
 
   const tagFilter = page.getByLabel("タグでさらに絞り込む");
+  await tagFilter.selectOption("bougin");
+  await expect(openingTypeCardByExactTitle(page, "棒銀")).toBeVisible();
+
+  await tagFilter.selectOption("");
+  await expect(page.getByRole("alert")).toContainText("学習手順の取得に失敗しました");
   await tagFilter.selectOption("bougin");
   await expect(page.getByRole("alert")).toContainText("学習手順の取得に失敗しました");
   await expect(page.getByTestId("opening-type-card")).toHaveCount(0);
