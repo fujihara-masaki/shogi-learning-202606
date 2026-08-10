@@ -3,7 +3,7 @@ import type { BoardThemeDefinition, BoardThemeId, PieceAssetKey, PieceThemeDefin
 const assetPath = (path: string): string => `${import.meta.env.BASE_URL}assets/shogi/${path}`;
 const attribution = {
   sourceName: "Shogi Images",
-  sourceUrl: "https://shogi-extend.com/shogi-images/",
+  sourceUrl: "https://sunfish-shogi.github.io/shogi-images/",
   licenseName: "CC0 1.0",
   licenseUrl: "https://creativecommons.org/publicdomain/zero/1.0/deed.ja",
   noticeAnchor: "shogi-images",
@@ -23,7 +23,7 @@ export const PIECE_THEMES = {
 } satisfies Record<PieceThemeId, PieceThemeDefinition>;
 
 export const BOARD_THEMES = {
-  "board-standard": { id: "board-standard", label: "標準盤", fallbackColor: "#dcb35c", lineColor: "#3c2a12" },
+  "board-standard": { id: "board-standard", label: "標準盤", fallbackColor: "#f3c970", lineColor: "#8a6a33" },
   "shogi-images-light": { id: "shogi-images-light", label: "Shogi Images 盤 - 木材（明）", backgroundImage: assetPath("boards/shogi-images-light/board.png"), fallbackColor: "#dcb35c", lineColor: "#3c2a12", attribution },
 } satisfies Record<BoardThemeId, BoardThemeDefinition>;
 

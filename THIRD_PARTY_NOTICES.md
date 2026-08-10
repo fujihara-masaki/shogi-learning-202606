@@ -1,10 +1,10 @@
 # Third-party notices
 
-## Shogi Images {#shogi-images}
+## Shogi Images
 
 The appearance theme is designed for the official Shogi Images distributions
 “一文字駒” (regular, non-Gothic) and “盤 - 木材（明）”. The official distribution
-page is <https://shogi-extend.com/shogi-images/> and describes the materials as
+page is <https://sunfish-shogi.github.io/shogi-images/> and describes the materials as
 dedicated to the public domain under [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/).
 
 - License/provenance review date: 2026-08-10

@@ -25,7 +25,7 @@ export default function LicensesPage() {
           <dl>
             <dt>素材種別</dt><dd>駒（一文字駒・通常版） / 盤（盤 - 木材（明））</dd>
             <dt>ライセンス</dt><dd><a href="https://creativecommons.org/publicdomain/zero/1.0/deed.ja">CC0 1.0</a></dd>
-            <dt>配布元</dt><dd><a href="https://shogi-extend.com/shogi-images/">Shogi Images 公式配布ページ</a></dd>
+            <dt>配布元</dt><dd><a href="https://sunfish-shogi.github.io/shogi-images/">Shogi Images 公式配布ページ</a></dd>
             <dt>第三者通知</dt><dd><code>THIRD_PARTY_NOTICES.md#shogi-images</code></dd>
           </dl>
         </article>

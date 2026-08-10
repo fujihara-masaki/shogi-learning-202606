@@ -255,7 +255,6 @@ select {
 }
 
 .board-surface[data-board-theme="shogi-images-light"] .board-cell {
-  background-color: transparent;
   border-color: var(--board-line-color, var(--board-line));
 }
 
