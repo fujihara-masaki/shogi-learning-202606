@@ -2,7 +2,6 @@ import { NavLink } from "react-router-dom";
 
 const MODES = [
   { to: "/tsume", label: "問題を解く" },
-  { to: "/review", label: "復習" },
   { to: "/time-attack", label: "タイムアタック" },
 ];
 

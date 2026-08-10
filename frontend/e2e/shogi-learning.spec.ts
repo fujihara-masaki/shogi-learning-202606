@@ -127,20 +127,26 @@ test("home presents learning subjects separately from cross-cutting tools", asyn
   const tools = page.getByRole("region", { name: "学習を支える機能" });
   for (const name of ["詰め将棋", "定跡学習", "次の一手"])
     await expect(learning.getByRole("link", { name })).toBeVisible();
-  for (const name of ["学習記録", "作成"])
+  for (const name of ["復習", "学習記録", "作成"])
     await expect(tools.getByRole("link", { name })).toBeVisible();
   await expect(learning.getByRole("link", { name: "復習" })).toHaveCount(0);
   await expect(learning.getByRole("link", { name: "タイムアタック" })).toHaveCount(0);
 });
 
-test("tsume modes share an accessible subnavigation", async ({ page }) => {
-  for (const [path, current] of [["/tsume", "問題を解く"], ["/review", "復習"], ["/time-attack", "タイムアタック"]]) {
+test("tsume modes contain only tsume-specific navigation", async ({ page }) => {
+  for (const [path, current] of [["/tsume", "問題を解く"], ["/time-attack", "タイムアタック"]]) {
     await page.goto(path);
     const modes = page.getByRole("navigation", { name: "詰め将棋の学習モード" });
-    for (const name of ["問題を解く", "復習", "タイムアタック"])
+    for (const name of ["問題を解く", "タイムアタック"])
       await expect(modes.getByRole("link", { name, exact: true })).toBeVisible();
+    await expect(modes.getByRole("link", { name: "復習", exact: true })).toHaveCount(0);
     await expect(modes.getByRole("link", { name: current, exact: true })).toHaveAttribute("aria-current", "page");
   }
+  await page.goto("/review");
+  await expect(page.getByRole("navigation", { name: "詰め将棋の学習モード" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: /間違えた問題/ })).toBeVisible();
+  await expect(page.getByRole("button", { name: /お気に入り/ })).toBeVisible();
+  await expect(page.getByRole("button", { name: /次の一手/ })).toBeVisible();
 });
 
 test("main and mobile navigation use the new hierarchy", async ({ page }) => {
@@ -148,10 +154,11 @@ test("main and mobile navigation use the new hierarchy", async ({ page }) => {
   const nav = page.getByRole("navigation", { name: "メインナビゲーション" });
   await expect(nav.getByRole("link", { name: "学習記録" })).toBeAttached();
   await expect(nav.getByRole("link", { name: "作成", exact: true })).toBeAttached();
-  await expect(nav.getByRole("link", { name: "復習", exact: true })).toHaveCount(0);
+  await expect(nav.getByRole("link", { name: "復習", exact: true })).toBeAttached();
   await expect(nav.getByRole("link", { name: "タイムアタック", exact: true })).toHaveCount(0);
   await page.goto("/more");
-  await expect(page.getByTestId("more-page").getByRole("link", { name: "復習" })).toHaveCount(0);
+  for (const name of ["復習", "学習記録", "作成", "データ出典"])
+    await expect(page.getByTestId("more-page").getByRole("link", { name })).toBeVisible();
   await expect(page.getByTestId("more-page").getByRole("link", { name: "タイムアタック" })).toHaveCount(0);
 });
 
