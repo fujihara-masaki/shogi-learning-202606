@@ -33,11 +33,8 @@ export default function App() {
           <span className="nav-label-short">定跡</span>
         </NavLink>
         <NavLink to="/next-move">次の一手</NavLink>
-        <NavLink to="/review" className="nav-secondary">復習</NavLink>
-        <NavLink to="/time-attack" className="nav-secondary">タイムアタック</NavLink>
-        <NavLink to="/history" className="nav-secondary">履歴</NavLink>
-        <NavLink to="/problem-editor" className="nav-secondary">問題作成</NavLink>
-        <NavLink to="/licenses" className="nav-secondary">データ出典</NavLink>
+        <NavLink to="/history" className="nav-secondary">学習記録</NavLink>
+        <NavLink to="/problem-editor" className="nav-secondary">作成</NavLink>
         <NavLink to="/more" className="nav-more">その他</NavLink>
       </nav>
       <div className="app-body">

@@ -2,10 +2,8 @@
 import { Link } from "react-router-dom";
 
 const MENU = [
-  { to: "/review", title: "復習", desc: "間違えた問題・お気に入りに再挑戦" },
-  { to: "/time-attack", title: "タイムアタック", desc: "連続出題でタイムを計測" },
-  { to: "/history", title: "履歴", desc: "解答履歴とタイムアタック結果" },
-  { to: "/problem-editor", title: "問題作成", desc: "盤面エディタで詰め将棋問題を作成・編集" },
+  { to: "/history", title: "学習記録", desc: "解答履歴とタイムアタック結果" },
+  { to: "/problem-editor", title: "作成", desc: "詰め将棋問題を作成・編集" },
   { to: "/licenses", title: "データ出典", desc: "取り込みデータの出典とライセンス" },
 ];
 

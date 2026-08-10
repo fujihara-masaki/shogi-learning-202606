@@ -47,7 +47,8 @@ export default function HistoryPage() {
 
   return (
     <div className="history-page" data-testid="history-page">
-      <h1>履歴</h1>
+      <h1>学習記録</h1>
+      <p className="muted">詰め将棋と次の一手の学習結果を確認できます。</p>
       {error && <div className="banner banner-error" role="alert">{error}</div>}
 
       <section aria-labelledby="next-move-history-heading">

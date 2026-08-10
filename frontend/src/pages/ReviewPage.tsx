@@ -5,6 +5,7 @@ import { ApiError, fetchNextMoveProblem, fetchNextMoveReview, fetchProblems, fet
 import { useNavigate } from "react-router-dom";
 import { NextMoveDatabaseError } from "../components/NextMoveDatabaseError";
 import { errorMessage } from "../components/nextMoveError";
+import TsumeModeNav from "../components/TsumeModeNav";
 
 type Tab = "wrong" | "favorite" | "next-move";
 
@@ -63,6 +64,7 @@ export default function ReviewPage() {
   return (
     <div className="review-page" data-testid="review-page">
       <h1>復習</h1>
+      <TsumeModeNav />
       {error && <div className="banner banner-error" role="alert">{error}</div>}
       <div className="segmented">
         <button
