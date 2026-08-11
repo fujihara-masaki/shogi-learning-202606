@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { readFile, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -5,8 +6,16 @@ import { fileURLToPath } from "node:url";
 import { chromium } from "@playwright/test";
 
 const EXPECTED_SIZE = { width: 458, height: 500 };
+const EXPECTED_SOURCE = {
+  byteLength: 258_910,
+  sha256: "641f3923c9091f365514693c0957ba9fc18f32d541229281addc15370f907294",
+};
 const scriptDirectory = dirname(fileURLToPath(import.meta.url));
-const boardPath = resolve(
+const sourceBoardPath = resolve(
+  scriptDirectory,
+  "../assets-source/shogi/boards/shogi-images-light/board-original.png",
+);
+const outputBoardPath = resolve(
   scriptDirectory,
   "../public/assets/shogi/boards/shogi-images-light/board.png",
 );
@@ -44,7 +53,13 @@ const starCenters = [
   [303, 331],
 ];
 
-const source = await readFile(boardPath);
+const source = await readFile(sourceBoardPath);
+const sourceSha256 = createHash("sha256").update(source).digest("hex");
+if (source.byteLength !== EXPECTED_SOURCE.byteLength || sourceSha256 !== EXPECTED_SOURCE.sha256) {
+  throw new Error(
+    `Unexpected immutable source: ${source.byteLength} bytes / SHA-256 ${sourceSha256}`,
+  );
+}
 const sourceUrl = `data:image/png;base64,${source.toString("base64")}`;
 const browser = await chromium.launch({ headless: true });
 
@@ -135,8 +150,10 @@ try {
     throw new Error(`Processed image has unexpected dimensions: ${result.width}x${result.height}`);
   }
 
-  await writeFile(boardPath, Buffer.from(result.png, "base64"));
-  console.log(`Processed ${boardPath} (${result.width}x${result.height})`);
+  await writeFile(outputBoardPath, Buffer.from(result.png, "base64"));
+  console.log(
+    `Processed ${sourceBoardPath} -> ${outputBoardPath} (${result.width}x${result.height})`,
+  );
 } finally {
   await browser.close();
 }

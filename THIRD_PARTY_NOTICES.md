@@ -9,12 +9,15 @@ the materials as dedicated to the public domain under
 [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/).
 
 - License/provenance review date: 2026-08-10
-- Included files: 30 original PNG piece images from “一文字駒（通常、非ゴシック）”
-  (both orientations, including 王, 玉, and promoted pieces) and one processed PNG
-  board texture derived from “盤 - 木材（明）”
-- Included asset total: 31 files / 564,243 bytes
-- Board modification: the original 9x9 grid lines and four star points were removed;
-  the 458x500 px dimensions and wood-grain texture were retained
+- Public/runtime assets: 31 files / 564,243 bytes, consisting of 30 PNG piece
+  images and one processed PNG board texture
+- Immutable processing source: `frontend/assets-source/shogi/boards/shogi-images-light/board-original.png`
+  is the official, unmodified Shogi Images “盤 - 木材（明）” PNG (258,910 bytes).
+  It is retained only to make the runtime board processing reproducible.
+- Runtime board modification: `frontend/public/assets/shogi/boards/shogi-images-light/board.png`
+  is generated from the immutable source with the original 9x9 grid lines and
+  four star points removed; the 458x500 px dimensions and wood-grain texture are
+  retained
 - Piece modification: none; all 30 piece PNG files are unprocessed
 - Attribution is not required by CC0; this notice is retained for provenance.
 
