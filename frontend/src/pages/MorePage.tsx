@@ -5,6 +5,7 @@ const MENU = [
   { to: "/review", title: "復習", desc: "間違えた詰め将棋や次の一手に再挑戦" },
   { to: "/history", title: "学習記録", desc: "解答履歴とタイムアタック結果" },
   { to: "/problem-editor", title: "作成", desc: "詰め将棋問題を作成・編集" },
+  { to: "/settings", title: "設定", desc: "駒と盤の見た目を変更" },
   { to: "/licenses", title: "データ出典", desc: "取り込みデータの出典とライセンス" },
 ];
 

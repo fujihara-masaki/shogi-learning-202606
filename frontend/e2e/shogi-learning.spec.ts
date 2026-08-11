@@ -107,6 +107,10 @@ async function showE2eOneMoveProblems(page: Page) {
   await page.getByRole("combobox").selectOption("e2e");
 }
 
+async function useShogiImagesTheme(page: Page) {
+  await page.addInitScript(() => localStorage.setItem("shogi.appearance.v1", JSON.stringify({ version: 1, pieceTheme: "shogi-images-hitomoji", boardTheme: "shogi-images-light" })));
+}
+
 async function playGoldDrop(page: Page, square: string) {
   const board = page.getByTestId("shogi-board");
   await board.getByRole("button", { name: "金" }).click();
@@ -189,6 +193,44 @@ test("main and mobile navigation use the new hierarchy", async ({ page }) => {
   await expect(page.getByTestId("more-page").getByRole("link", { name: "タイムアタック", exact: true })).toHaveCount(0);
 });
 
+test("appearance settings are reachable, independent, persistent, resettable, and responsive", async ({ page }) => {
+  await page.goto("/more");
+  await page.getByRole("link", { name: /設定/ }).click();
+  await expect(page).toHaveURL(/\/settings$/);
+  await expect(page.getByRole("heading", { name: "表示設定" })).toBeVisible();
+
+  await page.getByRole("radio", { name: /Shogi Images 一文字駒/ }).check();
+  await expect(page.locator(".appearance-preview").locator('img[src*="pieces/shogi-images-hitomoji"]')).toHaveCount(5);
+  await expect(page.locator(".appearance-preview [data-board-theme='board-standard']")).toBeVisible();
+  await page.getByRole("radio", { name: /Shogi Images 盤 - 木材（明）/ }).check();
+  await expect(page.locator(".appearance-preview [data-board-theme='shogi-images-light']")).toBeVisible();
+  await page.reload();
+  await expect(page.getByRole("radio", { name: /Shogi Images 一文字駒/ })).toBeChecked();
+  await expect(page.getByRole("radio", { name: /Shogi Images 盤 - 木材（明）/ })).toBeChecked();
+
+  await page.getByRole("button", { name: "標準設定に戻す" }).click();
+  await expect(page.getByRole("radio", { name: /標準（文字）/ })).toBeChecked();
+  await expect(page.getByRole("radio", { name: /標準盤/ })).toBeChecked();
+  await expect(page.getByText("標準設定に戻しました")).toHaveCount(1);
+
+  await page.setViewportSize({ width: 360, height: 740 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+});
+
+test("appearance storage corruption and write failures remain non-fatal", async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem("shogi.appearance.v1", "{broken"));
+  await page.goto("/settings");
+  await expect(page.getByRole("radio", { name: /標準（文字）/ })).toBeChecked();
+  await expect(page.getByRole("radio", { name: /標準盤/ })).toBeChecked();
+
+  await page.evaluate(() => {
+    Object.defineProperty(Storage.prototype, "setItem", { configurable: true, value: () => { throw new DOMException("disabled", "QuotaExceededError"); } });
+  });
+  await page.getByRole("radio", { name: /Shogi Images 一文字駒/ }).check();
+  await expect(page.getByRole("radio", { name: /Shogi Images 一文字駒/ })).toBeChecked();
+  await expect(page.getByRole("alert")).toContainText("保存できませんでした");
+});
+
 test("desktop nav separates 定跡学習 and 次の一手 with current-page state", async ({ page }) => {
   await page.goto("/openings");
   const nav = page.getByRole("navigation", { name: "メインナビゲーション" });
@@ -230,7 +272,8 @@ test("Shogi Images theme renders assets, highlights, flip, and interactions", as
   const problem = await createE2eProblem(request, title, {
     initial_sfen: "4k4/9/5+B3/9/9/9/9/9/4K4 b G 1",
   });
-  await page.goto("/tsume?pieceTheme=shogi-images-hitomoji&boardTheme=shogi-images-light");
+  await useShogiImagesTheme(page);
+  await page.goto("/tsume");
   await page.getByTestId("difficulty-filter").getByRole("button", { name: "1手詰", exact: true }).click();
   await page.getByRole("combobox").selectOption("e2e");
   await page.getByTestId(`problem-select-${problem.id}`).click();
@@ -277,7 +320,8 @@ test("Shogi Images theme renders assets, highlights, flip, and interactions", as
 });
 
 test("Shogi Images board retains selected and both last-move highlights", async ({ page }) => {
-  await page.goto("/openings/static-rook-rapid-attack?pieceTheme=shogi-images-hitomoji&boardTheme=shogi-images-light");
+  await useShogiImagesTheme(page);
+  await page.goto("/openings/static-rook-rapid-attack");
   const surface = page.getByTestId("shogi-board").locator('[data-board-theme="shogi-images-light"]');
   const from = surface.locator('[data-square="77"]');
   const to = surface.locator('[data-square="76"]');
@@ -294,7 +338,8 @@ test("Shogi Images board retains selected and both last-move highlights", async 
 test("Shogi Images 404 falls back to text and keeps the board operable", async ({ page, request }) => {
   const problem = await createE2eProblem(request, `${E2E_PREFIX} image fallback ${Date.now()}`);
   await page.route("**/assets/shogi/**", (route) => route.fulfill({ status: 404 }));
-  await page.goto("/tsume?pieceTheme=shogi-images-hitomoji&boardTheme=shogi-images-light");
+  await useShogiImagesTheme(page);
+  await page.goto("/tsume");
   await page.getByTestId("difficulty-filter").getByRole("button", { name: "1手詰", exact: true }).click();
   await page.getByRole("combobox").selectOption("e2e");
   await page.getByTestId(`problem-select-${problem.id}`).click();
@@ -322,8 +367,8 @@ test("problem editor renders the board editor and required fields", async ({ pag
 });
 
 test("Shogi Images theme renders EditorBoard and SolutionRecorder with all-gyoku policy", async ({ page }) => {
-  const query = "?pieceTheme=shogi-images-hitomoji&boardTheme=shogi-images-light";
-  await page.goto(`/problem-editor${query}`);
+  await useShogiImagesTheme(page);
+  await page.goto("/problem-editor");
   const editor = page.getByTestId("editor-board");
   await expect(editor.locator('[data-board-theme="shogi-images-light"]')).toHaveCount(1);
   const paletteButton = editor.getByRole("button", { name: "先手の玉を配置" });

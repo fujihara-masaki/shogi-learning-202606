@@ -11,6 +11,7 @@ import NextMovePage from "./pages/NextMovePage";
 import NextMoveStudyPage from "./pages/NextMoveStudyPage";
 import LicensesPage from "./pages/LicensesPage";
 import MorePage from "./pages/MorePage";
+import SettingsPage from "./pages/SettingsPage";
 
 // 旧URL(/openings/next-move/:id)からの互換リダイレクト。
 function LegacyNextMoveRedirect() {
@@ -55,6 +56,7 @@ export default function App() {
           <Route path="/editor" element={<ProblemEditorPage />} />
           <Route path="/licenses" element={<LicensesPage />} />
           <Route path="/more" element={<MorePage />} />
+          <Route path="/settings" element={<SettingsPage />} />
         </Routes>
       </div>
     </BrowserRouter>
