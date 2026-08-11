@@ -110,6 +110,30 @@ select {
   border: 0;
 }
 
+/* ---- 表示設定 ---- */
+.settings-page { max-width: 960px; margin: 0 auto; }
+.settings-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(220px, 320px); gap: 24px; align-items: start; }
+.settings-controls { min-width: 0; }
+.settings-controls fieldset { margin: 0 0 18px; padding: 12px; border: 1px solid #d8d2c4; border-radius: 8px; }
+.settings-controls legend { padding: 0 6px; font-weight: 700; }
+.theme-option { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 10px; padding: 10px 6px; border-radius: 6px; cursor: pointer; }
+.theme-option:hover { background: #f0ece2; }
+.theme-option input { width: 20px; height: 20px; margin: 0; }
+.theme-option strong { color: var(--accent); font-size: .85rem; }
+.appearance-preview { padding: 14px; border: 1px solid #d8d2c4; border-radius: 10px; background: #fff; }
+.appearance-preview h2 { margin-top: 0; }
+.preview-board { display: grid; grid-template-columns: repeat(3, 1fr); width: min(100%, 210px); aspect-ratio: 1; margin: 8px auto; background-size: cover; }
+.preview-cell { min-width: 0; display: flex; align-items: center; justify-content: center; border: 1px solid var(--board-line-color); font-size: clamp(18px, 6vw, 30px); }
+.preview-cell .piece-face { max-width: 80%; max-height: 80%; }
+.preview-hand { display: flex; min-height: 40px; align-items: center; justify-content: center; gap: 12px; }
+.preview-hand span { font-size: .85rem; color: var(--text-muted); }
+.banner-warning { background: #fff4ce; border-color: #b7791f; color: #5f3b00; }
+
+@media (max-width: 600px) {
+  .settings-layout { grid-template-columns: minmax(0, 1fr); }
+  .settings-page { width: 100%; min-width: 0; }
+}
+
 /* ---- ナビゲーション ---- */
 .app-nav {
   display: flex;
