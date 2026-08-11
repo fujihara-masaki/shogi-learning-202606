@@ -1,8 +1,15 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { useAppearance } from "../appearance/useAppearance";
 import { BOARD_THEMES, PIECE_THEMES } from "../appearance/catalog";
-import type { BoardThemeId, PieceThemeId } from "../appearance/types";
+import type { BoardThemeId, PieceThemeId, ThemeAttribution } from "../appearance/types";
 import AppearancePreview from "../components/AppearancePreview";
+
+const ATTRIBUTIONS = Array.from(new Map(
+  [...Object.values(PIECE_THEMES), ...Object.values(BOARD_THEMES)]
+    .flatMap((theme) => "attribution" in theme && theme.attribution ? [theme.attribution as ThemeAttribution] : [])
+    .map((attribution) => [`${attribution.sourceUrl}:${attribution.licenseUrl}`, attribution]),
+).values());
 
 export default function SettingsPage() {
   const appearance = useAppearance();
@@ -19,6 +26,17 @@ export default function SettingsPage() {
         </div>
         <AppearancePreview pieceTheme={appearance.pieceTheme} boardTheme={appearance.boardTheme} />
       </div>
+      <section className="settings-attributions" aria-labelledby="settings-attributions-title">
+        <h2 id="settings-attributions-title">テーマの出典・ライセンス</h2>
+        <ul>{ATTRIBUTIONS.map((attribution) => (
+          <li key={`${attribution.sourceUrl}:${attribution.licenseUrl}`}>
+            <a href={attribution.sourceUrl} target="_blank" rel="noreferrer">{attribution.sourceName}</a>
+            {" — "}
+            <a href={attribution.licenseUrl} target="_blank" rel="noreferrer">{attribution.licenseName}</a>
+          </li>
+        ))}</ul>
+        <p><Link to="/licenses">データ出典・ライセンス</Link></p>
+      </section>
       <p className="visually-hidden" aria-live="polite" aria-atomic="true">{announcement}</p>
     </main>
   );

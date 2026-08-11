@@ -198,6 +198,10 @@ test("appearance settings are reachable, independent, persistent, resettable, an
   await page.getByRole("link", { name: /設定/ }).click();
   await expect(page).toHaveURL(/\/settings$/);
   await expect(page.getByRole("heading", { name: "表示設定" })).toBeVisible();
+  const attributions = page.getByRole("region", { name: "テーマの出典・ライセンス" });
+  await expect(attributions.getByRole("link", { name: "Shogi Images" })).toBeVisible();
+  await expect(attributions.getByRole("link", { name: "CC0 1.0" })).toBeVisible();
+  await expect(attributions.getByRole("link", { name: "データ出典・ライセンス" })).toHaveAttribute("href", "/licenses");
 
   await page.getByRole("radio", { name: /Shogi Images 一文字駒/ }).check();
   await expect(page.locator(".appearance-preview .preview-board").locator('img[src*="pieces/shogi-images-hitomoji"]')).toHaveCount(5);

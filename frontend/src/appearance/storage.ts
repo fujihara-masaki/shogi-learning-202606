@@ -26,10 +26,13 @@ export function loadAppearanceSettings(storage?: StorageLike): AppearanceSetting
     const parsed: unknown = JSON.parse(value);
     if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) return { ...DEFAULT_APPEARANCE_SETTINGS };
     const record = parsed as Record<string, unknown>;
+    if (record.version !== 1) return { ...DEFAULT_APPEARANCE_SETTINGS };
     const pieceTheme = getPieceTheme(record.pieceTheme);
     const boardTheme = getBoardTheme(record.boardTheme);
-    if (record.version !== 1 || !pieceTheme || !boardTheme) return { ...DEFAULT_APPEARANCE_SETTINGS };
-    return { pieceTheme: pieceTheme.id, boardTheme: boardTheme.id };
+    return {
+      pieceTheme: pieceTheme?.id ?? DEFAULT_APPEARANCE_SETTINGS.pieceTheme,
+      boardTheme: boardTheme?.id ?? DEFAULT_APPEARANCE_SETTINGS.boardTheme,
+    };
   } catch {
     return { ...DEFAULT_APPEARANCE_SETTINGS };
   }
