@@ -4,6 +4,7 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
+    "assets:process-shogi-board": "node scripts/process-shogi-images-board.mjs",
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",

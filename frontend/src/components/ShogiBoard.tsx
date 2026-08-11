@@ -5,6 +5,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { ImmutablePosition, Move } from "tsshogi";
 import { Color, Piece, PieceType, Square, handPieceTypes } from "tsshogi";
 import { tsshogiPieceToVisual } from "../appearance/adapters";
+import { developmentThemeOverrides } from "../appearance/developmentThemes";
+import type { BoardThemeId, PieceThemeId } from "../appearance/types";
 import BoardSurface from "./shogi/BoardSurface";
 import PieceFace from "./shogi/PieceFace";
 
@@ -64,6 +66,8 @@ export interface ShogiBoardProps {
   /** 直前の指し手の移動元(打ち駒の場合は null) */
   lastMoveFrom?: Square | null;
   onUserMove: (move: Move) => void;
+  pieceTheme?: PieceThemeId;
+  boardTheme?: BoardThemeId;
 }
 
 export default function ShogiBoard({
@@ -73,7 +77,12 @@ export default function ShogiBoard({
   lastMoveTo,
   lastMoveFrom = null,
   onUserMove,
+  pieceTheme,
+  boardTheme,
 }: ShogiBoardProps) {
+  const developmentThemes = developmentThemeOverrides();
+  pieceTheme ??= developmentThemes.pieceTheme ?? "text-standard";
+  boardTheme ??= developmentThemes.boardTheme ?? "board-standard";
   const [selection, setSelection] = useState<Selection | null>(null);
   const [pendingPromotion, setPendingPromotion] = useState<PendingPromotion | null>(null);
   // roving tabindex: 盤面全体で 1 つの Tab ストップを持ち、矢印キーでフォーカスセルを移す。
@@ -290,6 +299,7 @@ export default function ShogiBoard({
                 onClick={() => handleHandActivate(color, pt)}
               >
                 <PieceFace
+                  pieceTheme={pieceTheme}
                   piece={tsshogiPieceToVisual(new Piece(color, pt))}
                   flipped={flipped}
                   kingGlyph="black-ou-white-gyoku"
@@ -322,6 +332,7 @@ export default function ShogiBoard({
         </div>
         <div className="board-row-container">
           <BoardSurface
+            boardTheme={boardTheme}
             className="board-grid"
             role="grid"
             aria-label="将棋盤"
@@ -381,6 +392,7 @@ export default function ShogiBoard({
                           className="piece-holder"
                         >
                           <PieceFace
+                            pieceTheme={pieceTheme}
                             piece={tsshogiPieceToVisual(piece)}
                             flipped={flipped}
                             kingGlyph="black-ou-white-gyoku"
