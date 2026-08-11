@@ -200,7 +200,8 @@ test("appearance settings are reachable, independent, persistent, resettable, an
   await expect(page.getByRole("heading", { name: "表示設定" })).toBeVisible();
 
   await page.getByRole("radio", { name: /Shogi Images 一文字駒/ }).check();
-  await expect(page.locator(".appearance-preview").locator('img[src*="pieces/shogi-images-hitomoji"]')).toHaveCount(5);
+  await expect(page.locator(".appearance-preview .preview-board").locator('img[src*="pieces/shogi-images-hitomoji"]')).toHaveCount(5);
+  await expect(page.locator(".appearance-preview .preview-hand").locator('img[src*="pieces/shogi-images-hitomoji"]')).toHaveCount(2);
   await expect(page.locator(".appearance-preview [data-board-theme='board-standard']")).toBeVisible();
   await page.getByRole("radio", { name: /Shogi Images 盤 - 木材（明）/ }).check();
   await expect(page.locator(".appearance-preview [data-board-theme='shogi-images-light']")).toBeVisible();
