@@ -1,4 +1,4 @@
-import { expect, test, type APIRequestContext, type Page } from "@playwright/test";
+import { expect, test, type APIRequestContext, type Locator, type Page } from "@playwright/test";
 
 const backendPort = process.env.E2E_BACKEND_PORT ?? "8000";
 const API_BASE = `http://127.0.0.1:${backendPort}`;
@@ -126,6 +126,20 @@ async function dragGoldDrop(page: Page, square: string) {
   await target.dispatchEvent("drop", { dataTransfer });
 }
 
+async function expectImageConstrainedToContainer(image: Locator, container: Locator, cell: Locator) {
+  const [imageBox, containerBox, cellBox] = await Promise.all([
+    image.boundingBox(),
+    container.boundingBox(),
+    cell.boundingBox(),
+  ]);
+  if (!imageBox || !containerBox || !cellBox) throw new Error("Expected visible piece image, container, and board cell");
+  const roundingTolerance = 1;
+  expect(imageBox.width).toBeLessThanOrEqual(containerBox.width + roundingTolerance);
+  expect(imageBox.height).toBeLessThanOrEqual(containerBox.height + roundingTolerance);
+  expect(imageBox.width).toBeLessThanOrEqual(cellBox.width * 0.88 + roundingTolerance);
+  expect(imageBox.height).toBeLessThanOrEqual(cellBox.height * 0.88 + roundingTolerance);
+}
+
 test.beforeEach(async ({ request }) => {
   await cleanupE2eProblems(request);
 });
@@ -229,9 +243,12 @@ test("Shogi Images theme renders assets, highlights, flip, and interactions", as
   await expect(surface.locator('img[src*="black/horse.png"]')).toHaveCount(1);
   await expect(surface.locator('img[src*="black/ou.png"]')).toHaveCount(1);
   await expect(surface.locator('img[src*="white/gyoku.png"]')).toHaveCount(1);
-  await expect(board.getByRole("button", { name: /持ち駒 金/ }).locator('img[src*="black/gold.png"]')).toHaveCount(1);
-
   const gold = board.getByRole("button", { name: /持ち駒 金/ });
+  const goldImage = gold.locator('img[src*="black/gold.png"]');
+  await expect(goldImage).toHaveCount(1);
+  await expect(goldImage).toHaveClass(/piece-image-hand/);
+  await expectImageConstrainedToContainer(goldImage, gold, surface.getByRole("gridcell").first());
+
   await gold.click();
   const target = surface.locator('[data-square="52"]');
   await expect(target).toHaveClass(/target/);
@@ -309,7 +326,15 @@ test("Shogi Images theme renders EditorBoard and SolutionRecorder with all-gyoku
   await page.goto(`/problem-editor${query}`);
   const editor = page.getByTestId("editor-board");
   await expect(editor.locator('[data-board-theme="shogi-images-light"]')).toHaveCount(1);
-  await expect(editor.getByRole("button", { name: "先手の玉を配置" }).locator('img[src*="black/gyoku.png"]')).toHaveCount(1);
+  const paletteButton = editor.getByRole("button", { name: "先手の玉を配置" });
+  const paletteImage = paletteButton.locator('img[src*="black/gyoku.png"]');
+  await expect(paletteImage).toHaveCount(1);
+  await expect(paletteImage).toHaveClass(/piece-image-plain/);
+  await expectImageConstrainedToContainer(
+    paletteImage,
+    paletteButton,
+    editor.locator(".editor-grid .board-cell").first(),
+  );
   await expect(editor.getByRole("button", { name: "後手の玉を配置" }).locator('img[src*="white/gyoku.png"]')).toHaveCount(1);
 
   await page.getByLabel("SFEN").fill(ONE_MOVE_SFEN);
