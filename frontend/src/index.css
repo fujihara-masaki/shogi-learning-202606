@@ -252,6 +252,7 @@ select {
   background-image: var(--board-background-image);
   background-size: 100% 100%;
   background-position: center;
+  background-repeat: no-repeat;
 }
 
 .board-surface[data-board-theme="shogi-images-light"] .board-cell {

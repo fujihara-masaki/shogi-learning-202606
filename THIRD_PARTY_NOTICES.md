@@ -2,15 +2,20 @@
 
 ## Shogi Images
 
-The appearance theme is designed for the official Shogi Images distributions
-“一文字駒” (regular, non-Gothic) and “盤 - 木材（明）”. The official distribution
-page is <https://sunfish-shogi.github.io/shogi-images/> and describes the materials as
-dedicated to the public domain under [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/).
+The appearance theme uses assets derived from the official Shogi Images
+distributions “一文字駒（通常、非ゴシック）” and “盤 - 木材（明）”. The official
+distribution page is <https://sunfish-shogi.github.io/shogi-images/> and describes
+the materials as dedicated to the public domain under
+[CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/).
 
 - License/provenance review date: 2026-08-10
-- Included files: 30 original PNG piece images from “一文字駒” (both orientations, including 王, 玉, and promoted pieces) and the original “盤 - 木材（明）” PNG
-- Included asset total: 31 files / 474,668 bytes
-- Modification: none; the distributed PNG files are included without resizing or format conversion
+- Included files: 30 original PNG piece images from “一文字駒（通常、非ゴシック）”
+  (both orientations, including 王, 玉, and promoted pieces) and one processed PNG
+  board texture derived from “盤 - 木材（明）”
+- Included asset total: 31 files / 564,243 bytes
+- Board modification: the original 9x9 grid lines and four star points were removed;
+  the 458x500 px dimensions and wood-grain texture were retained
+- Piece modification: none; all 30 piece PNG files are unprocessed
 - Attribution is not required by CC0; this notice is retained for provenance.
 
 ## `tokuhirom/tanuki-tsume-shogi`

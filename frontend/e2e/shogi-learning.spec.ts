@@ -225,6 +225,7 @@ test("Shogi Images theme renders assets, highlights, flip, and interactions", as
   const surface = board.locator('[data-board-theme="shogi-images-light"]');
   await expect(surface.getByRole("gridcell")).toHaveCount(81);
   await expect(surface).toHaveCSS("background-image", /boards\/shogi-images-light\/board\.png/);
+  await expect(surface).toHaveCSS("background-repeat", "no-repeat");
   await expect(surface.locator('img[src*="black/horse.png"]')).toHaveCount(1);
   await expect(surface.locator('img[src*="black/ou.png"]')).toHaveCount(1);
   await expect(surface.locator('img[src*="white/gyoku.png"]')).toHaveCount(1);
