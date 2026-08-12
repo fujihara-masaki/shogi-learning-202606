@@ -128,7 +128,7 @@ setPath((prev) => [...prev, branchIndex]);
 
 - 一致した node を feedback / source / last move の対象にする。
 - hint は「本線の一手」だけを暴露せず、初回は候補数または共通の着手目的、明示要求後は本線を示す。
-- 同一分岐点に同一 USI の sibling が複数あると board 操作だけでは区別不能なので、seed validator / backend test で禁止する。説明だけ違う同じ手は一 node に統合し、後続で分ける。
+- 同一分岐点に同一 USI の sibling が複数あると board 操作だけでは区別不能なので、**PR-A の前提として PR-A0 で既存データを正規化**し、seed validator / backend test で再発を禁止する。説明や後続だけが違う同じ手は一 node に統合し、分岐はその着手後に表現する。
 - `currentChoices.length === 0` の時だけ completed とする。
 - unit test は `findIndex` 相当を純粋 helper（例: `findOpeningChoiceIndex`）へ抽出して board component を介さず検査する。
 
@@ -367,7 +367,29 @@ PR-D の外部監査では Wikipedia の曖昧さ回避ページ、redirect、se
 
 ## 11. PR 分割
 
-依存順は **D0（監査仕様の固定）→ A → B → C → D1 → E群** を推奨する。metadata の語彙だけを先に固定する D0 と実データ修正 D1 を分けることで、未検証 seed を UX PR に混ぜない。A は現 tree だけで直せるため B と並行可能だが、merge 順は A→B が衝突を減らす。
+依存関係は一本の直列ではなく、次の二系統を並行して進められる。
+
+```text
+UX / 構造系:       A0 → A → B → C
+provenance 系:     D0 → D1
+Wikipedia seed 系: D1 ─┬→ E（単純な一次分岐・線形 seed）
+                       └→ B → E（多段分岐を必要とする seed）
+```
+
+`A0 → A` は board の `findIndex` が一意な sibling を返すための必須依存である。B は A の UX helper を前提に進めると衝突が少なく、C は B の direct-parent tree 契約に依存する。一方、D0/D1 は UX 系と並行可能である。各 PR-E は D1 の provenance 監査完了を必須とし、branch-of-branch を含むものだけ B にも依存する。したがって旧表記の `D0 → A → B → C → D1 → E` を絶対的な直列順とは扱わない。
+
+### PR-A0: 既存分岐構造正規化
+
+- **目的**: 現行 seed / DB / API が返す各分岐点を監査し、同一局面・同一 USI の sibling を原則1 nodeへ正規化して PR-A の一意な着手照合を成立させる。
+- **確認対象**: 特に原始鬼殺しの3手目▲7七桂後について、main 4手目と「△6二銀の対応」がともに `7a6b` となる重複疑いを、seed生成後の `from_sfen` / USI / parentで確認する。
+- **正規化規則**: 同じ `from_sfen` と USI の着手は一 nodeに統合する。説明・branch label・後続が異なる場合、共通着手nodeの `next` で分岐させる。provenanceが異なる場合も着手を複製せず、node/edge metadataの保持方法を明記する。
+- **変更対象**: `backend/app/seed.py`, `backend/tests/test_openings_import_api.py`、必要に応じて監査script/fixture。アプリの分岐UIは変更しない。
+- **DB migration**: 原則なし。既存DBの再seedだけで安全に直せない場合は、データmigration要否をPR本文で明示して小さく分離する。
+- **API/frontend**: response shapeの変更なし / 変更なし。
+- **seed**: 構造正規化のみ。Wikipediaの新しい手や本文解釈を追加しない。
+- **tests**: 全lineの各 `from_sfen` について sibling USI一意、原始鬼殺しの△6二銀が一 node、正規化後もmain/△6二金の合法な再生と出典が維持されることをpytestで検査。
+- **後方互換**: line ID、opening type、既存URL、到達可能な合法手順を維持する。
+- **provenance**: 既存metadataを失わないことだけ確認し、本文の再解釈はD1へ送る。
 
 ### PR-D0: provenance/coverage 契約文書と監査器の設計固定
 
@@ -392,7 +414,7 @@ PR-D の外部監査では Wikipedia の曖昧さ回避ページ、redirect、se
 
 - **目的**: parent-childを正規化し、A/A1/A2・B/B1/B2を安定再構築。
 - **変更対象**: `backend/app/database.py`, `backend/app/seed.py`, `backend/app/routers/openings.py`, `backend/app/schemas.py`（該当時）, `frontend/src/api/client.ts`, `frontend/src/shogi/openings.ts`, backend/frontend tests。
-- **DB migration**: **要否をspikeで決定**。stable `move_key` / `is_main` 追加なら要。既存 `parent_move_id` を直接親にbackfillする migration はいずれにせよ必要になり得る。
+- **DB migration**: **要否をspikeで決定**。stable `move_key` / `is_main` 追加なら要。既存 `parent_move_id` を直接親にbackfillする migration はいずれにせよ必要になり得る。あわせて、現行 UNIQUE `(line_id, ply, variation_group, sort_order)` が direct `parent_move_id` + sibling `sort_order` モデルでも正しい重複防止になるかを検証する。親が異なる同ply・同groupの合法nodeを誤って拒否する、または同一親の重複orderを許す場合は、`UNIQUE(line_id, parent_move_id, sort_order)` 相当（rootのNULL semanticsを含む）やstable key制約へのmigrationを設計する。
 - **API**: move `id` と direct `parent_move_id` の契約、stable orderingをadditiveに明記。
 - **frontend**: parent ID builder、legacy SFEN fallback、cycle/orphan error。
 - **seed**: `move_nodes`/`parent_key` 新形式とlegacy adapter。Wikipedia move追加なし。
@@ -405,7 +427,7 @@ PR-D の外部監査では Wikipedia の曖昧さ回避ページ、redirect、se
 - **変更対象**: `OpeningStudyPage.tsx` または新 `OpeningVariationList.tsx`、CSS、Vitest/Playwright。
 - **DB migration/API/seed**: なし（PR-B APIを利用）。
 - **frontend**: details/summary、nested list、current highlight、jump、fold、coverage/source link、responsive/a11y。
-- **tests**: path変換、current node、deep tree、500-node性能目安、keyboard、360px。
+- **tests**: path変換、current node、deep tree、500-node fixtureのrender時間・DOM数の測定と記録、keyboard、360px。現段階では根拠のない厳格な性能閾値を置かず、測定結果から最適化要否と将来の基準を判断する。accessibilityの自動検査は、実装時に採用可能な手段（例: Playwright + axe-core、既存test stackのmatcher）を確認して具体化する。
 - **後方互換**: linear lineでは単一の簡潔なlist。JSなしのnative disclosure semanticsを優先。
 - **provenance**: label/coverageが正しいbranchに表示されること。
 
@@ -435,16 +457,16 @@ PR-D の外部監査では Wikipedia の曖昧さ回避ページ、redirect、se
 
 ### 12.1 共通 test matrix
 
-| 検査 | A | B | C | D0/D1 | E群 |
-|---|---:|---:|---:|---:|---:|
-| backend unit/pytest | 関連なし | 必須 | 関連時 | 必須 | 必須 |
-| frontend Vitest | 必須 | 必須 | 必須 | metadata UI時 | 必須 |
-| frontend lint | 必須 | 必須 | 必須 | frontend変更時 | 必須 |
-| frontend build | 必須 | 必須 | 必須 | frontend変更時 | 必須 |
-| Playwright Chromium | 必須 | 必須 | 必須 | 表示変更時 | 必須 |
-| 360px mobile | 必須 | smoke | 必須 | 表示変更時 | branch追加時 |
-| git diff check | 必須 | 必須 | 必須 | 必須 | 必須 |
-| Wikipedia provenance review | 表示退行のみ | 継承確認 | 表示確認 | 必須 | 必須 |
+| 検査 | A0 | A | B | C | D0/D1 | E群 |
+|---|---:|---:|---:|---:|---:|---:|
+| backend unit/pytest | 必須 | 関連なし | 必須 | 関連時 | 必須 | 必須 |
+| frontend Vitest | 関連なし | 必須 | 必須 | 必須 | metadata UI時 | 必須 |
+| frontend lint | 関連なし | 必須 | 必須 | 必須 | frontend変更時 | 必須 |
+| frontend build | 関連なし | 必須 | 必須 | 必須 | frontend変更時 | 必須 |
+| Playwright Chromium | seed smoke | 必須 | 必須 | 必須 | 表示変更時 | 必須 |
+| 360px mobile | 関連なし | 必須 | smoke | 必須 | 表示変更時 | branch追加時 |
+| git diff check | 必須 | 必須 | 必須 | 必須 | 必須 | 必須 |
+| Wikipedia provenance review | 継承確認 | 表示退行のみ | 継承確認 | 表示確認 | 必須 | 必須 |
 
 推奨command（実際の `package.json`/README のscript名を各PR時に再確認）:
 
@@ -460,6 +482,13 @@ git diff --check
 
 ### 12.2 PR別 acceptance checklist
 
+#### PR-A0
+
+- [ ] 全既存lineを監査し、同一 `from_sfen` の sibling USI重複が0件である。
+- [ ] 原始鬼殺しの3手目後の `7a6b` は一 nodeだけで、異なる進行はその着手後に表現される。
+- [ ] 正規化で既存の合法手順、line ID、出典metadataが失われない。
+- [ ] 再seedを2回実行しても重複が再発せず、backend pytestとseed smoke E2Eを通過する。
+
 #### PR-A
 
 - [ ] 3候補の0/1/2番目をboardで指すと各 path index が選ばれ、正解feedbackになる。
@@ -467,13 +496,14 @@ git diff --check
 - [ ] card操作とboard操作が同じnode、source、historyを表示する。
 - [ ] 「本線を一手進む」「ここから本線を最後まで再生」の挙動が文言通り。
 - [ ] undo、直前分岐、過去分岐switch、reset後のfocus/live通知が一貫。
-- [ ] duplicate sibling USIを検知するtestがある。
+- [ ] PR-A0の正規化済みfixtureを前提に、duplicate sibling USIを再発検知するtestがある。
 - [ ] Vitest、lint、build、Chromium E2E、360pxを通過。
 
 #### PR-B
 
 - [ ] 本線→A→A1/A2、B→B1/B2 fixtureがDB→API→frontendで同じtreeになる。
 - [ ] 全非root rowの`parent_move_id`が直接親で、親to_sfenと子from_sfenが一致。
+- [ ] 現行UNIQUE `(line_id, ply, variation_group, sort_order)` をdirect-parent fixtureで評価し、維持または変更の根拠、NULL rootの扱い、migration/backfill手順を記録する。
 - [ ] orphan、cycle、duplicate key/USI/order、illegal moveを明確なerrorで拒否。
 - [ ] 同一SFENの異なるpathを自動mergeしないfixtureがある。
 - [ ] legacy seed/DBをmigration後も既存line ID/URLから再生可能。
@@ -487,8 +517,8 @@ git diff --check
 - [ ] node jump後にboard/history/current branchが一致。
 - [ ] collapseしてもfocus消失や同名button ambiguityがない。
 - [ ] 360pxでhorizontal overflowなし、touch targetと長文折返しを確認。
-- [ ] 500 node fixtureのrender時間/DOM数を記録し、許容基準をPR本文に記載。
-- [ ] Vitest、axe相当check、lint、build、Chromium E2Eを通過。
+- [ ] 500 node fixtureのrender時間/DOM数を測定してPR本文に記録する。初回は厳格な合否閾値を設けず、結果から最適化課題または将来の基準設定要否を判断する。
+- [ ] accessibility自動検査の利用手段を実装時に具体化し、その検査、Vitest、lint、build、Chromium E2Eを通過する。
 
 #### PR-D0/D1
 
@@ -532,7 +562,7 @@ git diff --check
 
 この取り組み全体は次を満たした時に完了とする。
 
-1. boardで同一分岐点の全登録候補が正解になり、選んだbranch index/path/history/sourceが一致する。
+1. PR-A0の監査で既存の同一局面・同一USI siblingが解消され、共通着手後に分岐する正規形になっている。その上で、boardで同一分岐点の全登録候補が正解になり、選んだbranch index/path/history/sourceが一致する。
 2. 自動再生、undo、分岐点復帰、switchの仕様とラベルが一致し、keyboard/ARIA/360pxで利用できる。
 3. direct parentによる任意深さtreeがDB→API→frontendで保持され、SFENは合法性・整合性の検査に使われる。
 4. transpositionを意図せずmergeせず、異なる学習pathを保持する。
