@@ -321,13 +321,20 @@ test.describe("次の一手", () => {
     await expect(page.locator(".file-coords span").first()).toHaveText("1");
     await expect(page.getByTestId("turn-indicator")).toContainText("△後手");
 
-    const focused = grid.locator('[data-square="57"]');
-    await focused.focus();
-    await expect(focused).toBeFocused();
-    await expect(grid.locator('[tabindex="0"]')).toHaveCount(1);
-    await focused.press("Enter");
-    await expect(focused).toHaveClass(/selected/);
-    await grid.locator('[data-square="58"]').press("Enter");
+    const initialFocus = grid.locator('[data-square="55"][tabindex="0"]');
+    await initialFocus.focus();
+    await initialFocus.press("ArrowUp");
+    await grid.locator('[data-square="56"]').press("ArrowUp");
+    const source = grid.locator('[data-square="57"]');
+    await expect(source).toBeFocused();
+    await expect(source).toHaveAttribute("tabindex", "0");
+    await source.press("Enter");
+    await expect(source).toHaveClass(/selected/);
+    await source.press("ArrowUp");
+    const destination = grid.locator('[data-square="58"]');
+    await expect(destination).toBeFocused();
+    await expect(destination).toHaveAttribute("tabindex", "0");
+    await destination.press("Enter");
     const dialog = page.getByRole("dialog", { name: "成り選択" });
     await expect(dialog).toBeVisible();
     await dialog.getByRole("button", { name: "成る", exact: true }).press("Space");
