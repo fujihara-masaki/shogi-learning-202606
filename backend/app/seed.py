@@ -526,9 +526,45 @@ def seed_opening_catalog_if_empty(conn) -> None:
                 (all_types[parent_name], all_types[name_ja], all_types[parent_name]),
             )
 
+
+def find_duplicate_opening_sibling_moves(conn, line_ids=None) -> list[dict]:
+    """Return duplicate USI moves that compete from the same seeded position.
+
+    The current opening replay contract treats moves with the same ``from_sfen``
+    in a line as siblings.  Keep this check in Python rather than adding a
+    database uniqueness constraint: future tree/transposition representations
+    may legitimately need more than ``line_id``, ``from_sfen`` and ``usi`` to
+    identify a node.
+    """
+    params = []
+    line_filter = ""
+    if line_ids is not None:
+        ids = sorted({int(line_id) for line_id in line_ids})
+        if not ids:
+            return []
+        line_filter = f"WHERE olm.line_id IN ({','.join('?' for _ in ids)})"
+        params.extend(ids)
+
+    rows = conn.execute(
+        f"""
+        SELECT olm.line_id, ol.name AS line_name, olm.from_sfen, olm.usi,
+               COUNT(*) AS duplicate_count
+        FROM opening_line_moves AS olm
+        JOIN opening_lines AS ol ON ol.id = olm.line_id
+        {line_filter}
+        GROUP BY olm.line_id, ol.name, olm.from_sfen, olm.usi
+        HAVING COUNT(*) > 1
+        ORDER BY olm.line_id, olm.from_sfen, olm.usi
+        """,
+        params,
+    ).fetchall()
+    return [dict(row) for row in rows]
+
+
 def seed_openings_if_empty(conn) -> None:
     import shogi
 
+    seeded_line_ids = []
     for opening in SAMPLE_OPENING_LINES:
         opening.setdefault("comments", [f"{opening['name']}の代表手順 {i}手目です。" for i in range(1, len(opening["moves"]) + 1)])
         metadata = _opening_source_metadata(opening)
@@ -605,6 +641,7 @@ def seed_openings_if_empty(conn) -> None:
                 ),
             )
             line_id = int(cur.lastrowid)
+        seeded_line_ids.append(line_id)
         for ply, sfen in enumerate(positions):
             position_row = conn.execute(
                 "SELECT id FROM opening_positions WHERE line_id = ? AND ply = ?",
@@ -713,6 +750,14 @@ def seed_openings_if_empty(conn) -> None:
                 "INSERT INTO opening_tags(line_id, tag, score, reason) VALUES (?, ?, ?, ?)",
                 (line_id, opening["tag"], 1.0, opening["description"]),
             )
+
+    duplicates = find_duplicate_opening_sibling_moves(conn, seeded_line_ids)
+    if duplicates:
+        details = ", ".join(
+            f"{row['line_name']}: {row['usi']} ({row['duplicate_count']} nodes)"
+            for row in duplicates
+        )
+        raise ValueError(f"サンプル定跡に同一 sibling USI の重複があります: {details}")
 
 
 def seed_if_empty() -> None:
