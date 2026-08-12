@@ -240,6 +240,11 @@ select {
   color: #6d6557;
 }
 
+/* 上部ナビと重複する導線は、モバイルの「その他」でのみ表示する。 */
+.more-mobile-only {
+  display: none;
+}
+
 /* ---- 盤面 ---- */
 .board-wrapper {
   display: inline-flex;
@@ -797,6 +802,10 @@ select {
 
 /* ---- スマホ ---- */
 @media (max-width: 720px) {
+  .more-mobile-only {
+    display: block;
+  }
+
   /* 主要4項目+「その他」の固定下部ナビ(親指で届く位置に主要導線を置く) */
   .app-nav {
     top: auto;

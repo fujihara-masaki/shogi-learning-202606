@@ -158,7 +158,7 @@ test("home presents learning subjects separately from cross-cutting tools", asyn
   const tools = page.getByRole("region", { name: "学習を支える機能" });
   for (const name of ["詰め将棋", "定跡学習", "次の一手"])
     await expect(learning.getByRole("link", { name })).toBeVisible();
-  for (const name of ["復習", "学習記録", "作成"])
+  for (const name of ["復習", "学習記録", "問題作成"])
     await expect(tools.getByRole("link", { name })).toBeVisible();
   await expect(learning.getByRole("link", { name: "復習" })).toHaveCount(0);
   await expect(learning.getByRole("link", { name: "タイムアタック", exact: true })).toHaveCount(0);
@@ -180,15 +180,22 @@ test("tsume modes contain only tsume-specific navigation", async ({ page }) => {
   await expect(page.getByRole("button", { name: /次の一手/ })).toBeVisible();
 });
 
-test("main and mobile navigation use the new hierarchy", async ({ page }) => {
+test("desktop navigation exposes cross-cutting tools without duplicating them in その他", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 800 });
   await page.goto("/");
   const nav = page.getByRole("navigation", { name: "メインナビゲーション" });
-  await expect(nav.getByRole("link", { name: "学習記録" })).toBeAttached();
-  await expect(nav.getByRole("link", { name: "作成", exact: true })).toBeAttached();
-  await expect(nav.getByRole("link", { name: "復習", exact: true })).toBeAttached();
+  await expect(nav.getByRole("link", { name: "学習記録" })).toBeVisible();
+  await expect(nav.getByRole("link", { name: "問題作成", exact: true })).toBeVisible();
+  await expect(nav.getByRole("link", { name: "作成", exact: true })).toHaveCount(0);
+  await expect(nav.getByRole("link", { name: "復習", exact: true })).toBeVisible();
   await expect(nav.getByRole("link", { name: "タイムアタック", exact: true })).toHaveCount(0);
+  await nav.getByRole("link", { name: "問題作成", exact: true }).click();
+  await expect(page).toHaveURL(/\/problem-editor$/);
+  await expect(page.getByRole("heading", { name: "詰め将棋問題作成" })).toBeVisible();
   await page.goto("/more");
-  for (const name of ["復習", "学習記録", "作成", "データ出典"])
+  for (const name of ["復習", "学習記録", "問題作成"])
+    await expect(page.getByTestId("more-page").getByRole("heading", { name, exact: true, includeHidden: true })).toBeHidden();
+  for (const name of ["設定", "データ出典"])
     await expect(page.getByTestId("more-page").getByRole("link", { name })).toBeVisible();
   await expect(page.getByTestId("more-page").getByRole("link", { name: "タイムアタック", exact: true })).toHaveCount(0);
 });
@@ -985,14 +992,17 @@ test.describe("mobile layout (360px)", () => {
     ).toBe(true);
     await nav.getByRole("link", { name: "その他" }).click();
     await expect(page.getByTestId("more-page")).toBeVisible();
-    for (const name of ["復習", "学習記録", "作成", "データ出典"]) {
+    for (const name of ["復習", "学習記録", "問題作成", "設定", "データ出典"]) {
       await expect(
         page.getByTestId("more-page").getByRole("heading", { name, exact: true }),
       ).toBeVisible();
     }
-    // 「その他」から復習画面へ移動できる
-    await page.getByTestId("more-page").getByRole("link", { name: "復習" }).click();
-    await expect(page.getByTestId("review-page")).toBeVisible();
+    expect(
+      await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
+    ).toBe(true);
+    await page.getByTestId("more-page").getByRole("link", { name: "問題作成" }).click();
+    await expect(page).toHaveURL(/\/problem-editor$/);
+    await expect(page.getByRole("heading", { name: "詰め将棋問題作成" })).toBeVisible();
   });
 
   test("tsume board and problem editor fit within the viewport width", async ({ page, request }) => {
