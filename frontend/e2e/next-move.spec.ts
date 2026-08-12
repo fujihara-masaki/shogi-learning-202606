@@ -142,6 +142,14 @@ async function playMove(page: Page, from: string, to: string) {
   await board.locator(`[data-square="${to}"]`).click();
 }
 
+async function useImageAppearance(page: Page) {
+  await page.addInitScript(() => localStorage.setItem("shogi.appearance.v1", JSON.stringify({
+    version: 1,
+    pieceTheme: "shogi-images-hitomoji",
+    boardTheme: "shogi-images-light",
+  })));
+}
+
 test("履歴に次の一手と既存の詰め将棋・タイムアタック履歴を表示する", async ({ page }) => {
   await page.route("**/api/stats", (route) => route.fulfill({ json: { overall: { total_answers: 1, total_correct: 1, total_wrong: 0, accuracy: 1, avg_elapsed_ms: 1000 }, by_mate_length: {}, recent_results: [{ id: 1, problem_id: 1, title: "1手詰", mate_length: 1, is_correct: true, elapsed_ms: 1000, mistake_count: 0, answered_at: "2026-01-01" }] } }));
   await page.route("**/api/time-attack/results", (route) => route.fulfill({ json: [{ id: 1, mode: "normal", mate_length: 1, total_questions: 5, correct_count: 5, mistake_count: 0, elapsed_ms: 5000, played_at: "2026-01-02" }] }));
@@ -299,6 +307,34 @@ test("360px幅でも長いDB異常案内がページ全体を横スクロール�
 test.describe("次の一手", () => {
   test.beforeEach(async ({ page }) => {
     await mockNextMoveApi(page);
+  });
+
+  test("画像テーマでも後手視点・成り・回答後操作と盤ARIAを維持する", async ({ page }) => {
+    await useImageAppearance(page);
+    await page.goto("/next-move/301");
+    const board = page.getByTestId("shogi-board");
+    const grid = board.getByRole("grid");
+    await expect(grid).toHaveAttribute("data-board-theme", "shogi-images-light");
+    await expect(grid.getByRole("gridcell")).toHaveCount(81);
+    await expect(grid.locator('img[src*="pieces/shogi-images-hitomoji"]')).not.toHaveCount(0);
+    await expect(grid.locator("img").first()).toHaveAttribute("alt", "");
+    await expect(page.locator(".file-coords span").first()).toHaveText("1");
+    await expect(page.getByTestId("turn-indicator")).toContainText("△後手");
+
+    const focused = grid.locator('[data-square="57"]');
+    await focused.focus();
+    await expect(focused).toBeFocused();
+    await expect(grid.locator('[tabindex="0"]')).toHaveCount(1);
+    await focused.press("Enter");
+    await expect(focused).toHaveClass(/selected/);
+    await grid.locator('[data-square="58"]').press("Enter");
+    const dialog = page.getByRole("dialog", { name: "成り選択" });
+    await expect(dialog).toBeVisible();
+    await dialog.getByRole("button", { name: "成る", exact: true }).press("Space");
+    await expect(page.getByTestId("next-move-feedback")).toContainText("最有力候補");
+    await expect(page.getByTestId("next-move-result")).toContainText("5g5h+");
+    await page.getByTestId("next-move-retry-button").click();
+    await expect(page.getByTestId("next-move-result")).toHaveCount(0);
   });
 
   test("次の一手一覧を独立ページとして表示し、答えを表示しない", async ({ page }) => {
