@@ -223,8 +223,38 @@ export function expectedOpeningMove(opening: OpeningLine, path: number[]): Openi
   return choices[0] ?? null;
 }
 
-export function isExpectedOpeningMove(move: Move, expected: OpeningMoveNode | null): boolean {
-  return Boolean(expected && move.usi === expected.usi);
+export function findOpeningChoiceIndex(choices: OpeningMoveNode[], move: Pick<Move, "usi">): number {
+  return choices.findIndex((choice) => choice.usi === move.usi);
+}
+
+/** Keep the selected path and append the first (main-line) choice until the end. */
+export function continueOpeningMainLine(opening: OpeningLine, path: number[]): number[] {
+  const nextPath: number[] = [];
+  let choices = opening.moves;
+  for (const index of path) {
+    const node = choices[index];
+    if (!node) break;
+    nextPath.push(index);
+    choices = node.next ?? [];
+  }
+  while (choices.length > 0) {
+    nextPath.push(0);
+    choices = choices[0].next ?? [];
+  }
+  return nextPath;
+}
+
+/** Return the path immediately before the most recently traversed branch choice. */
+export function pathBeforePreviousBranch(opening: OpeningLine, path: number[]): number[] {
+  let choices = opening.moves;
+  let latestBranchStep = -1;
+  for (const [stepIndex, index] of path.entries()) {
+    if (choices.length > 1) latestBranchStep = stepIndex;
+    const node = choices[index];
+    if (!node) break;
+    choices = node.next ?? [];
+  }
+  return latestBranchStep < 0 ? path : path.slice(0, latestBranchStep);
 }
 
 export interface ImportedOpeningLike {
