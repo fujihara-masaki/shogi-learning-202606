@@ -728,15 +728,17 @@ def test_wikipedia_long_seed_branches_are_idempotent_and_replayable(client):
     assert set(ids) == set(names)
 
     from app.database import get_connection
-    from app.seed import seed_openings_if_empty
+    from app.seed import find_duplicate_opening_sibling_moves, seed_openings_if_empty
 
     conn = get_connection()
     try:
         before = conn.execute("SELECT COUNT(*) AS c FROM opening_lines").fetchone()["c"]
         seed_openings_if_empty(conn)
+        seed_openings_if_empty(conn)
         conn.commit()
         after = conn.execute("SELECT COUNT(*) AS c FROM opening_lines").fetchone()["c"]
         assert after == before
+        assert find_duplicate_opening_sibling_moves(conn) == []
     finally:
         conn.close()
 
@@ -772,3 +774,78 @@ def test_wikipedia_long_seed_branches_are_idempotent_and_replayable(client):
             assert move in board.legal_moves, (group, move_row)
             board.push(move)
             assert move_row["to_sfen"] == board.sfen()
+
+
+def test_all_seed_opening_siblings_have_unique_usi(client):
+    from app.database import get_connection
+    from app.seed import find_duplicate_opening_sibling_moves
+
+    conn = get_connection()
+    try:
+        seed_line_ids = [
+            row["id"]
+            for row in conn.execute(
+                "SELECT id FROM opening_lines WHERE source_id IS NULL"
+            ).fetchall()
+        ]
+        assert seed_line_ids
+        assert find_duplicate_opening_sibling_moves(conn, seed_line_ids) == []
+    finally:
+        conn.close()
+
+
+def test_primitive_onigoroshi_silver_moves_are_distinct_nodes(client):
+    from app.database import get_connection
+
+    conn = get_connection()
+    try:
+        line = conn.execute(
+            "SELECT id FROM opening_lines WHERE name = ? AND source_id IS NULL",
+            ("原始鬼殺し（Wikipedia明示手順）",),
+        ).fetchone()
+        assert line is not None
+        moves = conn.execute(
+            """
+            SELECT id, ply, usi, from_sfen, parent_move_id, variation_group
+            FROM opening_line_moves
+            WHERE line_id = ? AND usi = '7a6b'
+            ORDER BY ply, variation_group
+            """,
+            (line["id"],),
+        ).fetchall()
+        assert len(moves) == 2
+
+        branch_move, main_move = moves
+        third_main_move = conn.execute(
+            """
+            SELECT id, to_sfen FROM opening_line_moves
+            WHERE line_id = ? AND ply = 3 AND variation_group = 'main'
+            """,
+            (line["id"],),
+        ).fetchone()
+
+        assert dict(branch_move) == {
+            "id": branch_move["id"],
+            "ply": 4,
+            "usi": "7a6b",
+            "from_sfen": third_main_move["to_sfen"],
+            "parent_move_id": third_main_move["id"],
+            "variation_group": "△6二銀の対応",
+        }
+        assert main_move["ply"] == 6
+        assert main_move["usi"] == "7a6b"
+        assert main_move["parent_move_id"] is None
+        assert main_move["variation_group"] == "main"
+        assert main_move["from_sfen"] != branch_move["from_sfen"]
+
+        sibling_count = conn.execute(
+            """
+            SELECT COUNT(*) AS count
+            FROM opening_line_moves
+            WHERE line_id = ? AND from_sfen = ? AND usi = '7a6b'
+            """,
+            (line["id"], third_main_move["to_sfen"]),
+        ).fetchone()["count"]
+        assert sibling_count == 1
+    finally:
+        conn.close()
