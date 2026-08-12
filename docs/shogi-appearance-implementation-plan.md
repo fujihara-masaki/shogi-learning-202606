@@ -316,6 +316,13 @@ Provider、versioned localStorage、設定画面、More からの導線、リセ
 - 画像障害、localStorage 破損／利用不可、直接 URL `/settings`、reload を確認。
 - `npm run lint`、`npm run build`、`npx vitest run`、`npm run e2e` を最終 gate とする。
 
+**完了時監査（2026-08-12）**
+
+- 標準テーマの深い操作回帰は既存 `shogi-learning.spec.ts` / `next-move.spec.ts`、画像テーマと障害縮退は既存 appearance E2E と resolver/storage Vitest を再利用し、同じ組み合わせの重複テストは追加しなかった。
+- PR-E では不足していたタイムアタックの画像表示、次の一手の画像表示での後手反転・成り・回答後リセット・ARIA、360px の定跡／タイムアタック画像盤を追加した。詰め将棋、定跡、EditorBoard、SolutionRecorder と両復習遷移は既存テストとの合成で matrix を満たす。
+- 全盤面は `AppearanceProvider` を共有し、appearance を React key にしていないことを確認した。設定 UI は別 route のため、実盤を表示したまま変更する製品導線はなく、実盤上の動的切替テストを作るための production 専用 API は追加していない。
+- 監査でテーマ適用漏れや production bug は見つからず、production code の変更は不要だった。
+
 ## 11. テスト戦略の補足
 
 ### スクリーンショット比較
@@ -388,4 +395,3 @@ Provider、versioned localStorage、設定画面、More からの導線、リセ
 - 360px 幅で盤、設定、editor にページ横スクロールがなく、focus と状態表示のコントラストが保たれる。
 - 導入素材ごとに公式条件を導入時点で再確認し、asset、catalog、`THIRD_PARTY_NOTICES.md`、画面上の出典が一致する。
 - 各 PR の対象テストに加え、最終的に lint、build、全 Vitest、全 Playwright が通る。
-

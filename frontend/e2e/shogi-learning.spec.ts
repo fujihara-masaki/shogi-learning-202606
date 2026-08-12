@@ -718,6 +718,18 @@ test("time attack setup starts and displays a problem", async ({ page }) => {
   await expect(page.getByTestId("shogi-board")).toBeVisible();
 });
 
+test("time attack applies image appearance without changing its session", async ({ page }) => {
+  await useShogiImagesTheme(page);
+  await page.goto("/time-attack");
+  await page.getByRole("button", { name: "5問" }).click();
+  await page.getByRole("button", { name: "スタート" }).click();
+  const board = page.getByTestId("shogi-board");
+  await expect(board.getByRole("grid")).toHaveAttribute("data-board-theme", "shogi-images-light");
+  await expect(board.getByRole("gridcell")).toHaveCount(81);
+  await expect(board.locator('img[src*="pieces/shogi-images-hitomoji"]')).not.toHaveCount(0);
+  await expect(page.getByText(/第 1 \/ 5 問/)).toBeVisible();
+});
+
 test("seeded opening replay controls move forward, backward, reset, and finish", async ({ page }) => {
   await page.goto("/openings");
   await showOpeningTypeLines(page, "中飛車");
@@ -997,5 +1009,22 @@ test.describe("mobile layout (360px)", () => {
     expect(
       await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
     ).toBe(true);
+  });
+
+  test("image boards on next learning routes stay inside the viewport", async ({ page }) => {
+    await useShogiImagesTheme(page);
+    for (const path of ["/openings/static-rook-rapid-attack", "/time-attack"]) {
+      await page.goto(path);
+      if (path === "/time-attack") {
+        await page.getByRole("button", { name: "5問" }).click();
+        await page.getByRole("button", { name: "スタート" }).click();
+      }
+      const board = page.getByTestId("shogi-board");
+      await expect(board.getByRole("grid")).toHaveAttribute("data-board-theme", "shogi-images-light");
+      const box = await board.boundingBox();
+      expect(box).not.toBeNull();
+      expect((box?.x ?? 0) + (box?.width ?? 0)).toBeLessThanOrEqual(360);
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+    }
   });
 });
