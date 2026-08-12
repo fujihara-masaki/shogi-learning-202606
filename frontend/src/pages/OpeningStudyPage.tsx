@@ -6,11 +6,13 @@ import MoveHistory from "../components/MoveHistory";
 import ShogiBoard from "../components/ShogiBoard";
 import {
   applyOpeningPath,
+  continueOpeningMainLine,
   expectedOpeningMove,
+  findOpeningChoiceIndex,
   findOpening,
-  isExpectedOpeningMove,
   openingFromImportedLine,
   openingFromLearningSample,
+  pathBeforePreviousBranch,
   type OpeningLine,
 } from "../shogi/openings";
 import { moveFromSquare } from "../shogi/tsume";
@@ -93,17 +95,18 @@ function OpeningStudyContent({ id }: { id: string | undefined }) {
     );
   }
 
-  const completed = expected === null;
+  const completed = currentChoices.length === 0;
 
   function handleUserMove(move: Move) {
-    if (!expected) return;
-    if (!isExpectedOpeningMove(move, expected)) {
-      setFeedback(`不正解です。ヒント: ${expected.hint}`);
+    const branchIndex = findOpeningChoiceIndex(currentChoices, move);
+    if (branchIndex < 0) {
+      setFeedback(`不正解です。登録された定跡手のいずれかを指してください。`);
       setHintVisible(true);
       return;
     }
-    setPath((prev) => [...prev, 0]);
-    setFeedback(`正解: ${expected.notation}`);
+    const selected = currentChoices[branchIndex];
+    setPath((prev) => [...prev, branchIndex]);
+    setFeedback(`正解: ${selected.notation}${selected.branchLabel ? `（${selected.branchLabel}）` : ""}`);
     setLastMoveTo(move.to);
     setLastMoveFrom(moveFromSquare(move));
   }
@@ -152,19 +155,22 @@ function OpeningStudyContent({ id }: { id: string | undefined }) {
   }
 
   function goToEnd() {
-    if (!opening) return;
-    const nextPath: number[] = [];
-    let choices = opening.moves;
-    while (choices.length > 0) {
-      nextPath.push(0);
-      choices = choices[0].next ?? [];
-    }
-    setPath(nextPath);
-    setFeedback("最後まで再生しました");
+    setPath((prev) => continueOpeningMainLine(opening!, prev));
+    setFeedback("選択中の変化を保持し、ここから本線を最後まで再生しました");
     setHintVisible(false);
     setLastMoveTo(null);
     setLastMoveFrom(null);
   }
+
+  function returnToPreviousBranch() {
+    setPath((prev) => pathBeforePreviousBranch(opening!, prev));
+    setFeedback("直前の分岐点へ戻りました");
+    setHintVisible(false);
+    setLastMoveTo(null);
+    setLastMoveFrom(null);
+  }
+
+  const hasPreviousBranch = pathBeforePreviousBranch(opening, path).length < path.length;
 
   return (
     <div className="opening-study-page" data-testid="opening-study-page">
@@ -176,9 +182,10 @@ function OpeningStudyContent({ id }: { id: string | undefined }) {
           <div
             className={`banner ${feedback?.startsWith("不正解") ? "banner-error" : completed ? "banner-success" : "banner-info"}`}
             role={feedback?.startsWith("不正解") ? "alert" : "status"}
+            aria-live="polite"
             data-testid="opening-feedback"
           >
-            {completed ? "この定跡手順を完了しました。Wikipediaで確認できる手順はここまでです。" : feedback ?? "盤面上で推奨手を指してください"}
+            {completed ? "この定跡手順を完了しました。Wikipediaで確認できる手順はここまでです。" : feedback ?? "登録されたいずれかの定跡手を指してください"}
             {hasBranches && <span className="branch-badge" data-testid="branch-badge">分岐あり</span>}
           </div>
           <ShogiBoard
@@ -201,29 +208,40 @@ function OpeningStudyContent({ id }: { id: string | undefined }) {
             <button type="button" onClick={undo} disabled={path.length === 0}>
               一手戻る
             </button>
+            <button type="button" onClick={returnToPreviousBranch} disabled={!hasPreviousBranch}>
+              直前の分岐点へ戻る
+            </button>
             <button type="button" onClick={stepForward} disabled={completed}>
-              一手進む
+              本線を一手進む
             </button>
             <button type="button" onClick={goToEnd} disabled={completed}>
-              最後まで進む
+              ここから本線を最後まで再生
             </button>
             <button type="button" onClick={() => setHintVisible((v) => !v)} aria-pressed={hintVisible} disabled={completed}>
               ヒント
             </button>
           </div>
-          {hintVisible && expected && <div className="hint-box">ヒント: {expected.hint}</div>}
+          {hintVisible && expected && <div className="hint-box">本線のヒント: {expected.hint}{hasBranches && "（ほかの表示中の候補も正解です）"}</div>}
           <section className="opening-branches" data-testid="opening-branches">
             <h2>分岐選択</h2>
             <p className="muted">現在の分岐パス: <strong>{selectedBranchPath}</strong></p>
             {hasBranches ? (
-              <div className="branch-choice-list">
+              <>
+                <p className="branch-count">この局面には <strong>{currentChoices.length}</strong> つの進行があります</p>
+                <div className="branch-choice-list branch-card-list">
                 {currentChoices.map((choice, index) => (
-                  <button key={choice.id} type="button" onClick={() => chooseBranch(index)} className={index === 0 ? "branch-choice primary" : "branch-choice"}>
-                    {choice.branchLabel || (index === 0 ? "本線" : `分岐${index + 1}`)}
-                    <span>{choice.notation} ({choice.usi})</span>
-                  </button>
+                  <article key={choice.id} className={`branch-card ${index === 0 ? "main" : "variation"}`}>
+                    <div className="branch-card-heading"><strong>{index === 0 ? "本線" : "変化"}</strong><span>{choice.branchLabel || (index === 0 ? "本線" : `分岐${index + 1}`)}</span></div>
+                    <p className="branch-card-move"><strong>{choice.notation}</strong> <code>{choice.usi}</code></p>
+                    <p>{choice.explanation}</p>
+                    {(choice.coverageStatus || choice.sourceTitle) && <p className="branch-card-provenance">{choice.coverageStatus && <>カバレッジ: {choice.coverageStatus}</>}{choice.coverageStatus && choice.sourceTitle && " / "}{choice.sourceTitle && <>出典: {choice.sourceTitle}</>}</p>}
+                    <button type="button" onClick={() => chooseBranch(index)} aria-label={`${index === 0 ? "本線" : "変化"} ${choice.notation}、この変化を見る`}>
+                      この変化を見る
+                    </button>
+                  </article>
                 ))}
-              </div>
+                </div>
+              </>
             ) : (
               <p className="muted">この局面の分岐候補はありません。</p>
             )}
@@ -233,8 +251,8 @@ function OpeningStudyContent({ id }: { id: string | undefined }) {
                 {state.steps.map((step, stepIndex) => step.choices.length > 1 && (
                   <div key={`${step.node.id}-branches`} className="branch-choice-list compact">
                     {step.choices.map((choice, branchIndex) => (
-                      <button key={choice.id} type="button" onClick={() => switchBranch(stepIndex, branchIndex)} disabled={path[stepIndex] === branchIndex}>
-                        {choice.branchLabel || (branchIndex === 0 ? "本線" : `分岐${branchIndex + 1}`)}
+                      <button key={choice.id} type="button" onClick={() => switchBranch(stepIndex, branchIndex)} aria-current={path[stepIndex] === branchIndex ? "step" : undefined} className={path[stepIndex] === branchIndex ? "selected" : undefined}>
+                        {choice.branchLabel || (branchIndex === 0 ? "本線" : `分岐${branchIndex + 1}`)}{path[stepIndex] === branchIndex ? "（選択中）" : "へ切り替える"}
                       </button>
                     ))}
                   </div>
@@ -256,7 +274,7 @@ function OpeningStudyContent({ id }: { id: string | undefined }) {
         </div>
         <div className="player-side">
           <section className="opening-current" data-testid="opening-current-move">
-            <h2>現在の推奨手</h2>
+            <h2>現在の本線手</h2>
             {expected ? (
               <>
                 <p><strong>{expected.notation}</strong> <span className="move-usi">({expected.usi})</span></p>

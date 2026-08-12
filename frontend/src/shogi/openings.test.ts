@@ -3,12 +3,15 @@ import { Color } from "tsshogi";
 import {
   OPENING_LINES,
   applyOpeningPath,
+  continueOpeningMainLine,
   countMainLineMoves,
   expectedOpeningMove,
   flattenMainLine,
-  isExpectedOpeningMove,
+  findOpeningChoiceIndex,
   openingFromImportedLine,
-  positionFromOpening,
+  pathBeforePreviousBranch,
+  type OpeningLine,
+  type OpeningMoveNode,
 } from "./openings";
 
 describe("opening sample data", () => {
@@ -36,12 +39,12 @@ describe("opening learning helpers", () => {
     expect(expectedOpeningMove(opening, [0])?.usi).toBe("3c3d");
   });
 
-  it("checks whether a user move matches the expected move", () => {
-    const position = positionFromOpening(opening);
-    const correct = position.createMoveByUSI("7g7f")!;
-    const wrong = position.createMoveByUSI("2g2f")!;
-    expect(isExpectedOpeningMove(correct, expectedOpeningMove(opening, []))).toBe(true);
-    expect(isExpectedOpeningMove(wrong, expectedOpeningMove(opening, []))).toBe(false);
+  it("finds every registered choice and rejects a move outside three choices", () => {
+    const choices = ["7g7f", "2g2f", "5g5f"].map((usi, index) => ({ usi, id: String(index) })) as OpeningMoveNode[];
+    expect(findOpeningChoiceIndex(choices, { usi: "7g7f" })).toBe(0);
+    expect(findOpeningChoiceIndex(choices, { usi: "2g2f" })).toBe(1);
+    expect(findOpeningChoiceIndex(choices, { usi: "5g5f" })).toBe(2);
+    expect(findOpeningChoiceIndex(choices, { usi: "6g6f" })).toBe(-1);
   });
 
   it("undo path restores the previous side to move", () => {
@@ -49,6 +52,35 @@ describe("opening learning helpers", () => {
     expect(advanced.position.color).toBe(Color.BLACK);
     const undone = applyOpeningPath(opening, [0]);
     expect(undone.position.color).toBe(Color.WHITE);
+  });
+});
+
+describe("opening branch path helpers", () => {
+  const node = (id: string, usi: string, next?: OpeningMoveNode[]): OpeningMoveNode => ({
+    id, usi, notation: usi, explanation: id, aim: id, hint: id, next,
+  });
+  const fixture: OpeningLine = {
+    id: "three-choices", name: "three choices", category: "test", description: "test",
+    initialSfen: "lnsgkgsnl/1r5b1/ppppppppp/9/9/9/PPPPPPPPP/1B5R1/LNSGKGSNL b - 1",
+    moves: [
+      node("zero", "7g7f", [node("zero-next", "3c3d")]),
+      node("one", "2g2f", [node("one-next", "8c8d")]),
+      node("two", "5g5f", [node("two-next", "5c5d")]),
+    ],
+  };
+
+  it.each([[0, "zero"], [1, "one"], [2, "two"]])("replays path index %i as node %s", (index, id) => {
+    expect(applyOpeningPath(fixture, [index]).steps[0].node.id).toBe(id);
+  });
+
+  it("keeps the selected path when continuing along first choices", () => {
+    expect(continueOpeningMainLine(fixture, [2])).toEqual([2, 0]);
+    expect(applyOpeningPath(fixture, continueOpeningMainLine(fixture, [2])).moves.map((move) => move.usi)).toEqual(["5g5f", "5c5d"]);
+  });
+
+  it("returns to immediately before the previous branch", () => {
+    expect(pathBeforePreviousBranch(fixture, [2, 0])).toEqual([]);
+    expect(pathBeforePreviousBranch(fixture, [])).toEqual([]);
   });
 });
 

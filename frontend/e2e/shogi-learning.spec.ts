@@ -715,6 +715,66 @@ test("opening study accepts correct moves and supports wrong feedback, undo, and
   await expect(page.getByText("まだ指し手はありません")).toBeVisible();
 });
 
+test("three-way opening branches behave the same from board and accessible cards", async ({ page }) => {
+  const start = "lnsgkgsnl/1r5b1/ppppppppp/9/9/9/PPPPPPPPP/1B5R1/LNSGKGSNL b - 1";
+  const branches = [
+    ["7g7f", "lnsgkgsnl/1r5b1/ppppppppp/9/9/2P6/PP1PPPPPP/1B5R1/LNSGKGSNL w - 1", "本線", "▲7六歩", "77", "76"],
+    ["2g2f", "lnsgkgsnl/1r5b1/ppppppppp/9/9/7P1/PPPPPPP1P/1B5R1/LNSGKGSNL w - 1", "飛車先", "▲2六歩", "27", "26"],
+    ["5g5f", "lnsgkgsnl/1r5b1/ppppppppp/9/9/4P4/PPPP1PPPP/1B5R1/LNSGKGSNL w - 1", "中央", "▲5六歩", "57", "56"],
+  ] as const;
+  await page.route("**/api/openings/999", (route) => route.fulfill({ json: {
+    id: 999, name: "三択fixture", opening_type: "E2E", opening_type_id: null, initial_sfen: start,
+    positions: [], tags: [],
+    source: { name: "Fixture source", license_name: "CC0", license_url: "https://example.test/license", source_title: "Fixture source", source_url: "https://example.test/very/long/source/url" },
+    moves: branches.flatMap(([usi, to, variation], index) => [
+      { ply: 1, usi, from_sfen: start, to_sfen: to, comment: `${variation}の解説`, variation_group: index === 0 ? "main" : variation, parent_move_id: null, sort_order: index },
+      { ply: 2, usi: "3c3d", from_sfen: to, to_sfen: to.replace("ppppppppp/9/9", "pppppp1pp/6p2/9"), comment: `${variation}の続き`, variation_group: index === 0 ? "main" : variation, parent_move_id: null, sort_order: 0 },
+    ]),
+  }}));
+
+  await page.goto("/openings/999");
+  await expect(page.getByText("この局面には")).toContainText("3");
+  await expect(page.getByRole("button", { name: "本線 7g7f、この変化を見る" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "変化 2g2f、この変化を見る" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "変化 5g5f、この変化を見る" })).toBeVisible();
+  await expect(page.getByTestId("opening-feedback")).toHaveAttribute("aria-live", "polite");
+
+  const board = page.getByTestId("shogi-board");
+  for (const [usi, , variation, , from, to] of branches) {
+    await board.locator(`[data-square="${from}"]`).click();
+    await board.locator(`[data-square="${to}"]`).click();
+    await expect(page.getByTestId("opening-feedback")).toContainText("正解");
+    await expect(page.getByText(usi, { exact: true })).toBeVisible();
+    await expect(page.getByTestId("opening-source")).toContainText("Fixture source");
+    await page.getByRole("button", { name: "直前の分岐点へ戻る" }).click();
+    await expect(page.getByText("この局面には")).toContainText("3");
+    await expect(page.getByTestId("opening-feedback")).toContainText("直前の分岐点へ戻りました");
+    await expect(page.getByText(variation, { exact: true })).toBeVisible();
+  }
+
+  await board.locator('[data-square="67"]').click();
+  await board.locator('[data-square="66"]').click();
+  await expect(page.getByTestId("opening-feedback")).toContainText("不正解");
+  await expect(page.getByText("まだ指し手はありません")).toBeVisible();
+
+  await page.getByRole("button", { name: "変化 5g5f、この変化を見る" }).click();
+  await expect(page.getByText("5g5f", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "ここから本線を最後まで再生" }).click();
+  await expect(page.getByText("5g5f", { exact: true })).toBeVisible();
+  await expect(page.getByText("3c3d", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "中央（選択中）" }).click();
+  await expect(page.getByRole("button", { name: "中央（選択中）" })).toHaveAttribute("aria-current", "step");
+  await page.getByRole("button", { name: "本線へ切り替える" }).click();
+  await expect(page.getByText("7g7f", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "一手戻る" }).click();
+  await page.getByRole("button", { name: "本線を一手進む" }).click();
+  await page.getByRole("button", { name: "最初に戻る" }).click();
+  await expect(page.getByText("まだ指し手はありません")).toBeVisible();
+
+  await page.setViewportSize({ width: 360, height: 800 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
+});
+
 test("time attack setup starts and displays a problem", async ({ page }) => {
   await page.goto("/time-attack");
   await expect(page.getByText("難易度:")).toBeVisible();
@@ -744,23 +804,23 @@ test("seeded opening replay controls move forward, backward, reset, and finish",
   await expect(page.getByTestId("opening-current-move")).toContainText("7g7f");
 
   const replayButtons = page.locator(".opening-replay-controls button");
-  await expect(replayButtons).toHaveText(["最初に戻る", "一手戻る", "一手進む", "最後まで進む", "ヒント"]);
+  await expect(replayButtons).toHaveText(["最初に戻る", "一手戻る", "直前の分岐点へ戻る", "本線を一手進む", "ここから本線を最後まで再生", "ヒント"]);
   await expect(page.getByRole("button", { name: "最初に戻る" })).toBeDisabled();
   await expect(page.getByRole("button", { name: "一手戻る" })).toBeDisabled();
-  await expect(page.getByRole("button", { name: "一手進む" })).toBeEnabled();
-  await expect(page.getByRole("button", { name: "最後まで進む" })).toBeEnabled();
+  await expect(page.getByRole("button", { name: "本線を一手進む" })).toBeEnabled();
+  await expect(page.getByRole("button", { name: "ここから本線を最後まで再生" })).toBeEnabled();
 
-  await page.getByRole("button", { name: "一手進む" }).click();
+  await page.getByRole("button", { name: "本線を一手進む" }).click();
   await expect(page.getByTestId("opening-current-move")).toContainText("3c3d");
   await page.getByRole("button", { name: "一手戻る" }).click();
   await expect(page.getByTestId("opening-current-move")).toContainText("7g7f");
-  await page.getByRole("button", { name: "一手進む" }).click();
+  await page.getByRole("button", { name: "本線を一手進む" }).click();
   await page.getByRole("button", { name: "最初に戻る" }).click();
   await expect(page.getByText("まだ指し手はありません")).toBeVisible();
-  await page.getByRole("button", { name: "最後まで進む" }).click();
+  await page.getByRole("button", { name: "ここから本線を最後まで再生" }).click();
   await expect(page.getByTestId("opening-feedback")).toContainText("この定跡手順を完了しました。Wikipediaで確認できる手順はここまでです。");
-  await expect(page.getByRole("button", { name: "一手進む" })).toBeDisabled();
-  await expect(page.getByRole("button", { name: "最後まで進む" })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "本線を一手進む" })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "ここから本線を最後まで再生" })).toBeDisabled();
 });
 
 
