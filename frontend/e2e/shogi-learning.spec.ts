@@ -741,7 +741,7 @@ test("three-way opening branches behave the same from board and accessible cards
 
   const board = page.getByTestId("shogi-board");
   const historyUsis = page.locator(".move-history .move-usi");
-  for (const [usi, , variation, , from, to] of branches) {
+  for (const [usi, , , , from, to] of branches) {
     await board.locator(`[data-square="${from}"]`).click();
     await board.locator(`[data-square="${to}"]`).click();
     await expect(page.getByTestId("opening-feedback")).toContainText("正解");
@@ -750,7 +750,7 @@ test("three-way opening branches behave the same from board and accessible cards
     await page.getByRole("button", { name: "直前の分岐点へ戻る" }).click();
     await expect(page.getByText("この局面には")).toContainText("3");
     await expect(page.getByTestId("opening-feedback")).toContainText("直前の分岐点へ戻りました");
-    await expect(page.getByText(variation, { exact: true })).toBeVisible();
+    await expect(historyUsis).toHaveCount(0);
   }
 
   await board.locator('[data-square="67"]').click();
