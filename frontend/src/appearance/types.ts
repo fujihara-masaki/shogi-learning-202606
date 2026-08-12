@@ -17,8 +17,16 @@ export interface PieceVisual {
   promoted: boolean;
 }
 
-export type PieceThemeId = "text-standard" | "shogi-images-hitomoji";
-export type BoardThemeId = "board-standard" | "shogi-images-light";
+export type PieceThemeId =
+  | "text-standard"
+  | "shogi-images-hitomoji"
+  | "shogi-images-futamoji"
+  | "shogi-images-hitomoji-dark";
+export type BoardThemeId =
+  | "board-standard"
+  | "shogi-images-light"
+  | "shogi-images-warm"
+  | "shogi-images-dark";
 export type PieceOrientationPolicy = "explicit-sides" | "rotate-opponent";
 export type PieceLocation = "board" | "hand";
 
@@ -50,4 +58,11 @@ export interface BoardThemeDefinition {
   fallbackColor: string;
   lineColor: string;
   attribution?: ThemeAttribution;
+}
+
+export interface AppearancePresetDefinition {
+  id: string;
+  label: string;
+  pieceTheme: PieceThemeId;
+  boardTheme: BoardThemeId;
 }

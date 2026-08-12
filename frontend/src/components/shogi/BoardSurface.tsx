@@ -16,7 +16,7 @@ const BoardSurface = forwardRef<HTMLDivElement, BoardSurfaceProps>(function Boar
     "--board-background-image": theme.backgroundImage ? `url("${theme.backgroundImage}")` : "none",
     ...style,
   } as CSSProperties;
-  return <div ref={ref} className={`board-surface ${className}`.trim()} data-board-theme={theme.id} style={themeStyle} {...props} />;
+  return <div ref={ref} className={`board-surface ${className}`.trim()} data-board-theme={theme.id} data-board-image={theme.backgroundImage ? "true" : undefined} style={themeStyle} {...props} />;
 });
 
 export default BoardSurface;

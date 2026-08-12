@@ -16,6 +16,7 @@ export function AppearanceProvider({ children }: { children: ReactNode }) {
       ...settings,
       setPieceTheme: (pieceTheme) => update({ ...settings, pieceTheme }),
       setBoardTheme: (boardTheme) => update({ ...settings, boardTheme }),
+      setAppearance: update,
       resetToDefaults: () => {
         setSettings({ ...DEFAULT_APPEARANCE_SETTINGS });
         setStorageWarning(!resetAppearanceSettings());

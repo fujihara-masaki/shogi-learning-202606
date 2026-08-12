@@ -1,24 +1,33 @@
 import { createHash } from "node:crypto";
-import { readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { chromium } from "@playwright/test";
 
 const EXPECTED_SIZE = { width: 458, height: 500 };
-const EXPECTED_SOURCE = {
-  byteLength: 258_910,
-  sha256: "641f3923c9091f365514693c0957ba9fc18f32d541229281addc15370f907294",
-};
 const scriptDirectory = dirname(fileURLToPath(import.meta.url));
-const sourceBoardPath = resolve(
-  scriptDirectory,
-  "../assets-source/shogi/boards/shogi-images-light/board-original.png",
-);
-const outputBoardPath = resolve(
-  scriptDirectory,
-  "../public/assets/shogi/boards/shogi-images-light/board.png",
-);
+const boardSources = [
+  {
+    id: "shogi-images-light",
+    byteLength: 258_910,
+    sha256: "641f3923c9091f365514693c0957ba9fc18f32d541229281addc15370f907294",
+  },
+  {
+    id: "shogi-images-warm",
+    byteLength: 196_141,
+    sha256: "17464e53b2f5d65c357810273ade65996a5ed73b5b9ab3ed2fccedbfc921d2bc",
+  },
+  {
+    id: "shogi-images-dark",
+    byteLength: 7_111,
+    sha256: "b09420655a41733a96ac1d708b30e502908dc6927504a963fd2e123f60514325",
+  },
+].map((source) => ({
+  ...source,
+  sourceBoardPath: resolve(scriptDirectory, `../assets-source/shogi/boards/${source.id}/board-original.png`),
+  outputBoardPath: resolve(scriptDirectory, `../public/assets/shogi/boards/${source.id}/board.png`),
+}));
 
 // The source image has ten vertical and ten horizontal rule bands. Each range
 // includes the dark rule and its antialiased edge pixels.
@@ -53,17 +62,18 @@ const starCenters = [
   [303, 331],
 ];
 
-const source = await readFile(sourceBoardPath);
-const sourceSha256 = createHash("sha256").update(source).digest("hex");
-if (source.byteLength !== EXPECTED_SOURCE.byteLength || sourceSha256 !== EXPECTED_SOURCE.sha256) {
-  throw new Error(
-    `Unexpected immutable source: ${source.byteLength} bytes / SHA-256 ${sourceSha256}`,
-  );
-}
-const sourceUrl = `data:image/png;base64,${source.toString("base64")}`;
 const browser = await chromium.launch({ headless: true });
 
 try {
+  for (const { id, byteLength, sha256, sourceBoardPath, outputBoardPath } of boardSources) {
+    const source = await readFile(sourceBoardPath);
+    const sourceSha256 = createHash("sha256").update(source).digest("hex");
+    if (source.byteLength !== byteLength || sourceSha256 !== sha256) {
+      throw new Error(
+        `Unexpected immutable source for ${id}: ${source.byteLength} bytes / SHA-256 ${sourceSha256}`,
+      );
+    }
+    const sourceUrl = `data:image/png;base64,${source.toString("base64")}`;
   const page = await browser.newPage();
   const result = await page.evaluate(
     async ({ sourceUrl, expectedSize, verticalRuleBands, horizontalRuleBands, starCenters }) => {
@@ -150,10 +160,12 @@ try {
     throw new Error(`Processed image has unexpected dimensions: ${result.width}x${result.height}`);
   }
 
+  await mkdir(dirname(outputBoardPath), { recursive: true });
   await writeFile(outputBoardPath, Buffer.from(result.png, "base64"));
   console.log(
     `Processed ${sourceBoardPath} -> ${outputBoardPath} (${result.width}x${result.height})`,
   );
+  }
 } finally {
   await browser.close();
 }
