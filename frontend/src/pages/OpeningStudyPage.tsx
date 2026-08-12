@@ -251,7 +251,7 @@ function OpeningStudyContent({ id }: { id: string | undefined }) {
                 {state.steps.map((step, stepIndex) => step.choices.length > 1 && (
                   <div key={`${step.node.id}-branches`} className="branch-choice-list compact">
                     {step.choices.map((choice, branchIndex) => (
-                      <button key={choice.id} type="button" onClick={() => switchBranch(stepIndex, branchIndex)} aria-current={path[stepIndex] === branchIndex ? "step" : undefined} className={path[stepIndex] === branchIndex ? "selected" : undefined}>
+                      <button key={choice.id} type="button" onClick={() => switchBranch(stepIndex, branchIndex)} disabled={path[stepIndex] === branchIndex} aria-current={path[stepIndex] === branchIndex ? "step" : undefined} className={path[stepIndex] === branchIndex ? "selected" : undefined}>
                         {choice.branchLabel || (branchIndex === 0 ? "本線" : `分岐${branchIndex + 1}`)}{path[stepIndex] === branchIndex ? "（選択中）" : "へ切り替える"}
                       </button>
                     ))}
