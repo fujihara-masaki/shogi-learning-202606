@@ -203,14 +203,14 @@ test("appearance settings are reachable, independent, persistent, resettable, an
   await expect(attributions.getByRole("link", { name: "CC0 1.0" })).toBeVisible();
   await expect(attributions.getByRole("link", { name: "データ出典・ライセンス" })).toHaveAttribute("href", "/licenses");
 
-  await page.getByRole("radio", { name: /Shogi Images 一文字駒/ }).check();
+  await page.getByRole("radio", { name: "Shogi Images 一文字駒", exact: true }).check();
   await expect(page.locator(".appearance-preview .preview-board").locator('img[src*="pieces/shogi-images-hitomoji"]')).toHaveCount(5);
   await expect(page.locator(".appearance-preview .preview-hand").locator('img[src*="pieces/shogi-images-hitomoji"]')).toHaveCount(2);
   await expect(page.locator(".appearance-preview [data-board-theme='board-standard']")).toBeVisible();
   await page.getByRole("radio", { name: /Shogi Images 盤 - 木材（明）/ }).check();
   await expect(page.locator(".appearance-preview [data-board-theme='shogi-images-light']")).toBeVisible();
   await page.reload();
-  await expect(page.getByRole("radio", { name: /Shogi Images 一文字駒/ })).toBeChecked();
+  await expect(page.getByRole("radio", { name: /^Shogi Images 一文字駒(?:\s+選択中)?$/ })).toBeChecked();
   await expect(page.getByRole("radio", { name: /Shogi Images 盤 - 木材（明）/ })).toBeChecked();
 
   await page.getByRole("button", { name: "標準設定に戻す" }).click();
@@ -231,8 +231,8 @@ test("appearance storage corruption and write failures remain non-fatal", async 
   await page.evaluate(() => {
     Object.defineProperty(Storage.prototype, "setItem", { configurable: true, value: () => { throw new DOMException("disabled", "QuotaExceededError"); } });
   });
-  await page.getByRole("radio", { name: /Shogi Images 一文字駒/ }).check();
-  await expect(page.getByRole("radio", { name: /Shogi Images 一文字駒/ })).toBeChecked();
+  await page.getByRole("radio", { name: "Shogi Images 一文字駒", exact: true }).check();
+  await expect(page.getByRole("radio", { name: /^Shogi Images 一文字駒(?:\s+選択中)?$/ })).toBeChecked();
   await expect(page.getByRole("alert")).toContainText("保存できませんでした");
 });
 

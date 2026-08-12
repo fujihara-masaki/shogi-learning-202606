@@ -1,5 +1,8 @@
 import { useEffect, useState } from "react";
 import { fetchLicenses, type LicenseResponse } from "../api/client";
+import { getThemeAttributionGroups } from "../appearance/catalog";
+
+const DISPLAY_ASSET_GROUPS = getThemeAttributionGroups();
 
 export default function LicensesPage() {
   const [data, setData] = useState<LicenseResponse | null>(null);
@@ -20,15 +23,16 @@ export default function LicensesPage() {
       </p>
       <section aria-labelledby="display-assets-heading">
         <h2 id="display-assets-heading">表示素材</h2>
-        <article className="license-source-card">
-          <h3>Shogi Images</h3>
+        {DISPLAY_ASSET_GROUPS.map(({ attribution, pieceThemes, boardThemes }) => <article className="license-source-card" id={attribution.noticeAnchor} key={`${attribution.sourceUrl}:${attribution.licenseUrl}`}>
+          <h3>{attribution.sourceName}</h3>
           <dl>
-            <dt>素材種別</dt><dd>駒（一文字駒・通常版） / 盤（盤 - 木材（明））</dd>
-            <dt>ライセンス</dt><dd><a href="https://creativecommons.org/publicdomain/zero/1.0/deed.ja">CC0 1.0</a></dd>
-            <dt>配布元</dt><dd><a href="https://sunfish-shogi.github.io/shogi-images/">Shogi Images 公式配布ページ</a></dd>
-            <dt>第三者通知</dt><dd><code>THIRD_PARTY_NOTICES.md#shogi-images</code></dd>
+            <dt>駒テーマ</dt><dd>{pieceThemes.map((theme) => theme.label).join(" / ") || "-"}</dd>
+            <dt>盤テーマ</dt><dd>{boardThemes.map((theme) => theme.label).join(" / ") || "-"}</dd>
+            <dt>ライセンス</dt><dd><a href={attribution.licenseUrl}>{attribution.licenseName}</a></dd>
+            <dt>配布元</dt><dd><a href={attribution.sourceUrl}>{attribution.sourceName} 公式配布ページ</a></dd>
+            <dt>第三者通知</dt><dd><code>THIRD_PARTY_NOTICES.md#{attribution.noticeAnchor}</code></dd>
           </dl>
-        </article>
+        </article>)}
       </section>
       {error && <p className="error">{error}</p>}
       {!data && !error && <p>読み込み中...</p>}

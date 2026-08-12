@@ -2,23 +2,29 @@
 
 ## Shogi Images
 
-The appearance theme uses assets derived from the official Shogi Images
-distributions “一文字駒（通常、非ゴシック）” and “盤 - 木材（明）”. The official
+The appearance themes use assets derived from the official Shogi Images
+distributions “一文字駒”, “二文字駒”, “一文字駒（ダーク）”, “盤 - 木材（明）”,
+“盤 - 木材（暖）”, and “盤 - ダーク”. The official
 distribution page is <https://sunfish-shogi.github.io/shogi-images/> and describes
 the materials as dedicated to the public domain under
 [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/).
 
-- License/provenance review date: 2026-08-10
-- Public/runtime assets: 31 files / 564,243 bytes, consisting of 30 PNG piece
-  images and one processed PNG board texture
-- Immutable processing source: `frontend/assets-source/shogi/boards/shogi-images-light/board-original.png`
-  is the official, unmodified Shogi Images “盤 - 木材（明）” PNG (258,910 bytes).
-  It is retained only to make the runtime board processing reproducible.
-- Runtime board modification: `frontend/public/assets/shogi/boards/shogi-images-light/board.png`
-  is generated from the immutable source with the original 9x9 grid lines and
-  four star points removed; the 458x500 px dimensions and wood-grain texture are
-  retained
-- Piece modification: none; all 30 piece PNG files are unprocessed
+- License/provenance review date: 2026-08-12
+- Public/runtime assets: 93 files / 1,377,301 bytes, consisting of 90 PNG piece
+  images and three processed PNG board textures
+- Immutable processing sources: the three `board-original.png` files under
+  `frontend/assets-source/shogi/boards/shogi-images-{light,warm,dark}/` are the
+  official, unmodified 458x500 Shogi Images board PNGs (258,910 / 196,141 /
+  7,111 bytes). They are retained only to make runtime processing reproducible.
+- Runtime board modification: each corresponding
+  `frontend/public/assets/shogi/boards/shogi-images-*/board.png` is generated
+  from its immutable source with the original 9x9 grid lines and four star
+  points removed; the 458x500 px dimensions and source texture are retained
+- Piece modification: none; all 90 piece PNG files are unprocessed. The
+  downloaded `futamoji.zip` and `hitomoji_dark.zip` archives had SHA-256
+  `c2bfa0c41e42af5e92e5478716c8334bb17b3d8a940ba6a4b4bc01281c026510` and
+  `dba5610aaa5250a220aae131f4464656baa18d97ad8bc201441ac9586172041a`
+  respectively; archive-only overview images and SVGs are not redistributed.
 - Attribution is not required by CC0; this notice is retained for provenance.
 
 ## `tokuhirom/tanuki-tsume-shogi`

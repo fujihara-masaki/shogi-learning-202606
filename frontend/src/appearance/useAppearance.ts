@@ -1,12 +1,13 @@
 import { createContext, useContext } from "react";
 import type { BoardThemeId, PieceThemeId } from "./types";
-import { DEFAULT_APPEARANCE_SETTINGS } from "./storage";
+import { DEFAULT_APPEARANCE_SETTINGS, type AppearanceSettings } from "./storage";
 
 export interface AppearanceContextValue {
   pieceTheme: PieceThemeId;
   boardTheme: BoardThemeId;
   setPieceTheme: (theme: PieceThemeId) => void;
   setBoardTheme: (theme: BoardThemeId) => void;
+  setAppearance: (settings: AppearanceSettings) => void;
   resetToDefaults: () => void;
   storageWarning: boolean;
 }
@@ -18,6 +19,7 @@ export function useAppearance(): AppearanceContextValue {
     ...DEFAULT_APPEARANCE_SETTINGS,
     setPieceTheme: () => undefined,
     setBoardTheme: () => undefined,
+    setAppearance: () => undefined,
     resetToDefaults: () => undefined,
     storageWarning: false,
   };
