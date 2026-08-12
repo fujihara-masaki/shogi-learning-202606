@@ -9,7 +9,7 @@ const LEARNING = [
 const TOOLS = [
   { to: "/review", title: "復習", desc: "間違えた詰め将棋や次の一手に再挑戦" },
   { to: "/history", title: "学習記録", desc: "詰め将棋などの解答履歴と学習結果を確認" },
-  { to: "/problem-editor", title: "作成", desc: "詰め将棋問題を作成・編集" },
+  { to: "/problem-editor", title: "問題作成", desc: "詰め将棋問題を作成・編集" },
 ];
 
 function CardGroup({ items }: { items: typeof LEARNING }) {

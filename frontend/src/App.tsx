@@ -36,7 +36,7 @@ export default function App() {
         <NavLink to="/next-move">次の一手</NavLink>
         <NavLink to="/review" className="nav-secondary">復習</NavLink>
         <NavLink to="/history" className="nav-secondary">学習記録</NavLink>
-        <NavLink to="/problem-editor" className="nav-secondary">作成</NavLink>
+        <NavLink to="/problem-editor" className="nav-secondary">問題作成</NavLink>
         <NavLink to="/more" className="nav-more">その他</NavLink>
       </nav>
       <div className="app-body">
