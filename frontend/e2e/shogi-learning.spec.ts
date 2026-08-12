@@ -740,11 +740,12 @@ test("three-way opening branches behave the same from board and accessible cards
   await expect(page.getByTestId("opening-feedback")).toHaveAttribute("aria-live", "polite");
 
   const board = page.getByTestId("shogi-board");
+  const historyUsis = page.locator(".move-history .move-usi");
   for (const [usi, , variation, , from, to] of branches) {
     await board.locator(`[data-square="${from}"]`).click();
     await board.locator(`[data-square="${to}"]`).click();
     await expect(page.getByTestId("opening-feedback")).toContainText("正解");
-    await expect(page.getByText(usi, { exact: true })).toBeVisible();
+    await expect(historyUsis).toHaveText([`(${usi})`]);
     await expect(page.getByTestId("opening-source")).toContainText("Fixture source");
     await page.getByRole("button", { name: "直前の分岐点へ戻る" }).click();
     await expect(page.getByText("この局面には")).toContainText("3");
@@ -758,15 +759,14 @@ test("three-way opening branches behave the same from board and accessible cards
   await expect(page.getByText("まだ指し手はありません")).toBeVisible();
 
   await page.getByRole("button", { name: "変化 5g5f、この変化を見る" }).click();
-  await expect(page.getByText("5g5f", { exact: true })).toBeVisible();
+  await expect(historyUsis).toHaveText(["(5g5f)"]);
   await page.getByRole("button", { name: "ここから本線を最後まで再生" }).click();
-  await expect(page.getByText("5g5f", { exact: true })).toBeVisible();
-  await expect(page.getByText("3c3d", { exact: true })).toBeVisible();
+  await expect(historyUsis).toHaveText(["(5g5f)", "(3c3d)"]);
   const selectedBranch = page.getByRole("button", { name: "中央（選択中）" });
   await expect(selectedBranch).toBeDisabled();
   await expect(selectedBranch).toHaveAttribute("aria-current", "step");
   await page.getByRole("button", { name: "本線へ切り替える" }).click();
-  await expect(page.getByText("7g7f", { exact: true })).toBeVisible();
+  await expect(historyUsis).toHaveText(["(7g7f)"]);
   await page.getByRole("button", { name: "一手戻る" }).click();
   await page.getByRole("button", { name: "本線を一手進む" }).click();
   await page.getByRole("button", { name: "最初に戻る" }).click();
