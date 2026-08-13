@@ -105,7 +105,10 @@ def list_openings(tag: str | None = Query(default=None)) -> list[dict[str, Any]]
                 ol.source_section,
                 ol.source_license,
                 ol.source_retrieved_at,
-                (SELECT COUNT(*) FROM opening_line_moves om WHERE om.line_id = ol.id AND om.variation_group = 'main') AS move_count,
+                (WITH RECURSIVE main_path(id) AS (
+                    SELECT id FROM opening_line_moves WHERE line_id=ol.id AND parent_move_id IS NULL AND is_main=1
+                    UNION ALL SELECT child.id FROM opening_line_moves child JOIN main_path parent ON child.parent_move_id=parent.id WHERE child.is_main=1
+                 ) SELECT COUNT(*) FROM main_path) AS move_count,
                 os.name AS source_name,
                 os.license_name,
                 os.license_url
@@ -164,7 +167,7 @@ def get_opening(line_id: int) -> dict[str, Any]:
             (line_id,),
         ).fetchall()
         moves = conn.execute(
-            "SELECT ply, usi, from_sfen, to_sfen, comment, variation_group, parent_move_id, sort_order FROM opening_line_moves WHERE line_id = ? ORDER BY variation_group, ply, sort_order",
+            "SELECT id, ply, usi, from_sfen, to_sfen, comment, variation_group, parent_move_id, sort_order, move_key, is_main FROM opening_line_moves WHERE line_id = ? ORDER BY ply, sort_order, id",
             (line_id,),
         ).fetchall()
         tags = conn.execute(
@@ -179,6 +182,7 @@ def get_opening(line_id: int) -> dict[str, Any]:
             "initial_sfen": row["initial_sfen"],
             "moves": [
                 {
+                    "id": move["id"],
                     "ply": move["ply"],
                     "usi": move["usi"],
                     "from_sfen": move["from_sfen"],
@@ -187,6 +191,8 @@ def get_opening(line_id: int) -> dict[str, Any]:
                     "variation_group": move["variation_group"],
                     "parent_move_id": move["parent_move_id"],
                     "sort_order": move["sort_order"],
+                    "move_key": move["move_key"],
+                    "is_main": bool(move["is_main"]),
                 }
                 for move in moves
             ],
@@ -225,15 +231,16 @@ def get_opening_moves(line_id: int) -> list[dict[str, Any]]:
             raise HTTPException(status_code=404, detail="opening not found")
         rows = conn.execute(
             """
-            SELECT ply, usi, from_sfen, to_sfen, comment, variation_group, parent_move_id, sort_order
+            SELECT id, ply, usi, from_sfen, to_sfen, comment, variation_group, parent_move_id, sort_order, move_key, is_main
             FROM opening_line_moves
             WHERE line_id = ?
-            ORDER BY variation_group, ply, sort_order
+            ORDER BY ply, sort_order, id
             """,
             (line_id,),
         ).fetchall()
         return [
             {
+                "id": row["id"],
                 "ply": row["ply"],
                 "usi": row["usi"],
                 "from_sfen": row["from_sfen"],
@@ -242,6 +249,8 @@ def get_opening_moves(line_id: int) -> list[dict[str, Any]]:
                 "variation_group": row["variation_group"],
                 "parent_move_id": row["parent_move_id"],
                 "sort_order": row["sort_order"],
+                "move_key": row["move_key"],
+                "is_main": bool(row["is_main"]),
             }
             for row in rows
         ]
@@ -276,7 +285,10 @@ def list_opening_type_lines(opening_type_id: int) -> list[dict[str, Any]]:
                 ol.source_section,
                 ol.source_license,
                 ol.source_retrieved_at,
-                (SELECT COUNT(*) FROM opening_line_moves om WHERE om.line_id = ol.id AND om.variation_group = 'main') AS move_count,
+                (WITH RECURSIVE main_path(id) AS (
+                    SELECT id FROM opening_line_moves WHERE line_id=ol.id AND parent_move_id IS NULL AND is_main=1
+                    UNION ALL SELECT child.id FROM opening_line_moves child JOIN main_path parent ON child.parent_move_id=parent.id WHERE child.is_main=1
+                 ) SELECT COUNT(*) FROM main_path) AS move_count,
                 os.name AS source_name,
                 os.license_name,
                 os.license_url

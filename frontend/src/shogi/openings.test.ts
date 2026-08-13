@@ -99,6 +99,32 @@ describe("openingFromImportedLine", () => {
     expect(opening.category).toBe("中飛車");
     expect(flattenMainLine(opening).map((move) => move.usi)).toEqual(["7g7f", "3c3d", "2h5h"]);
   });
+
+  it("builds direct-parent multi-level trees, keeps transpositions separate, and follows explicit main", () => {
+    const move = (id: number, parent_move_id: number | null, usi: string, sort_order: number, is_main: boolean, to_sfen: string) => ({
+      id, parent_move_id, usi, sort_order, is_main, move_key: `m${id}`,
+      from_sfen: "position", to_sfen, variation_group: is_main ? "main" : `v${id}`,
+    });
+    const opening = openingFromImportedLine({
+      id: 101, name: "tree", opening_type: "test", initial_sfen: "position",
+      moves: [
+        move(1, null, "7g7f", 0, true, "p1"),
+        move(2, 1, "3c3d", 0, false, "transposed"),
+        move(3, 1, "8c8d", 1, false, "p-b"),
+        move(4, 1, "4a3b", 2, true, "p-main"),
+        move(5, 2, "2g2f", 0, true, "a1"),
+        move(6, 2, "5g5f", 1, false, "a2"),
+        move(7, 3, "6g6f", 0, true, "transposed"),
+        move(8, 3, "9g9f", 1, false, "b2"),
+      ], source: { name: "fixture", license_name: "CC0", license_url: "" },
+    });
+    expect(opening.moves[0].next?.map((node) => node.id)).toEqual([
+      "imported-101-m2", "imported-101-m3", "imported-101-m4",
+    ]);
+    expect(expectedOpeningMove(opening, [0])?.id).toBe("imported-101-m4");
+    expect(continueOpeningMainLine(opening, [])).toEqual([0, 2]);
+    expect(opening.moves[0].next?.[0].next?.[0]).not.toBe(opening.moves[0].next?.[1].next?.[0]);
+  });
 });
 
 it("builds branch choices from imported moves and can switch back to the branch point", () => {

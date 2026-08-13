@@ -671,7 +671,8 @@ def test_startup_migrates_legacy_opening_line_moves_unique_constraint_for_branch
                 )
                 for index in unique_indexes
             }
-            assert ("line_id", "ply", "variation_group", "sort_order") in unique_columns
+            assert ("line_id", "move_key") in unique_columns
+            assert ("line_id", "parent_move_id", "sort_order") in unique_columns
             assert ("line_id", "ply") not in unique_columns
         finally:
             conn.close()
@@ -834,7 +835,11 @@ def test_primitive_onigoroshi_silver_moves_are_distinct_nodes(client):
         }
         assert main_move["ply"] == 6
         assert main_move["usi"] == "7a6b"
-        assert main_move["parent_move_id"] is None
+        previous_main = conn.execute(
+            "SELECT id FROM opening_line_moves WHERE line_id=? AND ply=5 AND variation_group='main'",
+            (line["id"],),
+        ).fetchone()
+        assert main_move["parent_move_id"] == previous_main["id"]
         assert main_move["variation_group"] == "main"
         assert main_move["from_sfen"] != branch_move["from_sfen"]
 

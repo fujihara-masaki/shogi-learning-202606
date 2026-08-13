@@ -130,13 +130,21 @@ CREATE TABLE IF NOT EXISTS opening_line_moves (
     variation_group TEXT NOT NULL DEFAULT 'main',
     parent_move_id INTEGER REFERENCES opening_line_moves(id) ON DELETE CASCADE,
     sort_order INTEGER NOT NULL DEFAULT 0,
-    UNIQUE(line_id, ply, variation_group, sort_order)
+    move_key TEXT NOT NULL,
+    is_main INTEGER NOT NULL DEFAULT 1 CHECK(is_main IN (0, 1)),
+    UNIQUE(line_id, move_key),
+    UNIQUE(line_id, parent_move_id, sort_order)
 );
 
 CREATE VIEW IF NOT EXISTS opening_moves AS
-    SELECT id, line_id, ply, usi, from_sfen, to_sfen, comment
-    FROM opening_line_moves
-    WHERE variation_group = 'main';
+    WITH RECURSIVE main_path(id) AS (
+        SELECT id FROM opening_line_moves WHERE parent_move_id IS NULL AND is_main = 1
+        UNION ALL
+        SELECT child.id FROM opening_line_moves child JOIN main_path parent ON child.parent_move_id = parent.id
+        WHERE child.is_main = 1
+    )
+    SELECT m.id, m.line_id, m.ply, m.usi, m.from_sfen, m.to_sfen, m.comment
+    FROM opening_line_moves m JOIN main_path ON main_path.id = m.id;
 
 CREATE TABLE IF NOT EXISTS opening_tags (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -319,9 +327,12 @@ def _migrate_opening_moves(conn: sqlite3.Connection) -> None:
         conn.execute(
             """
             CREATE VIEW IF NOT EXISTS opening_moves AS
-                SELECT id, line_id, ply, usi, from_sfen, to_sfen, comment
-                FROM opening_line_moves
-                WHERE variation_group = 'main'
+                WITH RECURSIVE main_path(id) AS (
+                    SELECT id FROM opening_line_moves WHERE parent_move_id IS NULL AND is_main = 1
+                    UNION ALL SELECT child.id FROM opening_line_moves child JOIN main_path parent ON child.parent_move_id=parent.id WHERE child.is_main=1
+                )
+                SELECT m.id, m.line_id, m.ply, m.usi, m.from_sfen, m.to_sfen, m.comment
+                FROM opening_line_moves m JOIN main_path ON main_path.id=m.id
             """
         )
 
@@ -334,12 +345,19 @@ def _ensure_opening_line_moves_schema(conn: sqlite3.Connection) -> None:
         return
 
     table_sql = " ".join(str(table["sql"]).lower().split())
-    has_old_unique = "unique(line_id, ply)" in table_sql
-    has_branch_unique = "unique(line_id, ply, variation_group, sort_order)" in table_sql
-    if not has_old_unique or has_branch_unique:
-        return
-
     columns = {row["name"] for row in conn.execute("PRAGMA table_info(opening_line_moves)").fetchall()}
+    if {"move_key", "is_main"}.issubset(columns):
+        conn.execute("DROP VIEW IF EXISTS opening_moves")
+        conn.execute(
+            """CREATE VIEW opening_moves AS
+               WITH RECURSIVE main_path(id) AS (
+                 SELECT id FROM opening_line_moves WHERE parent_move_id IS NULL AND is_main=1
+                 UNION ALL SELECT child.id FROM opening_line_moves child JOIN main_path parent ON child.parent_move_id=parent.id WHERE child.is_main=1
+               )
+               SELECT m.id, m.line_id, m.ply, m.usi, m.from_sfen, m.to_sfen, m.comment
+               FROM opening_line_moves m JOIN main_path ON main_path.id=m.id"""
+        )
+        return
     variation_expr = "variation_group" if "variation_group" in columns else "'main'"
     parent_expr = "parent_move_id" if "parent_move_id" in columns else "NULL"
     sort_expr = "sort_order" if "sort_order" in columns else "0"
@@ -359,7 +377,10 @@ def _ensure_opening_line_moves_schema(conn: sqlite3.Connection) -> None:
             variation_group TEXT NOT NULL DEFAULT 'main',
             parent_move_id INTEGER REFERENCES opening_line_moves(id) ON DELETE CASCADE,
             sort_order INTEGER NOT NULL DEFAULT 0,
-            UNIQUE(line_id, ply, variation_group, sort_order)
+            move_key TEXT NOT NULL,
+            is_main INTEGER NOT NULL DEFAULT 1 CHECK(is_main IN (0, 1)),
+            UNIQUE(line_id, move_key),
+            UNIQUE(line_id, parent_move_id, sort_order)
         )
         """
     )
@@ -367,21 +388,60 @@ def _ensure_opening_line_moves_schema(conn: sqlite3.Connection) -> None:
         f"""
         INSERT INTO opening_line_moves(
             id, line_id, ply, usi, from_sfen, to_sfen, comment,
-            variation_group, parent_move_id, sort_order
+            variation_group, parent_move_id, sort_order, move_key, is_main
         )
         SELECT
             id, line_id, ply, usi, from_sfen, to_sfen, comment,
-            {variation_expr}, {parent_expr}, {sort_expr}
+            {variation_expr}, {parent_expr}, {sort_expr},
+            'legacy-' || id, CASE WHEN {variation_expr} = 'main' THEN 1 ELSE 0 END
         FROM opening_line_moves_old
         """
     )
     conn.execute("DROP TABLE opening_line_moves_old")
+    # Old branch rows pointed every move at the branch point.  Convert them to
+    # direct-parent chains without using SFEN as node identity.
+    for line in conn.execute("SELECT id, initial_sfen FROM opening_lines").fetchall():
+        rows = conn.execute(
+            "SELECT * FROM opening_line_moves WHERE line_id=? ORDER BY ply, id", (line["id"],)
+        ).fetchall()
+        by_group = {}
+        for row in rows:
+            by_group.setdefault(row["variation_group"], []).append(row)
+        main = sorted(by_group.get("main", []), key=lambda row: (row["ply"], row["id"]))
+        previous = None
+        for row in main:
+            conn.execute("UPDATE opening_line_moves SET parent_move_id=? WHERE id=?", (previous, row["id"]))
+            previous = row["id"]
+        for group, group_rows in by_group.items():
+            if group == "main":
+                continue
+            previous = group_rows[0]["parent_move_id"]
+            for row in sorted(group_rows, key=lambda item: (item["ply"], item["id"])):
+                conn.execute("UPDATE opening_line_moves SET parent_move_id=? WHERE id=?", (previous, row["id"]))
+                previous = row["id"]
+        sibling_parents = conn.execute(
+            "SELECT DISTINCT parent_move_id FROM opening_line_moves WHERE line_id=?", (line["id"],)
+        ).fetchall()
+        for sibling_parent in sibling_parents:
+            parent_id = sibling_parent["parent_move_id"]
+            predicate = "parent_move_id IS NULL" if parent_id is None else "parent_move_id=?"
+            values = (line["id"],) if parent_id is None else (line["id"], parent_id)
+            group_rows = conn.execute(
+                f"SELECT id, variation_group, sort_order FROM opening_line_moves WHERE line_id=? AND {predicate} ORDER BY CASE variation_group WHEN 'main' THEN 0 ELSE 1 END, sort_order, id",
+                values,
+            ).fetchall()
+            conn.execute(f"UPDATE opening_line_moves SET is_main=0 WHERE line_id=? AND {predicate}", values)
+            if group_rows:
+                conn.execute("UPDATE opening_line_moves SET is_main=1 WHERE id=?", (group_rows[0]["id"],))
     conn.execute(
         """
         CREATE VIEW opening_moves AS
-            SELECT id, line_id, ply, usi, from_sfen, to_sfen, comment
-            FROM opening_line_moves
-            WHERE variation_group = 'main'
+            WITH RECURSIVE main_path(id) AS (
+                SELECT id FROM opening_line_moves WHERE parent_move_id IS NULL AND is_main=1
+                UNION ALL SELECT child.id FROM opening_line_moves child JOIN main_path parent ON child.parent_move_id=parent.id WHERE child.is_main=1
+            )
+            SELECT m.id, m.line_id, m.ply, m.usi, m.from_sfen, m.to_sfen, m.comment
+            FROM opening_line_moves m JOIN main_path ON main_path.id=m.id
         """
     )
 

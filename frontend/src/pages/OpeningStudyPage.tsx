@@ -7,6 +7,7 @@ import ShogiBoard from "../components/ShogiBoard";
 import {
   applyOpeningPath,
   continueOpeningMainLine,
+  mainOpeningChoice,
   expectedOpeningMove,
   findOpeningChoiceIndex,
   findOpening,
@@ -230,12 +231,12 @@ function OpeningStudyContent({ id }: { id: string | undefined }) {
                 <p className="branch-count">この局面には <strong>{currentChoices.length}</strong> つの進行があります</p>
                 <div className="branch-choice-list branch-card-list">
                 {currentChoices.map((choice, index) => (
-                  <article key={choice.id} className={`branch-card ${index === 0 ? "main" : "variation"}`}>
-                    <div className="branch-card-heading"><strong>{index === 0 ? "本線" : "変化"}</strong><span>{choice.branchLabel || (index === 0 ? "本線" : `分岐${index + 1}`)}</span></div>
+                  <article key={choice.id} className={`branch-card ${choice === mainOpeningChoice(currentChoices) ? "main" : "variation"}`}>
+                    <div className="branch-card-heading"><strong>{choice === mainOpeningChoice(currentChoices) ? "本線" : "変化"}</strong><span>{choice.branchLabel || (choice === mainOpeningChoice(currentChoices) ? "本線" : `分岐${index + 1}`)}</span></div>
                     <p className="branch-card-move"><strong>{choice.notation}</strong> <code>{choice.usi}</code></p>
                     <p>{choice.explanation}</p>
                     {(choice.coverageStatus || choice.sourceTitle) && <p className="branch-card-provenance">{choice.coverageStatus && <>カバレッジ: {choice.coverageStatus}</>}{choice.coverageStatus && choice.sourceTitle && " / "}{choice.sourceTitle && <>出典: {choice.sourceTitle}</>}</p>}
-                    <button type="button" onClick={() => chooseBranch(index)} aria-label={`${index === 0 ? "本線" : "変化"} ${choice.notation}、この変化を見る`}>
+                    <button type="button" onClick={() => chooseBranch(index)} aria-label={`${choice === mainOpeningChoice(currentChoices) ? "本線" : "変化"} ${choice.notation}、この変化を見る`}>
                       この変化を見る
                     </button>
                   </article>
@@ -252,7 +253,7 @@ function OpeningStudyContent({ id }: { id: string | undefined }) {
                   <div key={`${step.node.id}-branches`} className="branch-choice-list compact">
                     {step.choices.map((choice, branchIndex) => (
                       <button key={choice.id} type="button" onClick={() => switchBranch(stepIndex, branchIndex)} disabled={path[stepIndex] === branchIndex} aria-current={path[stepIndex] === branchIndex ? "step" : undefined} className={path[stepIndex] === branchIndex ? "selected" : undefined}>
-                        {choice.branchLabel || (branchIndex === 0 ? "本線" : `分岐${branchIndex + 1}`)}{path[stepIndex] === branchIndex ? "（選択中）" : "へ切り替える"}
+                        {choice.branchLabel || (choice === mainOpeningChoice(step.choices) ? "本線" : `分岐${branchIndex + 1}`)}{path[stepIndex] === branchIndex ? "（選択中）" : "へ切り替える"}
                       </button>
                     ))}
                   </div>

@@ -281,10 +281,14 @@ def import_file(path: Path, *, license_name: str, license_url: str) -> int:
                 "INSERT INTO opening_positions(line_id, ply, sfen) VALUES (?, ?, ?)",
                 [(line_id, ply, sfen) for ply, sfen in enumerate(positions)],
             )
-            conn.executemany(
-                "INSERT INTO opening_line_moves(line_id, ply, usi, from_sfen, to_sfen) VALUES (?, ?, ?, ?, ?)",
-                [(line_id, ply, usi, before, after) for ply, usi, before, after in move_rows],
-            )
+            parent_id = None
+            for ply, usi, before, after in move_rows:
+                move_key = f"main-{ply}"
+                move_cur = conn.execute(
+                    "INSERT INTO opening_line_moves(line_id, ply, usi, from_sfen, to_sfen, parent_move_id, move_key, is_main) VALUES (?, ?, ?, ?, ?, ?, ?, 1)",
+                    (line_id, ply, usi, before, after, parent_id, move_key),
+                )
+                parent_id = int(move_cur.lastrowid)
             stored_tags = list(tags)
             if inferred_tag.tag not in {tag.tag for tag in stored_tags}:
                 stored_tags.append(inferred_tag)

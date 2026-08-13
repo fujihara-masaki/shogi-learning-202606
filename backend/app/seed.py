@@ -530,11 +530,8 @@ def seed_opening_catalog_if_empty(conn) -> None:
 def find_duplicate_opening_sibling_moves(conn, line_ids=None) -> list[dict]:
     """Return duplicate USI moves that compete from the same seeded position.
 
-    The current opening replay contract treats moves with the same ``from_sfen``
-    in a line as siblings.  Keep this check in Python rather than adding a
-    database uniqueness constraint: future tree/transposition representations
-    may legitimately need more than ``line_id``, ``from_sfen`` and ``usi`` to
-    identify a node.
+    Siblings are nodes with the same direct parent (roots share NULL).  SFEN is
+    deliberately not identity: transposed paths remain separate tree nodes.
     """
     params = []
     line_filter = ""
@@ -547,18 +544,77 @@ def find_duplicate_opening_sibling_moves(conn, line_ids=None) -> list[dict]:
 
     rows = conn.execute(
         f"""
-        SELECT olm.line_id, ol.name AS line_name, olm.from_sfen, olm.usi,
+        SELECT olm.line_id, ol.name AS line_name, olm.parent_move_id, olm.usi,
                COUNT(*) AS duplicate_count
         FROM opening_line_moves AS olm
         JOIN opening_lines AS ol ON ol.id = olm.line_id
         {line_filter}
-        GROUP BY olm.line_id, ol.name, olm.from_sfen, olm.usi
+        GROUP BY olm.line_id, ol.name, olm.parent_move_id, olm.usi
         HAVING COUNT(*) > 1
-        ORDER BY olm.line_id, olm.from_sfen, olm.usi
+        ORDER BY olm.line_id, olm.parent_move_id, olm.usi
         """,
         params,
     ).fetchall()
     return [dict(row) for row in rows]
+
+
+def validate_opening_move_tree(conn, line_ids=None) -> None:
+    """Validate the persisted direct-parent tree and explicit-main contract."""
+    import shogi
+
+    params = []
+    where = ""
+    if line_ids is not None:
+        ids = sorted({int(value) for value in line_ids})
+        if not ids:
+            return
+        where = f"WHERE line_id IN ({','.join('?' for _ in ids)})"
+        params = ids
+    rows = conn.execute(f"SELECT * FROM opening_line_moves {where} ORDER BY line_id, id", params).fetchall()
+    by_id = {row["id"]: row for row in rows}
+    keys = set()
+    siblings = {}
+    for row in rows:
+        key = (row["line_id"], row["move_key"])
+        if not row["move_key"] or key in keys:
+            raise ValueError("opening move_key must be non-empty and unique within a line")
+        keys.add(key)
+        seen = set()
+        cursor = row
+        while cursor["parent_move_id"] is not None:
+            if cursor["id"] in seen:
+                raise ValueError(f"opening cycle: {row['move_key']}")
+            seen.add(cursor["id"])
+            cursor = by_id.get(cursor["parent_move_id"])
+            if cursor is None:
+                break
+        parent = by_id.get(row["parent_move_id"]) if row["parent_move_id"] is not None else None
+        if row["parent_move_id"] is not None and parent is None:
+            raise ValueError(f"invalid opening parent: {row['move_key']}")
+        if parent is not None:
+            if parent["line_id"] != row["line_id"]:
+                raise ValueError(f"opening parent belongs to another line: {row['move_key']}")
+            if row["ply"] != parent["ply"] + 1:
+                raise ValueError(f"opening ply mismatch: {row['move_key']}")
+            if parent["to_sfen"] != row["from_sfen"]:
+                raise ValueError(f"opening parent/child SFEN mismatch: {row['move_key']}")
+        elif row["ply"] != 1:
+            raise ValueError(f"only ply-one opening moves may be roots: {row['move_key']}")
+        board = shogi.Board(row["from_sfen"])
+        move = shogi.Move.from_usi(row["usi"])
+        if move not in board.legal_moves:
+            raise ValueError(f"illegal opening move: {row['move_key']} {row['usi']}")
+        board.push(move)
+        if board.sfen() != row["to_sfen"]:
+            raise ValueError(f"opening generated SFEN mismatch: {row['move_key']}")
+        siblings.setdefault((row["line_id"], row["parent_move_id"]), []).append(row)
+    for group in siblings.values():
+        if sum(int(row["is_main"]) for row in group) != 1:
+            raise ValueError("each opening sibling set must contain exactly one main move")
+        if len({row["sort_order"] for row in group}) != len(group):
+            raise ValueError("opening sibling sort_order must be unique")
+        if len({row["usi"] for row in group}) != len(group):
+            raise ValueError("opening sibling USI must be unique")
 
 
 def seed_openings_if_empty(conn) -> None:
@@ -658,33 +714,38 @@ def seed_openings_if_empty(conn) -> None:
                     (line_id, ply, sfen),
                 )
 
+        previous_main_id = None
         for ply, usi, before, after in move_rows:
             comment = opening["comments"][ply - 1]
+            move_key = f"main-{ply}"
             move_row = conn.execute(
                 """
                 SELECT id
                 FROM opening_line_moves
-                WHERE line_id = ? AND ply = ? AND variation_group = 'main' AND sort_order = 0
+                WHERE line_id = ? AND (move_key = ? OR (ply = ? AND variation_group = 'main' AND sort_order = 0))
                 """,
-                (line_id, ply),
+                (line_id, move_key, ply),
             ).fetchone()
             if move_row:
                 conn.execute(
                     """
                     UPDATE opening_line_moves
-                    SET usi = ?, from_sfen = ?, to_sfen = ?, comment = ?
+                    SET usi = ?, from_sfen = ?, to_sfen = ?, comment = ?, parent_move_id = ?, move_key = ?, is_main = 1
                     WHERE id = ?
                     """,
-                    (usi, before, after, comment, move_row["id"]),
+                    (usi, before, after, comment, previous_main_id, move_key, move_row["id"]),
                 )
+                current_id = int(move_row["id"])
             else:
-                conn.execute(
+                cur = conn.execute(
                     """
-                    INSERT INTO opening_line_moves(line_id, ply, usi, from_sfen, to_sfen, comment, variation_group, sort_order)
-                    VALUES (?, ?, ?, ?, ?, ?, 'main', 0)
+                    INSERT INTO opening_line_moves(line_id, ply, usi, from_sfen, to_sfen, comment, variation_group, parent_move_id, sort_order, move_key, is_main)
+                    VALUES (?, ?, ?, ?, ?, ?, 'main', ?, 0, ?, 1)
                     """,
-                    (line_id, ply, usi, before, after, comment),
+                    (line_id, ply, usi, before, after, comment, previous_main_id, move_key),
                 )
+                current_id = int(cur.lastrowid)
+            previous_main_id = current_id
 
         main_sfen_by_ply = {ply: sfen for ply, sfen in enumerate(positions)}
         main_move_id_by_ply = {
@@ -711,30 +772,36 @@ def seed_openings_if_empty(conn) -> None:
                 board.push(move)
                 after = board.sfen()
                 comment = branch.get("note", f"{branch_name} {offset}手目です。") if offset == 1 else f"{branch_name} {offset}手目です。"
+                move_key = f"branch-{branch_index}-{offset}"
+                sibling_order = branch_index if offset == 1 else 0
+                is_main = 0 if offset == 1 else 1
                 move_row = conn.execute(
                     """
                     SELECT id FROM opening_line_moves
-                    WHERE line_id = ? AND ply = ? AND variation_group = ? AND sort_order = ?
+                    WHERE line_id = ? AND (move_key = ? OR (ply = ? AND variation_group = ? AND sort_order = ?))
                     """,
-                    (line_id, branch_ply, branch_name, branch_index),
+                    (line_id, move_key, branch_ply, branch_name, sibling_order),
                 ).fetchone()
                 if move_row:
                     conn.execute(
                         """
                         UPDATE opening_line_moves
-                        SET usi = ?, from_sfen = ?, to_sfen = ?, comment = ?, parent_move_id = ?
+                        SET usi = ?, from_sfen = ?, to_sfen = ?, comment = ?, parent_move_id = ?, sort_order = ?, move_key = ?, is_main = ?
                         WHERE id = ?
                         """,
-                        (usi, before, after, comment, parent_move_id, move_row["id"]),
+                        (usi, before, after, comment, parent_move_id, sibling_order, move_key, is_main, move_row["id"]),
                     )
                 else:
                     conn.execute(
                         """
-                        INSERT INTO opening_line_moves(line_id, ply, usi, from_sfen, to_sfen, comment, variation_group, parent_move_id, sort_order)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        INSERT INTO opening_line_moves(line_id, ply, usi, from_sfen, to_sfen, comment, variation_group, parent_move_id, sort_order, move_key, is_main)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                         """,
-                        (line_id, branch_ply, usi, before, after, comment, branch_name, parent_move_id, branch_index),
+                        (line_id, branch_ply, usi, before, after, comment, branch_name, parent_move_id, sibling_order, move_key, is_main),
                     )
+                parent_move_id = int(conn.execute(
+                    "SELECT id FROM opening_line_moves WHERE line_id=? AND move_key=?", (line_id, move_key)
+                ).fetchone()["id"])
 
         tag_row = conn.execute(
             "SELECT id FROM opening_tags WHERE line_id = ? AND tag = ?",
@@ -758,6 +825,7 @@ def seed_openings_if_empty(conn) -> None:
             for row in duplicates
         )
         raise ValueError(f"サンプル定跡に同一 sibling USI の重複があります: {details}")
+    validate_opening_move_tree(conn, seeded_line_ids)
 
 
 def seed_if_empty() -> None:
