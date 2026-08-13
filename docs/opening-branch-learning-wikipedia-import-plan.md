@@ -1,8 +1,8 @@
 # 定跡分岐学習 UX・多段分岐・Wikipedia seed 拡張 実装計画
 
 - 対象: `fujihara-masaki/shogi-learning-202606`
-- 調査基準: `claude/clever-hopper-bphezm` 相当の履歴を含む現作業ツリー（2026-08-12）
-- 対象履歴: PR #19、#20、#22、#23、#40（ローカルの merge commit と構成 commit を確認）
+- 調査基準: PR #52（PR-A0）/ #53（PR-A）merge 後の現作業ツリー（2026-08-13）
+- 対象履歴: PR #19、#20、#22、#23、#40、#52、#53（ローカルの merge commit と構成 commit を確認）
 - 本書の範囲: 調査、設計、PR 分割、受け入れ条件。アプリ本体、DB schema、seed の変更は行わない。
 
 > **事実・提案・外部確認の表記**
@@ -60,60 +60,58 @@ frontend/src/pages/OpeningStudyPage.tsx
 
 | 要素 | 現状コード上の意味 | 状態 / 留意点 |
 |---|---|---|
-| 本線 | sibling の `sort_order` が先頭、frontend では事実上 `choices[0]` | **[実装済み]** だが「本線」の永続的な意味は `variation_group == "main"` と配列順の二重表現 |
+| 本線 | frontend の再生 helper では sibling 配列の `choices[0]`。表示上は `variation_group == "main"` も本線ラベルに使う | **[部分実装]**。PR-Aで操作ラベルは明確になったが、「本線である」という意味と表示順が未分離。PR-Bで独立した契約にする |
 | 分岐 | 同じ `from_sfen` を持つ複数 move。seed の `branches` は本線の `from_ply` から派生 | **[部分実装]** 一次分岐は扱える |
 | 分岐点 | `currentChoices.length > 1`、または通過 step の `choices.length > 1` | **[実装済み]** |
 | `variation_group` | `main` または人間向け変化名。branch 行を束ね、表示ラベルにも転用 | **[部分実装]** 構造上の親と表示名が混在 |
 | `parent_move_id` | branch の最初の行等に本線の分岐元 move ID を保存 | DB/API **[実装済み]**、frontend **[未使用]**。現 seed では branch 内の全行が同じ本線親を持ち得るため「直接親」としては未確立 |
 | `from_sfen` / `to_sfen` | 各手の前後局面。API から frontend へ渡りツリー接続に使用 | **[実装済み]**。局面の同一性と手順上の親子を同一視している |
-| `sort_order` | DB の同一 line / ply / group 内の安定順、frontend sibling の本線優先順 | **[実装済み]**。将来は「同一 parent の表示順」と明文化が必要 |
+| `sort_order` | DB/APIの安定表示順。現frontendでは結果的に先頭を本線として再生 | **[部分実装]**。PR-Bで「同一parent配下の表示順」だけに限定し、本線指定と切り離す |
 | `path: number[]` | root から各 sibling 配列で選んだ index の列 | **[実装済み]**。DB ID に依存せず軽量だが、tree 再構築で順序が変わると不安定 |
 | `currentChoices` | root なら `opening.moves`、進行後なら末尾 node の `next` | **[実装済み]** |
-| `expectedOpeningMove` | path をたどった先の `choices[0]` | **[実装済み]**、本線のみを正解にする原因 |
+| `expectedOpeningMove` | path をたどった先の `choices[0]` | **[実装済み]**。PR-A後は本線のhint/自動再生用であり、盤上の正解判定には使わない |
 | `chooseBranch(index)` | 現在の `path` へ任意 index を追加 | **[実装済み]** |
 | `switchBranch(stepIndex, branchIndex)` | 過去 path を分岐点直前で切り、別 index を追加 | **[実装済み]** |
 | `stepForward()` | `expected` を表示し常に `0` を追加 | **[実装済み]**、本線固定 |
-| `goToEnd()` | root から各階層の `choices[0]` を最後まで選ぶ | **[実装済み]**、現在 path を捨て本線終端へ移動 |
+| `continueOpeningMainLine()` / `goToEnd()` | 選択済みpathを保持し、以後の各階層で先頭候補を終端まで追加 | **[実装済み]**（PR #53）。表示順と本線意味の分離後は、先頭でなく明示的mainを選ぶ |
 
-### 1.3 現在の分岐 UI
+### 1.3 PR #52 / #53 後の分岐 UI と検証済み事項
 
-**[実装済み]**
+**PR #52（PR-A0）で実装済み**
 
-- 「分岐あり」badge、現在局面の分岐候補 button、現在の分岐パス。
-- `chooseBranch` による現在局面からの任意分岐選択。
-- 「通過した分岐」と `switchBranch` による過去の分岐点への復帰・切替。
-- 一手戻る、最初に戻る、一手進む、最後まで進む、ヒント。
-- 現在手に対応する Wikipedia 出典、section、license、取得日、coverage、note の表示。
-- Vitest の二択 imported tree 構築・両経路再生。
-- Playwright の通常本線に対する正解/不正解、undo/reset、自動再生。
+- seed後の全lineを対象に、同一 `line_id` / `from_sfen` / USI の重複 sibling を検出する validator を追加し、seed処理自体も重複時に失敗する。
+- 原始鬼殺しを含む現seedを検査した結果、疑われていた同一USI siblingは存在しないことをbackend testで固定した。したがって「△6二銀を共通nodeへ正規化する作業」を未実装課題として残さない。
+- DB制約への固定は避け、将来のdirect-parent treeでも検査単位を更新できるPython validatorとしている。
 
-**[部分実装]**
+**PR #53（PR-A）で実装済み**
 
-- PR #22 の出典 metadata / 分岐再生と PR #23 の長手順・分岐 seed は一次分岐の学習を可能にしたが、盤上操作と button 操作の正解集合が一致しない。
-- `OpeningMoveNode.next` 自体は任意深さを表せるが、seed 記法と親子復元契約が多段分岐を保証しない。
-- API は `parent_move_id` を返すが、型変換と tree builder は使わない。
+- 盤上着手は `findOpeningChoiceIndex(currentChoices, move)` で全登録候補を照合し、0以外の候補も正解として選択pathへ記録する。boardと分岐cardの正解集合の不一致は解消済み。
+- 分岐点card（本線/変化、表記、USI、説明、coverage/source）、現在の分岐path、通過した分岐、過去分岐切替を表示する。
+- 「本線を一手進む」「ここから本線を最後まで再生」「直前の分岐点へ戻る」を実装し、最後まで再生は現在pathを保持する。
+- 選択中の過去分岐buttonは `aria-current="step"` とdisabled/選択中表示を持ち、feedbackはlive regionで通知する。
+- Vitestで3候補照合・path helperを、Playwrightでboard/cardの3分岐、戻る、過去切替、現在path保持再生、360pxを検査する。
 
-### 1.4 盤上で分岐候補を指した現行挙動
+**なお未実装**
 
-`handleUserMove` は `expectedOpeningMove(opening, path)` の返す `choices[0]` だけを `isExpectedOpeningMove` で比較する。たとえば候補が「本線 △8四歩 / △6二銀 / △6二金」の順なら、盤上の △6二金 は合法かつ登録済みでも「不正解」になり、hint は △8四歩を示す。一方、同じ △6二金 は分岐 button なら進める。正解時も `path` に常に `0` を追加する。この不整合が最優先の UX defect である。
+- direct `parent_move_id` による任意深さtree契約（PR-B）。
+- 本線の意味と表示順の独立指定（PR-B）。
+- 通常は折りたたまれた補助的な全分岐一覧と任意node jump（PR-C）。
 
-## 2. 問題
+## 2. PR-A後に残る問題
 
-1. **正解集合の不一致**: board は本線一手、buttons は全分岐を正解として扱う。
-2. **用語と動作の曖昧さ**: 「一手進む」「最後まで進む」が本線固定であることをラベルから判断できない。特に `goToEnd` は現在選択中の変化を継続せず root 本線へ戻る。
-3. **分岐説明不足**: 現在の button は branch label を中心にし、各変化の意味・出典・本線である理由を比較しにくい。
-4. **構造契約不足**: `variation_group`、`parent_move_id`、SFEN、`sort_order` の責務が重なり、branch-of-branch の seed 表現がない。
-5. **transposition の曖昧さ**: 同じ SFEN への合流は `movesByFrom` を共有するため、異なる由来・ラベルの後続が意図せず合流し得る。`seen` は循環を止めるが DAG の意味を保存しない。
-6. **全体像不足**: 現在局面と通過分岐は見えるが、定跡全体の変化構造を開始前・途中に俯瞰できない。
-7. **provenance 粒度不足**: 既定 metadata の「局面図を参考に再構成」と個別の「本文明示」が自由文に埋まり、機械検査できない。
-8. **coverage の誤読余地**: `coverage_status` は列挙値でなく、note と実際の move 数の整合を保証する検査がない。
-9. **E2E 不足**: 盤上から非0分岐、多段分岐、一覧ジャンプ、360px、keyboard/accessibility の回帰検査がない。
+1. **本線意味と表示順の結合**: PR-Aの `expectedOpeningMove` / 自動再生 / cardは先頭indexを本線とみなす。編集上の表示順を変えるだけで学習上の本線が変わり得る。
+2. **構造契約不足**: `variation_group`、`parent_move_id`、SFEN、`sort_order` の責務が重なり、branch-of-branchのseed表現がない。
+3. **transpositionの曖昧さ**: 同じSFENへの合流は現builderで後続を共有し得て、異なる由来・ラベルの意味を保存できない。
+4. **補助的な全体像不足**: 現在局面のcardと通過分岐は主操作として十分だが、別の分岐点を探し、現在path/祖先を確認し、任意nodeへjumpする折りたたみ一覧がない。
+5. **「この分岐点の本線へ」の不足**: 過去の任意分岐には切り替えられるものの、一覧上の分岐点を基準に後続を破棄し、その分岐点の明示的mainへ戻す専用操作が未定義。
+6. **provenance / coverage粒度不足**: 自由文と実move数の整合を機械検査できず、segmentごとの根拠も未確立。
+7. **大規模treeの境界**: 500 node程度の測定、折りたたみ、DOM量の方針が必要。ただし横レーン型visual treeやvirtualizationはfollow-upとする。
 
 ## 3. 目標 UX
 
-### 3.1 正解判定を currentChoices 全体へ統一
+### 3.1 正解判定を currentChoices 全体へ統一（PR #53で実装済み）
 
-**[提案]** `expected` を「本線表示用」として残しても、判定は次のように全候補から行う。
+**[実装済み]** `expected` を「本線表示用」として残しても、判定は次のように全候補から行う。
 
 ```ts
 const branchIndex = currentChoices.findIndex(
@@ -128,11 +126,11 @@ setPath((prev) => [...prev, branchIndex]);
 
 - 一致した node を feedback / source / last move の対象にする。
 - hint は「本線の一手」だけを暴露せず、初回は候補数または共通の着手目的、明示要求後は本線を示す。
-- 同一分岐点に同一 USI の sibling が複数あると board 操作だけでは区別不能なので、**PR-A の前提として PR-A0 で既存データを正規化**し、seed validator / backend test で再発を禁止する。説明や後続だけが違う同じ手は一 node に統合し、分岐はその着手後に表現する。
+- 同一分岐点に同一USIのsiblingが複数あるとboard操作だけでは区別不能である。**PR #52では既存seedに重複がないことを確認し、seed validator / backend testで再発を禁止済み**。将来、説明や後続だけが違う同じ手をimportする場合は一nodeに統合し、分岐はその着手後に表現する。
 - `currentChoices.length === 0` の時だけ completed とする。
 - unit test は `findIndex` 相当を純粋 helper（例: `findOpeningChoiceIndex`）へ抽出して board component を介さず検査する。
 
-### 3.2 分岐点カード
+### 3.2 分岐点カード（PR #53で実装済み）
 
 分岐が2件以上なら見出しを「この局面には N つの進行があります」とし、次のカードを sibling ごとに表示する。
 
@@ -150,7 +148,7 @@ setPath((prev) => [...prev, branchIndex]);
 [この変化を見る]
 ```
 
-- `sort_order` 先頭かつ main のカードに「本線」。その他は「変化」。色だけで区別せず text / icon / border を併用。
+- PR-Aの現実装は先頭cardを「本線」とする。PR-B後は表示位置にかかわらずexplicit mainのcardだけに「本線」、その他に「変化」を表示する。色だけで区別せずtext / icon / borderを併用する。
 - 現在選択中は `aria-current="step"` 相当の明示、button は disabled にせず「選択中」と読める状態にする（再選択が無動作なら disabled + 状態説明でもよい）。
 - card 名は「本線 △8四歩、この変化を見る」のように一意な accessible name を持つ。
 - branch label、notation/USI、短い explanation、provenance/coverage badge を表示。長い source note は出典 section に置く。
@@ -234,27 +232,19 @@ validator は key 一意、親の存在、同一 line、acyclic、root、ply、s
 - `parent_move_id` は常に一つなので UI は tree のまま保つ。
 - 後続重複が実運用上問題になった時だけ `position_id` と reusable continuation の DAG を別 RFC にする。Wikipedia seed 数十〜数百 node の段階では過剰な一般化である。
 
-## 6. 「この定跡の変化」一覧 UI
+## 6. PR-C: 補助的な「この定跡の変化」一覧 UI
 
-初期版は専用 Tree View widget を使わず semantic HTML を優先する。
+メジャーな棋譜再生ソフトに共通する、棋譜リストを主表示に保ちつつ分岐選択・分岐点復帰を行うUXを参考にする。PR-Aの盤面、再生control、現在局面の分岐cardを主操作として残し、一覧はそれを置き換えない**補助navigation**とする。ShogiHome等に見られる横レーン型visual branch treeそのものは本PRに含めず、別follow-up計画へ分離する。
 
-```html
-<section aria-labelledby="opening-variations-title">
-  <h2 id="opening-variations-title">この定跡の変化</h2>
-  <details open>
-    <summary>本線（19手・本文明示）</summary>
-    <ol>...<li><button>7手目 ▲7五歩の局面へ</button>...</li></ol>
-  </details>
-</section>
-```
-
-- `details/summary` は branch 単位、手順は nested `ol/li`、移動は native `button`。
-- 各 node に手数、notation/USI、本線/変化、branch label、coverage badge。出典詳細は既存「データ出典」section へのリンク/参照にし重複させない。
-- 現在 node は `aria-current="step"`、visual highlight、screen reader text の三つで示す。
-- node click は root からその node までの path を設定し局面へ移動。現在より前後どちらでも同じ決定規則。
-- 初期展開は現在 path の祖先と root main。その他は折りたたむ。「すべて開く」は巨大 tree では付けず、branch 数/深さの閾値を計測して後続検討。
-- 360px は indent を浅くし、深い階層では border/level label へ切替。水平 scroll に依存しない。
-- lazy rendering は初期非目標。まず 500 node 程度の fixture で render 性能を計測し、問題時のみ subtree virtualization を検討。
+- section全体を`details/summary`等で**通常は折りたたむ**。初回表示で巨大treeを展開せず、summaryには分岐数、現在手数、現在branch程度を簡潔に示す。
+- 開いた内部はsemanticなnested `ol/li` とnative `button`を基本とし、branch単位も必要に応じて折りたためる。盤面横の棋譜リストを模した逐手表示は可能だが、横レーン描画はしない。
+- **current path**をrootから現在nodeまでの一本道として明示する。現在nodeは`aria-current="step"`と強いhighlight、ancestorは別の弱いhighlightおよびscreen reader textで区別し、currentとancestorを同じ見た目にしない。
+- node buttonは手数、notation/USI、branch labelを一意なaccessible nameに含め、押すとrootからそのnodeまでのpathを設定する（**node jump**）。前方・後方・別branchのいずれへのjumpも同じ規則でboard、history、sourceを同期する。
+- 各分岐点には **「この分岐点の本線へ切り替える」** を設ける。対象分岐点より後のpathを破棄し、そのparent配下でPR-Bが明示したmain nodeを選ぶ。すでにそのmain上なら選択中状態を示し、別branchから切り替えた場合は破棄と移動をlive通知する。
+- `sort_order`は一覧の見せる順序にのみ使い、main badge、main切替、自動再生の決定にはPR-Bの明示的main契約を使う。
+- coverage/sourceは簡潔なbadge/linkに留め、詳細は既存「データ出典」sectionへ委ねる。
+- 360pxではindentを浅くし、深い階層はborder/level labelへ切替え、水平scrollに依存しない。focusを含むsubtreeを閉じる場合はsummaryへ戻す。
+- 500 node fixtureで初期折りたたみ時と展開時のrender時間・DOM数を測定する。閾値設定、virtualization、overview/minimap、横レーン型treeは測定結果をfollow-upへ渡し、PR-Cの完了条件にはしない。
 
 ## 7. Wikipedia coverage 監査
 
@@ -365,93 +355,81 @@ PR-D の外部監査では Wikipedia の曖昧さ回避ページ、redirect、se
 
 現 seed は7手目 `5i4h`（▲4八玉）で終わるが、`source_note` は「および実戦以下▲7六飛を手順化」と読める。実際の `moves` に `7h7f` はない。PR-D は最低限 note を「▲4八玉まで収録。本文に記載された実戦以下▲7六飛は未収録」のように事実へ合わせる。もし本文の連続性・合法性を再確認して手を追加するなら、その seed 追加は PR-D ではなく石田流系 PR-E に分離する。
 
-## 11. PR 分割
+## 11. PR 分割と実装順序
 
-依存関係は一本の直列ではなく、次の二系統を並行して進められる。
+基本のPR分割は維持する。PR #52/#53でA0/Aは完了したため、残るUX/構造系のcritical pathは **B → C** である。
 
 ```text
-UX / 構造系:       A0 → A → B → C
-provenance 系:     D0 → D1
-Wikipedia seed 系: D1 ─┬→ E（単純な一次分岐・線形 seed）
-                       └→ B → E（多段分岐を必要とする seed）
+完了:               A0 (#52) → A (#53)
+UX / 構造系:                    B → C
+provenance 系:       D0 → D1 ─────────┐
+Wikipedia seed 系:                 E-linear（線形・小規模、D1必須）
+                                   B → C → E-branch-heavy（D1も必須、推奨gate）
+follow-up:                         現計画完了 → visual branch tree検討
 ```
 
-`A0 → A` は board の `findIndex` が一意な sibling を返すための必須依存である。B は A の UX helper を前提に進めると衝突が少なく、C は B の direct-parent tree 契約に依存する。一方、D0/D1 は UX 系と並行可能である。各 PR-E は D1 の provenance 監査完了を必須とし、branch-of-branch を含むものだけ B にも依存する。したがって旧表記の `D0 → A → B → C → D1 → E` を絶対的な直列順とは扱わない。
+- A0は重複を「修正した」のではなく、現seedに重複がないことと再発防止validatorを実装済み。Aは全候補照合、card、明示的な再生ラベル、path保持、直前分岐復帰まで実装済みである。
+- D0/D1はB/Cと並行でき、線形またはごく小さい一次分岐seedはD1後に追加可能。ただしレビュー・操作対象が多い **branch-heavy seed（多数のsibling、複数分岐点、多段分岐）を追加する前にB/Cを完了することを強く推奨**する。
+- B前にbranch-heavy seedを入れるとSFEN接続と配列先頭本線の暫定契約へ新データを固定し、B migration/backfillの範囲を増やす。C前に入れると既存card/通過履歴だけでは全体監査と任意node到達が難しい。例外は「多段構造を検証する最小fixture」であり、production Wikipedia seedではない。
+- PR-Eごとに `linear/small-branch` か `branch-heavy` をPR本文で宣言する。branch-heavyの判定例はbranch-of-branchを含む、複数の分岐点を含む、または一覧なしではreviewが困難な規模である。
 
-### PR-A0: 既存分岐構造正規化
+### PR-A0: 既存分岐の一意性検証 — **完了（PR #52）**
 
-- **目的**: 現行 seed / DB / API が返す各分岐点を監査し、同一局面・同一 USI の sibling を原則1 nodeへ正規化して PR-A の一意な着手照合を成立させる。
-- **確認対象**: 特に原始鬼殺しの3手目▲7七桂後について、main 4手目と「△6二銀の対応」がともに `7a6b` となる重複疑いを、seed生成後の `from_sfen` / USI / parentで確認する。
-- **正規化規則**: 同じ `from_sfen` と USI の着手は一 nodeに統合する。説明・branch label・後続が異なる場合、共通着手nodeの `next` で分岐させる。provenanceが異なる場合も着手を複製せず、node/edge metadataの保持方法を明記する。
-- **変更対象**: `backend/app/seed.py`, `backend/tests/test_openings_import_api.py`、必要に応じて監査script/fixture。アプリの分岐UIは変更しない。
-- **DB migration**: 原則なし。既存DBの再seedだけで安全に直せない場合は、データmigration要否をPR本文で明示して小さく分離する。
-- **API/frontend**: response shapeの変更なし / 変更なし。
-- **seed**: 構造正規化のみ。Wikipediaの新しい手や本文解釈を追加しない。
-- **tests**: 全lineの各 `from_sfen` について sibling USI一意、原始鬼殺しの△6二銀が一 node、正規化後もmain/△6二金の合法な再生と出典が維持されることをpytestで検査。
-- **後方互換**: line ID、opening type、既存URL、到達可能な合法手順を維持する。
-- **provenance**: 既存metadataを失わないことだけ確認し、本文の再解釈はD1へ送る。
+- seed後の同一line / `from_sfen` / USI siblingを全件検査するvalidatorとbackend testを追加済み。
+- 原始鬼殺しを含む現seedに重複はなく、到達可能手順を変更する正規化は不要だった。今後の重複はseed時に失敗する。
+- PR-Bでsiblingの同一性をdirect parent基準へ変える際、validatorのgroupingも `parent_move_id` / stable key基準へ更新する。
 
 ### PR-D0: provenance/coverage 契約文書と監査器の設計固定
 
 - **目的**: A/B/C/M、coverage列挙値、必須metadata、監査表の機械可読形式を固定。
-- **変更対象**: `docs/`、必要なら後続用 validator test fixture（実装する場合は `backend/app/seed.py` を触らず独立script）。
-- **DB migration**: なし（新列採用判断だけをADR化）。
-- **API/frontend/seed**: なし。
-- **tests**: 文書 link/check。Wikipedia revision の取得手順をdry-run。
-- **provenance**: 必須。現在記事を取得できる環境でURL/section/revisionを記録。
+- **変更対象**: `docs/`、必要なら後続用validator test fixture。DB/API/frontend/seed変更なし。
+- **依存**: B/Cと並行可能。現在記事のURL/section/revisionを記録する。
 
-### PR-A: 分岐学習 UX 改善
+### PR-A: 分岐学習 UX 改善 — **完了（PR #53）**
 
-- **目的**: board と card の正解集合を統一し、再生操作を明確化。
-- **変更対象**: `frontend/src/pages/OpeningStudyPage.tsx`, `frontend/src/shogi/openings.ts`, tests, `frontend/src/index.css`, `frontend/e2e/shogi-learning.spec.ts`。
-- **DB migration/API/seed**: なし / なし / なし。
-- **frontend**: choice matching helper、分岐点cards、現在branch、ラベル、直前分岐へ戻る、現在pathを保つgo-to-end。
-- **tests**: 3候補の任意USI、誤手、undo、過去切替、main replay、mobile/a11y。
-- **後方互換**: linear/static/sample opening、既存URL、既存APIを維持。
-- **provenance**: 表示の退行確認のみ。Wikipedia本文変更なし。
+- board/cardの全候補照合、3候補feedback、分岐card、現在path、通過分岐切替、直前分岐点復帰を実装済み。
+- 「本線を一手進む」「ここから本線を最後まで再生」を明示し、最後まで再生は選択済みpathを保持する。
+- Vitest/Playwrightでhelper、board/card同値、過去切替、360pxを検査済み。PR-BはこのUXを退行させない。
 
-### PR-B: 多段分岐データモデル
+### PR-B: 多段分岐データモデルと本線意味の分離
 
-- **目的**: parent-childを正規化し、A/A1/A2・B/B1/B2を安定再構築。
+- **目的**: direct parentでA/A1/A2・B/B1/B2を安定再構築し、**本線であること（semantic main）とsibling表示順（presentation order）を独立させる**。
+- **責務**:
+  - `parent_move_id` / stable parent key = 構造。
+  - `is_main`相当 = 各parent配下で学習上どれを本線とするか。各sibling集合で正確に1件（空集合を除く）をvalidatorで保証する。
+  - `sort_order` = 同一parent配下の表示順だけ。mainが常に0番/先頭である必要はなく、同値時はstable key/idで決定的にする。
+  - `variation_group` / branch label = 人間向け表示・出典groupであり、構造・main・順序を兼用しない。
 - **変更対象**: `backend/app/database.py`, `backend/app/seed.py`, `backend/app/routers/openings.py`, `backend/app/schemas.py`（該当時）, `frontend/src/api/client.ts`, `frontend/src/shogi/openings.ts`, backend/frontend tests。
-- **DB migration**: **要否をspikeで決定**。stable `move_key` / `is_main` 追加なら要。既存 `parent_move_id` を直接親にbackfillする migration はいずれにせよ必要になり得る。あわせて、現行 UNIQUE `(line_id, ply, variation_group, sort_order)` が direct `parent_move_id` + sibling `sort_order` モデルでも正しい重複防止になるかを検証する。親が異なる同ply・同groupの合法nodeを誤って拒否する、または同一親の重複orderを許す場合は、`UNIQUE(line_id, parent_move_id, sort_order)` 相当（rootのNULL semanticsを含む）やstable key制約へのmigrationを設計する。
-- **API**: move `id` と direct `parent_move_id` の契約、stable orderingをadditiveに明記。
-- **frontend**: parent ID builder、legacy SFEN fallback、cycle/orphan error。
-- **seed**: `move_nodes`/`parent_key` 新形式とlegacy adapter。Wikipedia move追加なし。
-- **tests**: migration、idempotent seed、multi-level branches、invalid parent/cycle/SFEN/legal move、legacy互換、transposition非merge。
-- **provenance**: metadataが各node/segmentで欠落しないことだけ確認。
+- **DB migration**: spikeで決定。stable `move_key` / `is_main`追加、direct `parent_move_id` backfill、現行UNIQUE制約とNULL root semanticsを検証する。
+- **API/frontend**: move `id`, direct `parent_move_id`, explicit main, stable display orderをadditiveに契約。builderはparent IDを使い、legacy SFEN fallbackは移行期間だけ許す。`expectedOpeningMove`、step、continue-to-end、badgeは配列index 0でなくexplicit mainを使う一方、card/listは`sort_order`順に並べる。
+- **seed**: `move_nodes` / `parent_key`新形式とlegacy adapter。Wikipedia move追加なし。
+- **tests**: mainが表示順の途中/末尾にあるfixture、multi-level branch、main一意性、migration、idempotency、invalid parent/cycle/SFEN/legal move、legacy互換、transposition非merge。
 
-### PR-C: 「この定跡の変化」一覧 UI
+### PR-C: 折りたたみ式「この定跡の変化」補助一覧 UI
 
-- **目的**: 全体 tree の俯瞰と任意局面ジャンプ。
-- **変更対象**: `OpeningStudyPage.tsx` または新 `OpeningVariationList.tsx`、CSS、Vitest/Playwright。
-- **DB migration/API/seed**: なし（PR-B APIを利用）。
-- **frontend**: details/summary、nested list、current highlight、jump、fold、coverage/source link、responsive/a11y。
-- **tests**: path変換、current node、deep tree、500-node fixtureのrender時間・DOM数の測定と記録、keyboard、360px。現段階では根拠のない厳格な性能閾値を置かず、測定結果から最適化要否と将来の基準を判断する。accessibilityの自動検査は、実装時に採用可能な手段（例: Playwright + axe-core、既存test stackのmatcher）を確認して具体化する。
-- **後方互換**: linear lineでは単一の簡潔なlist。JSなしのnative disclosure semanticsを優先。
-- **provenance**: label/coverageが正しいbranchに表示されること。
+- **目的**: PR-Aの主操作を保ったまま、全体treeの探索、current path確認、任意node jump、分岐点単位のmain復帰を補助する。
+- **変更対象**: `OpeningStudyPage.tsx`または新`OpeningVariationList.tsx`、CSS、Vitest/Playwright。DB/API/seed変更なし（PR-B契約を利用）。
+- **frontend**: 通常collapsedのdisclosure、semantic nested list、current/ancestorを別々にhighlight、current path表示、node jump、**「この分岐点の本線へ切り替える」**、coverage/source link、responsive/a11y。
+- **動作**: node jumpとmain切替はrootからのpathを一意に再構築し、board/history/sourceを同期する。main切替は対象分岐点より後を破棄してPR-Bのexplicit mainを選び、配列先頭を仮定しない。
+- **tests**: path変換、current/ancestor、別branchの前後jump、各深さでのmain切替、collapsed初期状態、focus、deep tree、keyboard、360px、500-node fixtureの初期/展開時測定。
+- **非目標**: 横レーン型visual branch tree、棋譜リストとの双方向手数同期、branch比較、大規模tree virtualization。これらはfollow-up文書で扱う。
 
 ### PR-D1: Wikipedia coverage監査・metadata整合
 
 - **目的**: 全seedのA/B/C/M確定、source note/coverage修正。升田式石田流の不整合を解消。
-- **変更対象**: `backend/app/seed.py` のmetadataのみ、tests、監査文書/CSV、必要ならAPI/clientのmetadata field。
-- **DB migration**: provenance/revisionを列追加する決定なら要。JSON/既存列に収めるなら不要だが型安全性を比較。
-- **API/frontend**: 新metadataを表示する場合additive。
-- **seed**: **手順追加なし**。metadataのみ。
-- **tests**: 全Wikipedia lineの必須field、URL、license、coverage enum、note終端、revision、再seed idempotency。
-- **provenance**: reviewerが記事revisionと監査artifactを照合。
+- **seed**: 手順追加なし、metadataのみ。provenance/revision列の採否を決定し、必須field・終端・idempotencyを検査する。
 
-### PR-E以降: Wikipedia seed 追加
+### PR-E以降: Wikipedia seed追加
 
-1. **PR-E1 石田流・早石田系**: 新・早石田、早石田、石田流、升田式。metadata defect解消後、A/B別line/branch。
-2. **PR-E2 横歩取り系**: 基本局面から各応手を小さなbranch群に分割。大きければ△3三角/△8五飛とその他を分ける。
-3. **PR-E3 角換わり系**: 基本、一手損、既存棒銀/早繰り銀/腰掛け銀の重複整理。
-4. **PR-E4 棒銀系**: 原始棒銀を優先。本文連続の攻防のみ。
-5. **PR-E5 ゴキゲン・対ゴキゲン**: mainの再監査後、超急戦、超速、丸山ワクチンを別branch/line。
-6. **PR-E6 鬼殺し系**: 原始鬼殺しの同一USI branchを正規化後、新・鬼殺し等をA/B/C判定。
+1. **PR-E1 石田流・早石田系**
+2. **PR-E2 横歩取り系**
+3. **PR-E3 角換わり系**
+4. **PR-E4 棒銀系**
+5. **PR-E5 ゴキゲン・対ゴキゲン**
+6. **PR-E6 鬼殺し系**
 7. **PR-E7以降**: 矢倉、相掛かり、四間、三間、向かい飛車をarticle/section単位の小PR。
 
-各seed PRは一つの出典sectionまたは密接なbranch群を原則とし、巨大な「Wikipedia全追加」PRを禁止する。
+各seed PRは一つの出典sectionまたは密接なbranch群を原則とし、巨大な一括PRを禁止する。D1は全seed PRの必須gate。branch-heavyなPR-EはB/C完了後を推奨順序とし、先行させる場合は暫定構造を増やす理由と後続migration/UI監査方法を明記する。
 
 ## 12. テスト戦略と各 PR の受け入れ条件
 
@@ -482,26 +460,27 @@ git diff --check
 
 ### 12.2 PR別 acceptance checklist
 
-#### PR-A0
+#### PR-A0（PR #52で完了）
 
-- [ ] 全既存lineを監査し、同一 `from_sfen` の sibling USI重複が0件である。
-- [ ] 原始鬼殺しの3手目後の `7a6b` は一 nodeだけで、異なる進行はその着手後に表現される。
-- [ ] 正規化で既存の合法手順、line ID、出典metadataが失われない。
-- [ ] 再seedを2回実行しても重複が再発せず、backend pytestとseed smoke E2Eを通過する。
+- [x] 全既存lineで同一 `from_sfen` の sibling USI重複が0件であることを検証した。
+- [x] 原始鬼殺しを含む現seedに疑われた重複がないことを固定した。
+- [x] seed時validatorとbackend testで再発を禁止した。
 
-#### PR-A
+#### PR-A（PR #53で完了）
 
-- [ ] 3候補の0/1/2番目をboardで指すと各 path index が選ばれ、正解feedbackになる。
-- [ ] 候補外合法手は不正解でposition/pathを変えない。
-- [ ] card操作とboard操作が同じnode、source、historyを表示する。
-- [ ] 「本線を一手進む」「ここから本線を最後まで再生」の挙動が文言通り。
-- [ ] undo、直前分岐、過去分岐switch、reset後のfocus/live通知が一貫。
-- [ ] PR-A0の正規化済みfixtureを前提に、duplicate sibling USIを再発検知するtestがある。
-- [ ] Vitest、lint、build、Chromium E2E、360pxを通過。
+- [x] 3候補の0/1/2番目をboardで指すと各 path index が選ばれ、正解feedbackになる。
+- [x] 候補外合法手は不正解でposition/pathを変えない。
+- [x] card操作とboard操作が同じnode、source、historyを表示する。
+- [x] 「本線を一手進む」「ここから本線を最後まで再生」の挙動が文言通り。
+- [x] undo、直前分岐、過去分岐switch、reset後のfocus/live通知が一貫。
+- [x] PR-A0の一意性検証済みfixtureを前提に、duplicate sibling USIを再発検知するtestがある。
+- [x] Vitest、lint、build、Chromium E2E、360pxを通過。
 
 #### PR-B
 
 - [ ] 本線→A→A1/A2、B→B1/B2 fixtureがDB→API→frontendで同じtreeになる。
+- [ ] explicit mainと`sort_order`を分離し、mainが表示順の先頭でないfixtureでも自動再生・badge・main切替が正しい。
+- [ ] 各sibling集合のmainは正確に1件で、0件/複数件をvalidatorが拒否する。
 - [ ] 全非root rowの`parent_move_id`が直接親で、親to_sfenと子from_sfenが一致。
 - [ ] 現行UNIQUE `(line_id, ply, variation_group, sort_order)` をdirect-parent fixtureで評価し、維持または変更の根拠、NULL rootの扱い、migration/backfill手順を記録する。
 - [ ] orphan、cycle、duplicate key/USI/order、illegal moveを明確なerrorで拒否。
@@ -512,9 +491,11 @@ git diff --check
 
 #### PR-C
 
+- [ ] 一覧は通常collapsedで、PR-Aの盤面/card/replayを主操作として維持する。
 - [ ] semantic nested list/disclosureで全nodeへ到達可能。
-- [ ] 現在位置と祖先が視覚・`aria-current`双方で分かる。
-- [ ] node jump後にboard/history/current branchが一致。
+- [ ] current pathを表示し、currentとancestorを異なる視覚表現・screen reader textで示す。`aria-current="step"`はcurrentだけに付ける。
+- [ ] node jump後にboard/history/current branch/sourceが一致。
+- [ ] 各分岐点の「この分岐点の本線へ切り替える」が後続pathを破棄し、表示順に依存せずexplicit mainへ移動する。
 - [ ] collapseしてもfocus消失や同名button ambiguityがない。
 - [ ] 360pxでhorizontal overflowなし、touch targetと長文折返しを確認。
 - [ ] 500 node fixtureのrender時間/DOM数を測定してPR本文に記録する。初回は厳格な合否閾値を設けず、結果から最適化課題または将来の基準設定要否を判断する。
@@ -562,11 +543,11 @@ git diff --check
 
 この取り組み全体は次を満たした時に完了とする。
 
-1. PR-A0の監査で既存の同一局面・同一USI siblingが解消され、共通着手後に分岐する正規形になっている。その上で、boardで同一分岐点の全登録候補が正解になり、選んだbranch index/path/history/sourceが一致する。
+1. PR #52のvalidatorで既存seedの同一局面・同一USI siblingが0件と確認され、再発が禁止されている。PR #53によりboardで同一分岐点の全登録候補が正解になり、選んだbranch index/path/history/sourceが一致する。
 2. 自動再生、undo、分岐点復帰、switchの仕様とラベルが一致し、keyboard/ARIA/360pxで利用できる。
-3. direct parentによる任意深さtreeがDB→API→frontendで保持され、SFENは合法性・整合性の検査に使われる。
+3. direct parentによる任意深さtreeがDB→API→frontendで保持され、semantic mainと表示順が分離され、SFENは合法性・整合性の検査に使われる。
 4. transpositionを意図せずmergeせず、異なる学習pathを保持する。
-5. 「この定跡の変化」から全体構造、main/variation、手数、現在位置、coverageを把握し任意nodeへ移動できる。
+5. 通常collapsedの補助的な「この定跡の変化」でcurrent pathとcurrent/ancestorを区別でき、任意nodeへjumpし、各分岐点のexplicit mainへ切り替えられる。
 6. 既存全seedにA/B/C/Mと正規化coverageが付き、source metadataと実moves終端が一致する。
 7. 升田式石田流のnote/実moves不整合が解消する。
 8. 未収録一覧の各項目は「名称確認」と「連続手順確認」が分離され、Cからmove seedが生成されない。
@@ -574,6 +555,8 @@ git diff --check
 10. 各PRのpytest/Vitest/lint/build/Chromium/360px/後方互換/provenance gateが満たされる。
 11. 既存のstatic opening、learning sample、imported linear line、一次分岐、既存URLが退行しない。
 12. 本書の**[要外部再確認]**項目は、ネットワーク利用可能なseed PRで一次資料（現行Wikipedia記事とrevision）に置き換え、推測を実装へ持ち込まない。
+
+横レーン型visual branch tree、棋譜リストとの高度な手数同期、分岐比較、virtualizationを含む大規模tree UIは、上記完了条件に含めない。本計画完了後に `docs/opening-visual-branch-tree-followup-plan.md` で別途評価する。
 
 ---
 
@@ -589,4 +572,4 @@ git diff --check
 - seed/metadata/合法手生成: `backend/app/seed.py`
 - backend tests: `backend/tests/test_openings_import_api.py`, `backend/tests/test_database_migrations.py`
 - provenance方針: `README.md`, `THIRD_PARTY_NOTICES.md`
-- 履歴: PR #19/#20相当の playable seed、PR #22相当の metadata/branch replay、PR #23相当の長手順/branch/migration、PR #40相当の opening type中心UI。
+- 履歴: PR #19/#20相当の playable seed、PR #22相当の metadata/branch replay、PR #23相当の長手順/branch/migration、PR #40相当の opening type中心UI、PR #52のsibling一意性validator、PR #53の分岐学習UX。
