@@ -716,8 +716,13 @@ def _prepare_opening_move_nodes(opening: dict, initial_sfen: str) -> list[dict]:
             "to_sfen": board.sfen(),
             "sort_order": int(source.get("sort_order", 0)),
             "is_main": bool(source.get("is_main", False)),
-            "variation_group": source.get("variation_group", source.get("branch_key", "main")),
-            "comment": source.get("comment", source.get("branch_label", "")),
+            # variation_group is the existing persisted display-label field.
+            # Stable branch keys identify nodes; they must not leak into the UI
+            # when the seed provides a separate human-readable label.
+            "variation_group": source.get(
+                "variation_group", source.get("branch_label", source.get("branch_key", "main"))
+            ),
+            "comment": source.get("comment", ""),
         }
         visiting.remove(key)
         prepared[key] = result
@@ -855,6 +860,10 @@ def seed_openings_if_empty(conn) -> None:
                     "INSERT INTO opening_positions(line_id, ply, sfen) VALUES (?, ?, ?)",
                     (line_id, ply, sfen),
                 )
+        conn.execute(
+            "DELETE FROM opening_positions WHERE line_id = ? AND ply >= ?",
+            (line_id, len(positions)),
+        )
 
         existing_ids = {}
         for node in move_nodes:
@@ -907,6 +916,19 @@ def seed_openings_if_empty(conn) -> None:
                 )
                 current_id = int(cur.lastrowid)
             id_by_key[node["key"]] = current_id
+
+        # The stable-key seed is the canonical snapshot for this line.  Prune
+        # only after every retained node has been upserted and reparented, so an
+        # obsolete parent's ON DELETE CASCADE cannot remove a retained child.
+        retained_ids = tuple(id_by_key.values())
+        if retained_ids:
+            placeholders = ", ".join("?" for _ in retained_ids)
+            conn.execute(
+                f"DELETE FROM opening_line_moves WHERE line_id = ? AND id NOT IN ({placeholders})",
+                (line_id, *retained_ids),
+            )
+        else:
+            conn.execute("DELETE FROM opening_line_moves WHERE line_id = ?", (line_id,))
 
         tag_row = conn.execute(
             "SELECT id FROM opening_tags WHERE line_id = ? AND tag = ?",

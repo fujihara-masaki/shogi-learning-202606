@@ -18,7 +18,7 @@ TREE_SEED = {
         {"key": "m2", "parent_key": "m1", "usi": "3c3d", "sort_order": 0, "is_main": True},
         # Display B first, but follow A as the semantic main choice.
         {"key": "b", "parent_key": "m2", "usi": "2g2f", "sort_order": 0, "is_main": False,
-         "branch_key": "b", "branch_label": "B"},
+         "branch_key": "b", "branch_label": "B", "comment": "explicit B comment"},
         {"key": "a", "parent_key": "m2", "usi": "6g6f", "sort_order": 1, "is_main": True,
          "branch_key": "a", "branch_label": "A"},
         {"key": "a1", "parent_key": "a", "usi": "8c8d", "sort_order": 0, "is_main": False},
@@ -79,6 +79,10 @@ def test_stable_key_seed_persists_branch_of_branch_and_reseeds_by_natural_key(cl
         assert by_key["a2"]["parent_move_id"] == by_key["a"]["id"]
         assert by_key["a"]["sort_order"] == 1 and by_key["a"]["is_main"] == 1
         assert by_key["b"]["sort_order"] == 0 and by_key["b"]["is_main"] == 0
+        assert by_key["a"]["variation_group"] == "A"
+        assert by_key["b"]["variation_group"] == "B"
+        assert by_key["a"]["comment"] == ""
+        assert by_key["b"]["comment"] == "explicit B comment"
         for row in rows:
             if row["parent_move_id"] is not None:
                 parent = next(candidate for candidate in rows if candidate["id"] == row["parent_move_id"])
@@ -91,6 +95,56 @@ def test_stable_key_seed_persists_branch_of_branch_and_reseeds_by_natural_key(cl
         api_by_key = {row["move_key"]: row for row in detail.json()["moves"]}
         assert api_by_key["a1"]["parent_move_id"] == api_by_key["a"]["id"]
         assert api_by_key["a2"]["parent_move_id"] == api_by_key["a"]["id"]
+        assert api_by_key["a"]["variation_group"] == "A"
+        assert api_by_key["b"]["variation_group"] == "B"
+    finally:
+        conn.close()
+
+
+def test_stable_key_reseed_prunes_obsolete_nodes_and_positions(client, monkeypatch):
+    monkeypatch.setattr(seed, "SAMPLE_OPENING_LINES", [TREE_SEED])
+    conn = get_connection()
+    try:
+        seed_openings_if_empty(conn)
+        line = conn.execute("SELECT id FROM opening_lines WHERE name=?", (TREE_SEED["name"],)).fetchone()
+        original = {
+            row["move_key"]: row["id"]
+            for row in conn.execute(
+                "SELECT id, move_key FROM opening_line_moves WHERE line_id=?", (line["id"],)
+            )
+        }
+
+        revised = {**TREE_SEED, "move_nodes": [
+            *TREE_SEED["move_nodes"][:2],
+            # Reuse removed B's USI under a new stable key.
+            {"key": "c", "parent_key": "m2", "usi": "2g2f", "sort_order": 0,
+             "is_main": False, "branch_key": "c", "branch_label": "C"},
+            TREE_SEED["move_nodes"][3],
+        ]}
+        monkeypatch.setattr(seed, "SAMPLE_OPENING_LINES", [revised])
+        seed_openings_if_empty(conn)
+        seed_openings_if_empty(conn)
+        conn.commit()
+
+        rows = conn.execute(
+            "SELECT * FROM opening_line_moves WHERE line_id=? ORDER BY ply, sort_order", (line["id"],)
+        ).fetchall()
+        by_key = {row["move_key"]: row for row in rows}
+        assert set(by_key) == {"m1", "m2", "a", "c"}
+        assert by_key["m1"]["id"] == original["m1"]
+        assert by_key["m2"]["id"] == original["m2"]
+        assert by_key["a"]["id"] == original["a"]
+        assert by_key["a"]["parent_move_id"] == by_key["m2"]["id"]
+        assert all(row["sort_order"] >= 0 for row in rows)
+        assert conn.execute(
+            "SELECT MAX(ply) AS max_ply FROM opening_positions WHERE line_id=?", (line["id"],)
+        ).fetchone()["max_ply"] == 3
+        validate_opening_move_tree(conn, [line["id"]])
+
+        api_keys = {
+            row["move_key"] for row in client.get(f"/api/openings/{line['id']}").json()["moves"]
+        }
+        assert api_keys == set(by_key)
     finally:
         conn.close()
 

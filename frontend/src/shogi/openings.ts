@@ -331,7 +331,10 @@ export function openingFromImportedLine(imported: ImportedOpeningLike): OpeningL
       .map(({ move, index }) => {
         if (ancestors.has(move.id!)) throw new Error(`定跡ツリーに循環があります: ${move.id}`);
         const choices = byParent.get(parentId) ?? [];
-        const node = decorate(move, index, choices.length > 1 ? (move.is_main ? "本線" : move.variation_group) : undefined);
+        const branchLabel = choices.length > 1
+          ? (move.variation_group === "main" ? "本線" : move.variation_group)
+          : undefined;
+        const node = decorate(move, index, branchLabel);
         node.next = buildFromParent(move.id!, new Set([...ancestors, move.id!]));
         return node;
       });

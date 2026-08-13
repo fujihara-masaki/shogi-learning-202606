@@ -138,6 +138,26 @@ describe("openingFromImportedLine", () => {
     expect(continueOpeningMainLine(opening, [])).toEqual([0, 2]);
     expect(opening.moves[0].next?.[0].next?.[0]).not.toBe(opening.moves[0].next?.[1].next?.[0]);
   });
+
+  it("uses persisted branch display labels rather than internal stable keys", () => {
+    const opening = openingFromImportedLine({
+      id: 102, name: "labels", opening_type: "test", initial_sfen: "position",
+      moves: [
+        { id: 1, parent_move_id: null, usi: "7g7f", sort_order: 0, is_main: true,
+          move_key: "m1", variation_group: "main" },
+        { id: 2, parent_move_id: 1, usi: "2g2f", sort_order: 0, is_main: false,
+          move_key: "b", variation_group: "B" },
+        { id: 3, parent_move_id: 1, usi: "6g6f", sort_order: 1, is_main: true,
+          move_key: "a", variation_group: "A" },
+      ], source: { name: "fixture", license_name: "CC0", license_url: "" },
+    });
+
+    const choices = opening.moves[0].next!;
+    expect(choices.map((choice) => choice.branchLabel)).toEqual(["B", "A"]);
+    expect(choices.map((choice) => choice.branchLabel)).not.toContain("a");
+    expect(choices.map((choice) => choice.branchLabel)).not.toContain("b");
+    expect(mainOpeningChoice(choices)?.id).toBe("imported-102-a");
+  });
 });
 
 it("builds branch choices from imported moves and can switch back to the branch point", () => {
