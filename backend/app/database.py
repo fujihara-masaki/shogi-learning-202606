@@ -362,6 +362,18 @@ def _ensure_opening_line_moves_schema(conn: sqlite3.Connection) -> None:
     parent_expr = "parent_move_id" if "parent_move_id" in columns else "NULL"
     sort_expr = "sort_order" if "sort_order" in columns else "0"
 
+    # The constrained copy below must temporarily renumber siblings.  Preserve
+    # the structural fields from the old table first: variation_group is only
+    # a display label and is not, by itself, a legacy branch identity.
+    legacy_identity = {
+        row["id"]: (row["original_parent_move_id"], row["original_sort_order"])
+        for row in conn.execute(
+            f"""SELECT id, {parent_expr} AS original_parent_move_id,
+                       {sort_expr} AS original_sort_order
+                FROM opening_line_moves"""
+        ).fetchall()
+    }
+
     conn.execute("DROP VIEW IF EXISTS opening_moves")
     conn.execute("ALTER TABLE opening_line_moves RENAME TO opening_line_moves_old")
     conn.execute(
@@ -406,8 +418,7 @@ def _ensure_opening_line_moves_schema(conn: sqlite3.Connection) -> None:
     # exist to make reparenting collision-free and must not become display
     # ordering (for example, by reversing two variations through negative IDs).
     legacy_sort_orders = {
-        row["id"]: row["sort_order"]
-        for row in conn.execute("SELECT id, sort_order FROM opening_line_moves").fetchall()
+        row_id: identity[1] for row_id, identity in legacy_identity.items()
     }
     # Reparenting can move a root-level main move into a sibling set that still
     # contains legacy branch rows with the same order.  Evacuate every copied
@@ -422,16 +433,21 @@ def _ensure_opening_line_moves_schema(conn: sqlite3.Connection) -> None:
         ).fetchall()
         by_group = {}
         for row in rows:
-            by_group.setdefault(row["variation_group"], []).append(row)
-        main = sorted(by_group.get("main", []), key=lambda row: (row["ply"], row["id"]))
+            original_parent, original_sort = legacy_identity[row["id"]]
+            branch_identity = (row["variation_group"], original_parent, original_sort)
+            by_group.setdefault(branch_identity, []).append(row)
+        main = sorted(
+            (row for row in rows if row["variation_group"] == "main"),
+            key=lambda row: (row["ply"], row["id"]),
+        )
         previous = None
         for row in main:
             conn.execute("UPDATE opening_line_moves SET parent_move_id=? WHERE id=?", (previous, row["id"]))
             previous = row["id"]
         for group, group_rows in by_group.items():
-            if group == "main":
+            if group[0] == "main":
                 continue
-            previous = group_rows[0]["parent_move_id"]
+            previous = group[1]
             for row in sorted(group_rows, key=lambda item: (item["ply"], item["id"])):
                 conn.execute("UPDATE opening_line_moves SET parent_move_id=? WHERE id=?", (previous, row["id"]))
                 previous = row["id"]

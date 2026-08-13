@@ -866,24 +866,46 @@ def seed_openings_if_empty(conn) -> None:
         )
 
         existing_ids = {}
+        claimed_legacy_ids = set()
         for node in move_nodes:
             row = conn.execute(
                 "SELECT id FROM opening_line_moves WHERE line_id=? AND move_key=?",
                 (line_id, node["key"]),
             ).fetchone()
-            if row is None:
-                # Compatibility for databases migrated from the pre-stable-key
-                # seed: claim the old structural row once, then give it the
-                # canonical key below.
-                row = conn.execute(
-                    """SELECT id FROM opening_line_moves
-                       WHERE line_id=? AND ply=? AND variation_group=? AND sort_order=?
-                         AND move_key LIKE 'legacy-%'
-                       ORDER BY id LIMIT 1""",
-                    (line_id, node["ply"], node["variation_group"], node["sort_order"]),
-                ).fetchone()
             if row is not None:
                 existing_ids[node["key"]] = int(row["id"])
+
+        for node in move_nodes:
+            if node["key"] in existing_ids:
+                continue
+            parent_key = node["parent_key"]
+            parent_id = existing_ids.get(parent_key)
+            # Do not force a structural match when a non-root parent itself is
+            # new: its database identity is not known yet.
+            if parent_key is not None and parent_id is None:
+                continue
+            parent_clause = "parent_move_id IS NULL" if parent_id is None else "parent_move_id=?"
+            params = [
+                line_id, node["ply"], node["variation_group"], node["sort_order"], node["usi"],
+            ]
+            if parent_id is not None:
+                params.append(parent_id)
+            candidates = conn.execute(
+                f"""SELECT id FROM opening_line_moves
+                    WHERE line_id=? AND ply=? AND variation_group=? AND sort_order=? AND usi=?
+                      AND {parent_clause} AND move_key LIKE 'legacy-%'
+                    ORDER BY id""",
+                params,
+            ).fetchall()
+            row = next(
+                (candidate for candidate in candidates
+                 if int(candidate["id"]) not in claimed_legacy_ids),
+                None,
+            )
+            if row is not None:
+                claimed_id = int(row["id"])
+                claimed_legacy_ids.add(claimed_id)
+                existing_ids[node["key"]] = claimed_id
 
         # Avoid transient sibling-unique conflicts if an existing seed changes
         # its parent or display order. Stable move_key remains the natural key.

@@ -149,6 +149,63 @@ def test_stable_key_reseed_prunes_obsolete_nodes_and_positions(client, monkeypat
         conn.close()
 
 
+def test_legacy_compatibility_row_is_claimed_once_with_resolved_parent(client, monkeypatch):
+    tree = {
+        **TREE_SEED,
+        "name": "single legacy claim fixture",
+        "move_nodes": [
+            {"key": "left", "parent_key": None, "usi": "7g7f", "sort_order": 0,
+             "is_main": True},
+            {"key": "right", "parent_key": None, "usi": "2g2f", "sort_order": 1,
+             "is_main": False},
+            {"key": "left-child", "parent_key": "left", "usi": "3c3d", "sort_order": 0,
+             "is_main": True, "branch_label": "同名"},
+            {"key": "right-child", "parent_key": "right", "usi": "3c3d", "sort_order": 0,
+             "is_main": True, "branch_label": "同名"},
+        ],
+    }
+    monkeypatch.setattr(seed, "SAMPLE_OPENING_LINES", [tree])
+    conn = get_connection()
+    try:
+        seed_openings_if_empty(conn)
+        line = conn.execute("SELECT id FROM opening_lines WHERE name=?", (tree["name"],)).fetchone()
+        rows = {
+            row["move_key"]: row
+            for row in conn.execute("SELECT * FROM opening_line_moves WHERE line_id=?", (line["id"],))
+        }
+        legacy_id = rows["left-child"]["id"]
+        conn.execute("DELETE FROM opening_line_moves WHERE id=?", (rows["right-child"]["id"],))
+        conn.execute(
+            "UPDATE opening_line_moves SET move_key='legacy-single' WHERE id=?", (legacy_id,)
+        )
+
+        seed_openings_if_empty(conn)
+        first = {
+            row["move_key"]: row
+            for row in conn.execute("SELECT * FROM opening_line_moves WHERE line_id=?", (line["id"],))
+        }
+        seed_openings_if_empty(conn)
+        second_ids = {
+            row["move_key"]: row["id"]
+            for row in conn.execute("SELECT * FROM opening_line_moves WHERE line_id=?", (line["id"],))
+        }
+
+        assert first["left-child"]["id"] == legacy_id
+        assert first["right-child"]["id"] != legacy_id
+        assert first["left-child"]["id"] != first["right-child"]["id"]
+        assert first["left-child"]["parent_move_id"] == first["left"]["id"]
+        assert first["right-child"]["parent_move_id"] == first["right"]["id"]
+        assert second_ids == {key: row["id"] for key, row in first.items()}
+        validate_opening_move_tree(conn, [line["id"]])
+        conn.commit()
+        api_keys = {
+            row["move_key"] for row in client.get(f"/api/openings/{line['id']}").json()["moves"]
+        }
+        assert {"left-child", "right-child"} <= api_keys
+    finally:
+        conn.close()
+
+
 @pytest.mark.parametrize(
     ("nodes", "message"),
     [

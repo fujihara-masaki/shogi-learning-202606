@@ -674,6 +674,11 @@ def test_startup_migrates_legacy_opening_line_moves_unique_constraint_for_branch
             for branch_order, branch_name, branch_moves in (
                 (1, "△6二銀の対応", ("7a6b",)),
                 (2, "△6二金の有効な受け", ("6a6b", "7g6e", "6c6d")),
+                # Two independent legacy branches intentionally reuse one
+                # human-readable label. Their original sort orders are their
+                # structural identities and must not be chained together.
+                (3, "同じ表示名", ("4a4b", "6g6f")),
+                (4, "同じ表示名", ("5c5d", "6g6f")),
             ):
                 branch_board = shogi.Board()
                 for usi in main_moves[:3]:
@@ -689,6 +694,20 @@ def test_startup_migrates_legacy_opening_line_moves_unique_constraint_for_branch
                         (ply, usi, from_sfen, branch_board.sfen(), branch_name,
                          branch_parent_id, branch_order),
                     )
+            # Reuse the same label and sort rank at a different branch point;
+            # original parent identity must keep this branch separate too.
+            branch_board = shogi.Board()
+            for usi in main_moves[:5]:
+                branch_board.push_usi(usi)
+            from_sfen = branch_board.sfen()
+            branch_board.push_usi("4a4b")
+            conn.execute(
+                """INSERT INTO opening_line_moves
+                   (line_id, ply, usi, from_sfen, to_sfen, variation_group,
+                    parent_move_id, sort_order)
+                   VALUES (1, 6, '4a4b', ?, ?, '同じ表示名', ?, 3)""",
+                (from_sfen, branch_board.sfen(), main_ids[5]),
+            )
             conn.commit()
         finally:
             conn.close()
@@ -728,7 +747,7 @@ def test_startup_migrates_legacy_opening_line_moves_unique_constraint_for_branch
             rows = conn.execute(
                 "SELECT * FROM opening_line_moves WHERE line_id=1 ORDER BY ply"
             ).fetchall()
-            assert len(rows) == 23
+            assert len(rows) == 28
             by_id = {row["id"]: row for row in rows}
             roots = [row for row in rows if row["parent_move_id"] is None]
             assert len(roots) == 1
@@ -764,8 +783,29 @@ def test_startup_migrates_legacy_opening_line_moves_unique_constraint_for_branch
                 (branch_point["id"],),
             ).fetchall()
             assert [row["variation_group"] for row in variations] == [
-                "△6二銀の対応", "△6二金の有効な受け",
+                "△6二銀の対応", "△6二金の有効な受け", "同じ表示名", "同じ表示名",
             ]
+            same_label_roots = conn.execute(
+                """SELECT * FROM opening_line_moves
+                   WHERE line_id=1 AND parent_move_id=? AND variation_group='同じ表示名'
+                   ORDER BY sort_order""",
+                (branch_point["id"],),
+            ).fetchall()
+            assert [row["usi"] for row in same_label_roots] == ["4a4b", "5c5d"]
+            assert len({row["id"] for row in same_label_roots}) == 2
+            for root in same_label_roots:
+                child = conn.execute(
+                    "SELECT * FROM opening_line_moves WHERE parent_move_id=?", (root["id"],)
+                ).fetchone()
+                assert child is not None
+                assert root["to_sfen"] == child["from_sfen"]
+            reused_at_other_parent = conn.execute(
+                """SELECT * FROM opening_line_moves
+                   WHERE parent_move_id=? AND variation_group='同じ表示名'""",
+                (main_ids[5],),
+            ).fetchone()
+            assert reused_at_other_parent is not None
+            assert reused_at_other_parent["usi"] == "4a4b"
 
             from app.seed import validate_opening_move_tree
             validate_opening_move_tree(conn, [1])
