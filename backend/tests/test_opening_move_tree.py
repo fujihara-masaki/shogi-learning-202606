@@ -4,7 +4,27 @@ import pytest
 import shogi
 
 from app.database import get_connection
-from app.seed import seed_openings_if_empty, validate_opening_move_tree
+from app import seed
+from app.seed import _prepare_opening_move_nodes, seed_openings_if_empty, validate_opening_move_tree
+
+
+TREE_SEED = {
+    "name": "stable-key multi-level fixture",
+    "opening_type": "test",
+    "description": "stable key tree fixture",
+    "tag": "stable-key-tree",
+    "move_nodes": [
+        {"key": "m1", "parent_key": None, "usi": "7g7f", "sort_order": 0, "is_main": True},
+        {"key": "m2", "parent_key": "m1", "usi": "3c3d", "sort_order": 0, "is_main": True},
+        # Display B first, but follow A as the semantic main choice.
+        {"key": "b", "parent_key": "m2", "usi": "2g2f", "sort_order": 0, "is_main": False,
+         "branch_key": "b", "branch_label": "B"},
+        {"key": "a", "parent_key": "m2", "usi": "6g6f", "sort_order": 1, "is_main": True,
+         "branch_key": "a", "branch_label": "A"},
+        {"key": "a1", "parent_key": "a", "usi": "8c8d", "sort_order": 0, "is_main": False},
+        {"key": "a2", "parent_key": "a", "usi": "4c4d", "sort_order": 1, "is_main": True},
+    ],
+}
 
 
 def _line_and_rows(conn):
@@ -32,6 +52,63 @@ def test_seed_tree_is_direct_valid_and_reseed_is_idempotent(client):
         assert {"id", "parent_move_id", "move_key", "is_main", "sort_order"} <= detail["moves"][0].keys()
     finally:
         conn.close()
+
+
+def test_stable_key_seed_persists_branch_of_branch_and_reseeds_by_natural_key(client, monkeypatch):
+    monkeypatch.setattr(seed, "SAMPLE_OPENING_LINES", [TREE_SEED])
+    conn = get_connection()
+    try:
+        seed_openings_if_empty(conn)
+        conn.commit()
+        line = conn.execute("SELECT id FROM opening_lines WHERE name=?", (TREE_SEED["name"],)).fetchone()
+        rows = conn.execute(
+            "SELECT * FROM opening_line_moves WHERE line_id=? ORDER BY ply, sort_order", (line["id"],)
+        ).fetchall()
+        first_ids = {row["move_key"]: row["id"] for row in rows}
+
+        seed_openings_if_empty(conn)
+        conn.commit()
+        rows = conn.execute(
+            "SELECT * FROM opening_line_moves WHERE line_id=? ORDER BY ply, sort_order", (line["id"],)
+        ).fetchall()
+        assert {row["move_key"]: row["id"] for row in rows} == first_ids
+        assert len(rows) == len(TREE_SEED["move_nodes"])
+
+        by_key = {row["move_key"]: row for row in rows}
+        assert by_key["a1"]["parent_move_id"] == by_key["a"]["id"]
+        assert by_key["a2"]["parent_move_id"] == by_key["a"]["id"]
+        assert by_key["a"]["sort_order"] == 1 and by_key["a"]["is_main"] == 1
+        assert by_key["b"]["sort_order"] == 0 and by_key["b"]["is_main"] == 0
+        for row in rows:
+            if row["parent_move_id"] is not None:
+                parent = next(candidate for candidate in rows if candidate["id"] == row["parent_move_id"])
+                assert row["ply"] == parent["ply"] + 1
+                assert row["from_sfen"] == parent["to_sfen"]
+        validate_opening_move_tree(conn, [line["id"]])
+
+        detail = client.get(f"/api/openings/{line['id']}")
+        assert detail.status_code == 200
+        api_by_key = {row["move_key"]: row for row in detail.json()["moves"]}
+        assert api_by_key["a1"]["parent_move_id"] == api_by_key["a"]["id"]
+        assert api_by_key["a2"]["parent_move_id"] == api_by_key["a"]["id"]
+    finally:
+        conn.close()
+
+
+@pytest.mark.parametrize(
+    ("nodes", "message"),
+    [
+        ([{"key": "x", "parent_key": "missing", "usi": "7g7f", "is_main": True}], "missing.*parent_key"),
+        ([{"key": "x", "parent_key": None, "usi": "7g7f", "is_main": True},
+          {"key": "x", "parent_key": None, "usi": "2g2f", "is_main": False}], "duplicate.*key"),
+        ([{"key": "x", "parent_key": "y", "usi": "7g7f", "is_main": True},
+          {"key": "y", "parent_key": "x", "usi": "3c3d", "is_main": True}], "cycle"),
+        ([{"key": "x", "parent_key": None, "usi": "7g7g", "is_main": True}], "illegal.*USI"),
+    ],
+)
+def test_stable_key_seed_rejects_invalid_graphs(nodes, message):
+    with pytest.raises(ValueError, match=message):
+        _prepare_opening_move_nodes({"move_nodes": nodes}, shogi.STARTING_SFEN)
 
 
 def test_root_sort_order_is_unique_but_distinct_root_orders_are_allowed(client):
