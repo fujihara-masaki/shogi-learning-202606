@@ -746,6 +746,16 @@ def test_startup_migrates_legacy_opening_line_moves_unique_constraint_for_branch
             assert groups["main"] == list(main_moves)
             assert groups["△6二銀の対応"] == ["7a6b"]
             assert groups["△6二金の有効な受け"] == ["6a6b", "7g6e", "6c6d"]
+            branch_point = next(row for row in rows if row["variation_group"] == "main" and row["ply"] == 3)
+            variations = conn.execute(
+                """SELECT variation_group FROM opening_line_moves
+                   WHERE line_id=1 AND parent_move_id=? AND variation_group != 'main'
+                   ORDER BY sort_order""",
+                (branch_point["id"],),
+            ).fetchall()
+            assert [row["variation_group"] for row in variations] == [
+                "△6二銀の対応", "△6二金の有効な受け",
+            ]
 
             from app.seed import validate_opening_move_tree
             validate_opening_move_tree(conn, [1])

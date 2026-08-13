@@ -1,4 +1,5 @@
 import pytest
+import shogi
 
 from app.database import get_connection
 from app.seed import seed_openings_if_empty, validate_opening_move_tree
@@ -28,6 +29,39 @@ def test_seed_tree_is_direct_valid_and_reseed_is_idempotent(client):
         detail = client.get(f"/api/openings/{line_id}").json()
         assert {"id", "parent_move_id", "move_key", "is_main", "sort_order"} <= detail["moves"][0].keys()
     finally:
+        conn.close()
+
+
+def test_tree_validator_normalizes_root_and_initial_positions(client):
+    conn = get_connection()
+    try:
+        line_id, rows = _line_and_rows(conn)
+        root = next(row for row in rows if row["parent_move_id"] is None)
+
+        # The persisted full SFEN and its startpos alias describe one position.
+        conn.execute("UPDATE opening_lines SET initial_sfen='startpos' WHERE id=?", (line_id,))
+        validate_opening_move_tree(conn, [line_id])
+        conn.execute(
+            "UPDATE opening_lines SET initial_sfen=? WHERE id=?",
+            (shogi.STARTING_SFEN, line_id),
+        )
+        conn.execute("UPDATE opening_line_moves SET from_sfen='startpos' WHERE id=?", (root["id"],))
+        validate_opening_move_tree(conn, [line_id])
+
+        # Use another valid position and a legal move from it; validation must
+        # still reject the root because it is unrelated to the line's initial position.
+        board = shogi.Board()
+        board.push_usi("7g7f")
+        unrelated_from = board.sfen()
+        board.push_usi("3c3d")
+        conn.execute(
+            "UPDATE opening_line_moves SET usi='3c3d', from_sfen=?, to_sfen=? WHERE id=?",
+            (unrelated_from, board.sfen(), root["id"]),
+        )
+        with pytest.raises(ValueError, match="root/initial SFEN mismatch"):
+            validate_opening_move_tree(conn, [line_id])
+    finally:
+        conn.rollback()
         conn.close()
 
 

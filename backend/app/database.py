@@ -402,6 +402,13 @@ def _ensure_opening_line_moves_schema(conn: sqlite3.Connection) -> None:
         """
     )
     conn.execute("DROP TABLE opening_line_moves_old")
+    # Keep the copied legacy rank before evacuation.  Temporary values only
+    # exist to make reparenting collision-free and must not become display
+    # ordering (for example, by reversing two variations through negative IDs).
+    legacy_sort_orders = {
+        row["id"]: row["sort_order"]
+        for row in conn.execute("SELECT id, sort_order FROM opening_line_moves").fetchall()
+    }
     # Reparenting can move a root-level main move into a sibling set that still
     # contains legacy branch rows with the same order.  Evacuate every copied
     # order before changing any parent so the active UNIQUE constraint cannot
@@ -436,9 +443,17 @@ def _ensure_opening_line_moves_schema(conn: sqlite3.Connection) -> None:
             predicate = "parent_move_id IS NULL" if parent_id is None else "parent_move_id=?"
             values = (line["id"],) if parent_id is None else (line["id"], parent_id)
             group_rows = conn.execute(
-                f"SELECT id, variation_group, sort_order FROM opening_line_moves WHERE line_id=? AND {predicate} ORDER BY CASE variation_group WHEN 'main' THEN 0 ELSE 1 END, sort_order, id",
+                f"SELECT id, variation_group, sort_order FROM opening_line_moves WHERE line_id=? AND {predicate}",
                 values,
             ).fetchall()
+            group_rows = sorted(
+                group_rows,
+                key=lambda row: (
+                    0 if row["variation_group"] == "main" else 1,
+                    legacy_sort_orders[row["id"]],
+                    row["id"],
+                ),
+            )
             # Move the legacy values out of the non-negative target range first.
             # Updating directly to 0..n can otherwise collide with a sibling that
             # has not yet been updated while the UNIQUE constraint is active.

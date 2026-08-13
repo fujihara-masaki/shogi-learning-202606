@@ -571,6 +571,15 @@ def validate_opening_move_tree(conn, line_ids=None) -> None:
         where = f"WHERE line_id IN ({','.join('?' for _ in ids)})"
         params = ids
     rows = conn.execute(f"SELECT * FROM opening_line_moves {where} ORDER BY line_id, id", params).fetchall()
+    line_rows = conn.execute(
+        f"SELECT id, initial_sfen FROM opening_lines "
+        + (f"WHERE id IN ({','.join('?' for _ in params)})" if line_ids is not None else ""),
+        params,
+    ).fetchall()
+    initial_positions = {}
+    for line in line_rows:
+        initial_sfen = shogi.STARTING_SFEN if line["initial_sfen"].strip() == "startpos" else line["initial_sfen"]
+        initial_positions[line["id"]] = " ".join(shogi.Board(initial_sfen).sfen().split()[:3])
     by_id = {row["id"]: row for row in rows}
     keys = set()
     siblings = {}
@@ -598,9 +607,15 @@ def validate_opening_move_tree(conn, line_ids=None) -> None:
                 raise ValueError(f"opening ply mismatch: {row['move_key']}")
             if parent["to_sfen"] != row["from_sfen"]:
                 raise ValueError(f"opening parent/child SFEN mismatch: {row['move_key']}")
-        elif row["ply"] != 1:
-            raise ValueError(f"only ply-one opening moves may be roots: {row['move_key']}")
-        board = shogi.Board(row["from_sfen"])
+        else:
+            if row["ply"] != 1:
+                raise ValueError(f"only ply-one opening moves may be roots: {row['move_key']}")
+            root_sfen = shogi.STARTING_SFEN if row["from_sfen"].strip() == "startpos" else row["from_sfen"]
+            root_position = " ".join(shogi.Board(root_sfen).sfen().split()[:3])
+            if root_position != initial_positions[row["line_id"]]:
+                raise ValueError(f"opening root/initial SFEN mismatch: {row['move_key']}")
+        from_sfen = shogi.STARTING_SFEN if row["from_sfen"].strip() == "startpos" else row["from_sfen"]
+        board = shogi.Board(from_sfen)
         move = shogi.Move.from_usi(row["usi"])
         if move not in board.legal_moves:
             raise ValueError(f"illegal opening move: {row['move_key']} {row['usi']}")
