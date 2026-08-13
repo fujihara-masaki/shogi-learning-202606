@@ -176,7 +176,8 @@ def test_legacy_compatibility_row_is_claimed_once_with_resolved_parent(client, m
         legacy_id = rows["left-child"]["id"]
         conn.execute("DELETE FROM opening_line_moves WHERE id=?", (rows["right-child"]["id"],))
         conn.execute(
-            "UPDATE opening_line_moves SET move_key='legacy-single' WHERE id=?", (legacy_id,)
+            "UPDATE opening_line_moves SET move_key=? WHERE id=?",
+            (f"legacy-{legacy_id}", legacy_id),
         )
 
         seed_openings_if_empty(conn)

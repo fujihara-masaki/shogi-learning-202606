@@ -875,6 +875,12 @@ def seed_openings_if_empty(conn) -> None:
             if row is not None:
                 existing_ids[node["key"]] = int(row["id"])
 
+        # A user-defined stable key may itself start with ``legacy-``. Reserve
+        # every row already matched by its natural key, and only treat the
+        # exact ``legacy-<id>`` form emitted by the schema migration as a
+        # compatibility candidate below.
+        claimed_legacy_ids.update(existing_ids.values())
+
         for node in move_nodes:
             if node["key"] in existing_ids:
                 continue
@@ -893,7 +899,7 @@ def seed_openings_if_empty(conn) -> None:
             candidates = conn.execute(
                 f"""SELECT id FROM opening_line_moves
                     WHERE line_id=? AND ply=? AND variation_group=? AND sort_order=? AND usi=?
-                      AND {parent_clause} AND move_key LIKE 'legacy-%'
+                      AND {parent_clause} AND move_key = 'legacy-' || id
                     ORDER BY id""",
                 params,
             ).fetchall()
