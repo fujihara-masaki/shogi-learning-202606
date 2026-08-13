@@ -648,44 +648,47 @@ def test_startup_migrates_legacy_opening_line_moves_unique_constraint_for_branch
                 "INSERT INTO opening_lines(name, opening_type, initial_sfen) VALUES (?, ?, ?)",
                 ("原始鬼殺し（旧seed）", "奇襲戦法", "startpos"),
             )
+            main_moves = (
+                "7g7f", "3c3d", "8i7g", "8c8d", "7g6e", "7a6b", "7f7e",
+                "6c6d", "8h2b+", "3a2b", "B*5e", "2b3c", "5e6d", "6a5b",
+                "7e7d", "6b6c", "2h7h", "6c6d", "7d7c+",
+            )
             board = shogi.Board()
-            parent_id = None
-            for ply, usi in enumerate(("7g7f", "3c3d", "8i7g"), start=1):
+            main_ids = {}
+            for ply, usi in enumerate(main_moves, start=1):
                 from_sfen = board.sfen()
                 board.push_usi(usi)
                 cursor = conn.execute(
                     """INSERT INTO opening_line_moves
                        (line_id, ply, usi, from_sfen, to_sfen, variation_group,
                         parent_move_id, sort_order)
-                       VALUES (1, ?, ?, ?, ?, 'main', ?, 0)""",
-                    (ply, usi, from_sfen, board.sfen(), parent_id),
+                       VALUES (1, ?, ?, ?, ?, 'main', NULL, 0)""",
+                    (ply, usi, from_sfen, board.sfen()),
                 )
-                parent_id = cursor.lastrowid
+                main_ids[ply] = cursor.lastrowid
 
-            # PR-A以前の形式ではvariationの全手が分岐点を直接参照し、同じ
-            # sort_orderを持っていた。「△6二金の有効な受け」の実データと
-            # 同じ三手を、この衝突する形のままfixtureにする。
-            branch_parent_id = parent_id
-            branch_board = shogi.Board(board.sfen())
-            for ply, usi in enumerate(("6a6b", "7g6e", "6c6d"), start=4):
-                from_sfen = branch_board.sfen()
-                branch_board.push_usi(usi)
-                conn.execute(
-                    """INSERT INTO opening_line_moves
-                       (line_id, ply, usi, from_sfen, to_sfen, variation_group,
-                        parent_move_id, sort_order)
-                       VALUES (1, ?, ?, ?, ?, '△6二金の有効な受け', ?, 1)""",
-                    (ply, usi, from_sfen, branch_board.sfen(), branch_parent_id),
-                )
-            from_sfen = board.sfen()
-            board.push_usi("8c8d")
-            conn.execute(
-                """INSERT INTO opening_line_moves
-                   (line_id, ply, usi, from_sfen, to_sfen, variation_group,
-                    parent_move_id, sort_order)
-                   VALUES (1, 4, '8c8d', ?, ?, 'main', ?, 0)""",
-                (from_sfen, board.sfen(), branch_parent_id),
-            )
+            # Exact pre-PR-B seed shape: main rows are all roots (order 0), and
+            # every move in a variation shares move 3 as parent and its branch
+            # index as sort_order.
+            branch_parent_id = main_ids[3]
+            for branch_order, branch_name, branch_moves in (
+                (1, "△6二銀の対応", ("7a6b",)),
+                (2, "△6二金の有効な受け", ("6a6b", "7g6e", "6c6d")),
+            ):
+                branch_board = shogi.Board()
+                for usi in main_moves[:3]:
+                    branch_board.push_usi(usi)
+                for ply, usi in enumerate(branch_moves, start=4):
+                    from_sfen = branch_board.sfen()
+                    branch_board.push_usi(usi)
+                    conn.execute(
+                        """INSERT INTO opening_line_moves
+                           (line_id, ply, usi, from_sfen, to_sfen, variation_group,
+                            parent_move_id, sort_order)
+                           VALUES (1, ?, ?, ?, ?, ?, ?, ?)""",
+                        (ply, usi, from_sfen, branch_board.sfen(), branch_name,
+                         branch_parent_id, branch_order),
+                    )
             conn.commit()
         finally:
             conn.close()
@@ -715,7 +718,7 @@ def test_startup_migrates_legacy_opening_line_moves_unique_constraint_for_branch
             rows = conn.execute(
                 "SELECT * FROM opening_line_moves WHERE line_id=1 ORDER BY ply"
             ).fetchall()
-            assert len(rows) == 7
+            assert len(rows) == 23
             by_id = {row["id"]: row for row in rows}
             roots = [row for row in rows if row["parent_move_id"] is None]
             assert len(roots) == 1
@@ -735,6 +738,17 @@ def test_startup_migrates_legacy_opening_line_moves_unique_constraint_for_branch
             ).fetchall()
             assert all(row["sort_orders"] == row["total"] for row in sibling_groups)
             assert all(row["main_count"] == 1 for row in sibling_groups)
+            groups = {
+                row["variation_group"]: [item["usi"] for item in rows
+                                          if item["variation_group"] == row["variation_group"]]
+                for row in rows
+            }
+            assert groups["main"] == list(main_moves)
+            assert groups["△6二銀の対応"] == ["7a6b"]
+            assert groups["△6二金の有効な受け"] == ["6a6b", "7g6e", "6c6d"]
+
+            from app.seed import validate_opening_move_tree
+            validate_opening_move_tree(conn, [1])
         finally:
             conn.close()
     finally:

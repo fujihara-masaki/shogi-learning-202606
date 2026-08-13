@@ -402,6 +402,11 @@ def _ensure_opening_line_moves_schema(conn: sqlite3.Connection) -> None:
         """
     )
     conn.execute("DROP TABLE opening_line_moves_old")
+    # Reparenting can move a root-level main move into a sibling set that still
+    # contains legacy branch rows with the same order.  Evacuate every copied
+    # order before changing any parent so the active UNIQUE constraint cannot
+    # be hit halfway through the conversion.
+    conn.execute("UPDATE opening_line_moves SET sort_order = -id - 1")
     # Old branch rows pointed every move at the branch point.  Convert them to
     # direct-parent chains without using SFEN as node identity.
     for line in conn.execute("SELECT id, initial_sfen FROM opening_lines").fetchall():
