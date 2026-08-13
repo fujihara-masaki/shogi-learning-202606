@@ -8,6 +8,7 @@ import {
   applyOpeningPath,
   continueOpeningMainLine,
   mainOpeningChoice,
+  mainOpeningChoiceIndex,
   expectedOpeningMove,
   findOpeningChoiceIndex,
   findOpening,
@@ -114,7 +115,7 @@ function OpeningStudyContent({ id }: { id: string | undefined }) {
 
   function stepForward() {
     if (!expected) return;
-    setPath((prev) => [...prev, 0]);
+    setPath((prev) => [...prev, mainOpeningChoiceIndex(currentChoices)]);
     setFeedback(`再生: ${expected.notation}`);
     setHintVisible(false);
     setLastMoveTo(null);

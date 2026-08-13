@@ -8,6 +8,8 @@ import {
   expectedOpeningMove,
   flattenMainLine,
   findOpeningChoiceIndex,
+  mainOpeningChoice,
+  mainOpeningChoiceIndex,
   openingFromImportedLine,
   pathBeforePreviousBranch,
   type OpeningLine,
@@ -76,6 +78,17 @@ describe("opening branch path helpers", () => {
   it("keeps the selected path when continuing along first choices", () => {
     expect(continueOpeningMainLine(fixture, [2])).toEqual([2, 0]);
     expect(applyOpeningPath(fixture, continueOpeningMainLine(fixture, [2])).moves.map((move) => move.usi)).toEqual(["5g5f", "5c5d"]);
+  });
+
+  it("uses the explicit semantic main index consistently for display and playback", () => {
+    const choices = fixture.moves.map((choice, index) => ({ ...choice, isMain: index === 1 }));
+    const explicitMainFixture = { ...fixture, moves: choices };
+
+    expect(mainOpeningChoice(choices)?.id).toBe("one");
+    expect(mainOpeningChoiceIndex(choices)).toBe(1);
+    expect(expectedOpeningMove(explicitMainFixture, [])?.id).toBe("one");
+    expect(continueOpeningMainLine(explicitMainFixture, [])).toEqual([1, 0]);
+    expect(applyOpeningPath(explicitMainFixture, [mainOpeningChoiceIndex(choices)]).steps[0].node.id).toBe("one");
   });
 
   it("returns to immediately before the previous branch", () => {

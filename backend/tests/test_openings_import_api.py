@@ -713,6 +713,16 @@ def test_startup_migrates_legacy_opening_line_moves_unique_constraint_for_branch
             }
             assert ("line_id", "move_key") in unique_columns
             assert ("line_id", "parent_move_id", "sort_order") in unique_columns
+            root_index = next(
+                index for index in unique_indexes
+                if index["name"] == "idx_opening_line_moves_root_sort_order"
+            )
+            assert root_index["partial"] == 1
+            assert tuple(
+                row["name"] for row in conn.execute(
+                    "PRAGMA index_info(idx_opening_line_moves_root_sort_order)"
+                ).fetchall()
+            ) == ("line_id", "sort_order")
             assert ("line_id", "ply") not in unique_columns
 
             rows = conn.execute(

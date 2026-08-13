@@ -1,3 +1,5 @@
+import sqlite3
+
 import pytest
 import shogi
 
@@ -29,6 +31,31 @@ def test_seed_tree_is_direct_valid_and_reseed_is_idempotent(client):
         detail = client.get(f"/api/openings/{line_id}").json()
         assert {"id", "parent_move_id", "move_key", "is_main", "sort_order"} <= detail["moves"][0].keys()
     finally:
+        conn.close()
+
+
+def test_root_sort_order_is_unique_but_distinct_root_orders_are_allowed(client):
+    conn = get_connection()
+    try:
+        line_id, rows = _line_and_rows(conn)
+        root = next(row for row in rows if row["parent_move_id"] is None)
+        values = (line_id, root["ply"], root["usi"], root["from_sfen"], root["to_sfen"], "extra-root")
+        sql = """INSERT INTO opening_line_moves
+                 (line_id, ply, usi, from_sfen, to_sfen, variation_group,
+                  parent_move_id, sort_order, move_key, is_main)
+                 VALUES (?, ?, ?, ?, ?, ?, NULL, ?, ?, ?)"""
+        with pytest.raises(sqlite3.IntegrityError):
+            conn.execute(sql, (*values, root["sort_order"], "duplicate-root", 0))
+
+        distinct_order = root["sort_order"] + 1
+        conn.execute(sql, (*values, distinct_order, "distinct-root", 0))
+        assert conn.execute(
+            """SELECT 1 FROM opening_line_moves
+               WHERE line_id=? AND parent_move_id IS NULL AND sort_order=?""",
+            (line_id, distinct_order),
+        ).fetchone()
+    finally:
+        conn.rollback()
         conn.close()
 
 

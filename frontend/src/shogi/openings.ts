@@ -229,6 +229,12 @@ export function mainOpeningChoice(choices: OpeningMoveNode[]): OpeningMoveNode |
   return choices.find((choice) => choice.isMain === true) ?? choices[0] ?? null;
 }
 
+/** Return the array index of the semantic main choice, with the legacy first-choice fallback. */
+export function mainOpeningChoiceIndex(choices: OpeningMoveNode[]): number {
+  const main = mainOpeningChoice(choices);
+  return main ? choices.indexOf(main) : -1;
+}
+
 export function findOpeningChoiceIndex(choices: OpeningMoveNode[], move: Pick<Move, "usi">): number {
   return choices.findIndex((choice) => choice.usi === move.usi);
 }
@@ -244,8 +250,9 @@ export function continueOpeningMainLine(opening: OpeningLine, path: number[]): n
     choices = node.next ?? [];
   }
   while (choices.length > 0) {
-    const main = mainOpeningChoice(choices)!;
-    nextPath.push(choices.indexOf(main));
+    const mainIndex = mainOpeningChoiceIndex(choices);
+    const main = choices[mainIndex];
+    nextPath.push(mainIndex);
     choices = main.next ?? [];
   }
   return nextPath;
