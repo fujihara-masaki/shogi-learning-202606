@@ -610,7 +610,7 @@ def test_init_db_migrates_existing_opening_lines_type_id_column_and_index(tmp_pa
 
 def test_startup_migrates_legacy_opening_line_moves_unique_constraint_for_branch_seeds(tmp_path):
     import sqlite3
-    from fastapi.testclient import TestClient
+    import shogi
 
     db_path = tmp_path / "legacy_branch_seed.db"
     os.environ["SHOGI_DB_PATH"] = str(db_path)
@@ -640,23 +640,60 @@ def test_startup_migrates_legacy_opening_line_moves_unique_constraint_for_branch
                     comment TEXT NOT NULL DEFAULT '',
                     variation_group TEXT NOT NULL DEFAULT 'main',
                     parent_move_id INTEGER REFERENCES opening_line_moves(id) ON DELETE CASCADE,
-                    sort_order INTEGER NOT NULL DEFAULT 0,
-                    UNIQUE(line_id, ply)
+                    sort_order INTEGER NOT NULL DEFAULT 0
                 );
                 """
+            )
+            conn.execute(
+                "INSERT INTO opening_lines(name, opening_type, initial_sfen) VALUES (?, ?, ?)",
+                ("原始鬼殺し（旧seed）", "奇襲戦法", "startpos"),
+            )
+            board = shogi.Board()
+            parent_id = None
+            for ply, usi in enumerate(("7g7f", "3c3d", "8i7g"), start=1):
+                from_sfen = board.sfen()
+                board.push_usi(usi)
+                cursor = conn.execute(
+                    """INSERT INTO opening_line_moves
+                       (line_id, ply, usi, from_sfen, to_sfen, variation_group,
+                        parent_move_id, sort_order)
+                       VALUES (1, ?, ?, ?, ?, 'main', ?, 0)""",
+                    (ply, usi, from_sfen, board.sfen(), parent_id),
+                )
+                parent_id = cursor.lastrowid
+
+            # PR-A以前の形式ではvariationの全手が分岐点を直接参照し、同じ
+            # sort_orderを持っていた。「△6二金の有効な受け」の実データと
+            # 同じ三手を、この衝突する形のままfixtureにする。
+            branch_parent_id = parent_id
+            branch_board = shogi.Board(board.sfen())
+            for ply, usi in enumerate(("6a6b", "7g6e", "6c6d"), start=4):
+                from_sfen = branch_board.sfen()
+                branch_board.push_usi(usi)
+                conn.execute(
+                    """INSERT INTO opening_line_moves
+                       (line_id, ply, usi, from_sfen, to_sfen, variation_group,
+                        parent_move_id, sort_order)
+                       VALUES (1, ?, ?, ?, ?, '△6二金の有効な受け', ?, 1)""",
+                    (ply, usi, from_sfen, branch_board.sfen(), branch_parent_id),
+                )
+            from_sfen = board.sfen()
+            board.push_usi("8c8d")
+            conn.execute(
+                """INSERT INTO opening_line_moves
+                   (line_id, ply, usi, from_sfen, to_sfen, variation_group,
+                    parent_move_id, sort_order)
+                   VALUES (1, 4, '8c8d', ?, ?, 'main', ?, 0)""",
+                (from_sfen, board.sfen(), branch_parent_id),
             )
             conn.commit()
         finally:
             conn.close()
 
-        from app.main import app
+        from app.database import init_db
 
-        with TestClient(app) as client:
-            lines = client.get("/api/openings").json()
-            onigoroshi = next(line for line in lines if line["name"] == "原始鬼殺し（Wikipedia明示手順）")
-            detail = client.get(f"/api/openings/{onigoroshi['id']}").json()
-            branch_groups = {move["variation_group"] for move in detail["moves"] if move["variation_group"] != "main"}
-            assert branch_groups == {"△6二銀の対応", "△6二金の有効な受け"}
+        init_db()
+        init_db()  # startup migration is idempotent
 
         conn = sqlite3.connect(db_path)
         conn.row_factory = sqlite3.Row
@@ -674,6 +711,30 @@ def test_startup_migrates_legacy_opening_line_moves_unique_constraint_for_branch
             assert ("line_id", "move_key") in unique_columns
             assert ("line_id", "parent_move_id", "sort_order") in unique_columns
             assert ("line_id", "ply") not in unique_columns
+
+            rows = conn.execute(
+                "SELECT * FROM opening_line_moves WHERE line_id=1 ORDER BY ply"
+            ).fetchall()
+            assert len(rows) == 7
+            by_id = {row["id"]: row for row in rows}
+            roots = [row for row in rows if row["parent_move_id"] is None]
+            assert len(roots) == 1
+            for row in rows:
+                if row["parent_move_id"] is None:
+                    continue
+                parent = by_id[row["parent_move_id"]]
+                assert parent["ply"] == row["ply"] - 1
+                assert by_id[row["parent_move_id"]]["to_sfen"] == row["from_sfen"]
+
+            sibling_groups = conn.execute(
+                """SELECT parent_move_id, COUNT(*) AS total,
+                          COUNT(DISTINCT sort_order) AS sort_orders,
+                          SUM(is_main) AS main_count
+                   FROM opening_line_moves WHERE line_id=1
+                   GROUP BY parent_move_id"""
+            ).fetchall()
+            assert all(row["sort_orders"] == row["total"] for row in sibling_groups)
+            assert all(row["main_count"] == 1 for row in sibling_groups)
         finally:
             conn.close()
     finally:

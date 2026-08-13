@@ -392,7 +392,11 @@ def _ensure_opening_line_moves_schema(conn: sqlite3.Connection) -> None:
         )
         SELECT
             id, line_id, ply, usi, from_sfen, to_sfen, comment,
-            {variation_expr}, {parent_expr}, {sort_expr},
+            {variation_expr}, {parent_expr},
+            ROW_NUMBER() OVER (
+                PARTITION BY line_id, {parent_expr}
+                ORDER BY {sort_expr}, id
+            ) - 1,
             'legacy-' || id, CASE WHEN {variation_expr} = 'main' THEN 1 ELSE 0 END
         FROM opening_line_moves_old
         """
@@ -430,6 +434,19 @@ def _ensure_opening_line_moves_schema(conn: sqlite3.Connection) -> None:
                 f"SELECT id, variation_group, sort_order FROM opening_line_moves WHERE line_id=? AND {predicate} ORDER BY CASE variation_group WHEN 'main' THEN 0 ELSE 1 END, sort_order, id",
                 values,
             ).fetchall()
+            # Move the legacy values out of the non-negative target range first.
+            # Updating directly to 0..n can otherwise collide with a sibling that
+            # has not yet been updated while the UNIQUE constraint is active.
+            for row in group_rows:
+                conn.execute(
+                    "UPDATE opening_line_moves SET sort_order=? WHERE id=?",
+                    (-row["id"] - 1, row["id"]),
+                )
+            for sort_order, row in enumerate(group_rows):
+                conn.execute(
+                    "UPDATE opening_line_moves SET sort_order=? WHERE id=?",
+                    (sort_order, row["id"]),
+                )
             conn.execute(f"UPDATE opening_line_moves SET is_main=0 WHERE line_id=? AND {predicate}", values)
             if group_rows:
                 conn.execute("UPDATE opening_line_moves SET is_main=1 WHERE id=?", (group_rows[0]["id"],))
