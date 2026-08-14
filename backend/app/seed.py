@@ -726,7 +726,10 @@ def _prepare_opening_move_nodes(opening: dict, initial_sfen: str) -> list[dict]:
             "from_sfen": shogi.STARTING_SFEN if from_sfen.strip() == "startpos" else from_sfen,
             "to_sfen": board.sfen(),
             "sort_order": int(source.get("sort_order", 0)),
-            "is_main": bool(source.get("is_main", False)),
+            # Keep omission distinct from an explicit false until sibling
+            # cardinality is known.  Display order must never imply semantic
+            # main status for a branching stable-key seed.
+            "is_main": bool(source["is_main"]) if "is_main" in source else None,
             # variation_group is the existing persisted display-label field.
             # Stable branch keys identify nodes; they must not leak into the UI
             # when the seed provides a separate human-readable label.
@@ -748,8 +751,18 @@ def _prepare_opening_move_nodes(opening: dict, initial_sfen: str) -> list[dict]:
     for children in siblings.values():
         if len({child["sort_order"] for child in children}) != len(children):
             raise ValueError("opening move node sibling sort_order must be unique")
-        if sum(child["is_main"] for child in children) != 1:
+        if len(children) == 1 and children[0]["is_main"] is None:
+            children[0]["is_main"] = True
+        elif len(children) > 1 and all(child["is_main"] is None for child in children):
+            raise ValueError(
+                "opening move node siblings are ambiguous; multiple siblings "
+                "require exactly one explicit is_main=true"
+            )
+        if sum(child["is_main"] is True for child in children) != 1:
             raise ValueError("opening move node siblings must have exactly one is_main")
+        for child in children:
+            if child["is_main"] is None:
+                child["is_main"] = False
         if len({child["usi"] for child in children}) != len(children):
             raise ValueError("opening move node sibling USI must be unique")
 

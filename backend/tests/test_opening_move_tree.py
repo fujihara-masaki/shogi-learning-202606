@@ -111,6 +111,68 @@ def test_stable_key_seed_persists_branch_of_branch_and_reseeds_by_natural_key(cl
         conn.close()
 
 
+def test_linear_stable_key_seed_infers_omitted_main_status(client, monkeypatch):
+    fixture = _seed_fixture(
+        "implicit linear stable-key main",
+        move_nodes=[
+            {"key": "m1", "parent_key": None, "usi": "7g7f", "sort_order": 0},
+            {"key": "m2", "parent_key": "m1", "usi": "3c3d", "sort_order": 0},
+            {"key": "m3", "parent_key": "m2", "usi": "2g2f", "sort_order": 0},
+        ],
+    )
+    monkeypatch.setattr(seed, "SAMPLE_OPENING_LINES", [fixture])
+    conn = get_connection()
+    try:
+        seed_openings_if_empty(conn)
+        line = conn.execute("SELECT id FROM opening_lines WHERE name=?", (fixture["name"],)).fetchone()
+        rows = conn.execute(
+            "SELECT * FROM opening_line_moves WHERE line_id=? ORDER BY ply", (line["id"],)
+        ).fetchall()
+        assert [row["is_main"] for row in rows] == [1, 1, 1]
+        validate_opening_move_tree(conn, [line["id"]])
+    finally:
+        conn.close()
+
+
+def test_stable_key_seed_infers_sole_child_inside_nested_branch():
+    nodes = _prepare_opening_move_nodes({"move_nodes": [
+        {"key": "root", "parent_key": None, "usi": "7g7f", "sort_order": 0},
+        {"key": "branch", "parent_key": "root", "usi": "3c3d", "sort_order": 0,
+         "is_main": True},
+        {"key": "alternative", "parent_key": "root", "usi": "8c8d", "sort_order": 1,
+         "is_main": False},
+        {"key": "nested", "parent_key": "branch", "usi": "2g2f", "sort_order": 0},
+        {"key": "leaf", "parent_key": "nested", "usi": "8c8d", "sort_order": 0},
+    ]}, shogi.STARTING_SFEN)
+
+    by_key = {node["key"]: node for node in nodes}
+    assert by_key["nested"]["is_main"] is True
+    assert by_key["leaf"]["is_main"] is True
+
+
+def test_stable_key_siblings_require_explicit_main_without_using_sort_order():
+    with pytest.raises(ValueError, match="multiple siblings require exactly one explicit is_main=true"):
+        _prepare_opening_move_nodes({"move_nodes": [
+            {"key": "root", "parent_key": None, "usi": "7g7f", "sort_order": 0},
+            {"key": "first", "parent_key": "root", "usi": "3c3d", "sort_order": 0},
+            {"key": "second", "parent_key": "root", "usi": "8c8d", "sort_order": 1},
+        ]}, shogi.STARTING_SFEN)
+
+
+def test_stable_key_explicit_main_is_independent_of_sibling_sort_order():
+    nodes = _prepare_opening_move_nodes({"move_nodes": [
+        {"key": "root", "parent_key": None, "usi": "7g7f", "sort_order": 0},
+        {"key": "variation", "parent_key": "root", "usi": "3c3d", "sort_order": 0,
+         "is_main": False},
+        {"key": "main", "parent_key": "root", "usi": "8c8d", "sort_order": 1,
+         "is_main": True},
+    ]}, shogi.STARTING_SFEN)
+
+    by_key = {node["key"]: node for node in nodes}
+    assert by_key["variation"]["is_main"] is False
+    assert by_key["main"]["is_main"] is True
+
+
 @pytest.mark.parametrize(
     "tree_fields",
     [

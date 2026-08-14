@@ -181,7 +181,7 @@ keyboard は board の既存 roving/focus 操作と card の native button を�
 | `parent_move_id` | **構造**: 同じ line 内の直接親 move。root は `NULL`。各非root move は直前手の ID |
 | `from_sfen` / `to_sfen` | **局面整合性**: 合法性、再生前後、検索・診断。親子決定の唯一の根拠にはしない |
 | `variation_group` | **表示/出典**: 変化の人間向け stable slug/label。親子構造を表さない |
-| `sort_order` | **順序**: 同一 `parent_move_id` 配下の sibling 表示順。0 を main 推奨とするだけでなく `is_main` の要否も PR-B で決定 |
+| `sort_order` | **表示順**: 同一 `parent_move_id` 配下の sibling 表示順。semantic main を表す `is_main` とは別概念 |
 | `ply` | root からの深さ。診断・表示用。親子構造の代用にしない |
 
 `variation_group == "main"` だけでは branch A 内の main と全体本線を区別しづらい。必要十分な案は、move ごとの `branch_key` / `branch_label` と sibling ごとの `is_main` を seed DTO に持たせ、DB は当面 `variation_group` と `sort_order=0` へ写像すること。DB migration を避けられるかを fixture で検証し、曖昧なら小さな migration で `branch_key` と `is_main` を追加する。
@@ -199,7 +199,15 @@ keyboard は board の既存 roving/focus 操作と card の native button を�
 ]
 ```
 
-validator は key 一意、親の存在、同一 line、acyclic、root、ply、sibling sort order、sibling USI 一意、全手合法、親 `to_sfen == 子 from_sfen`、生成 SFEN と格納 SFEN の一致を検査する。upsert は key を自然キーとして ID を解決する。既存 DB に stable key がない場合、PR-B migration が必要になる可能性が高い。
+`move_nodes` の `is_main` は sibling 集合ごとの semantic main を表し、
+`sort_order=0` であることから推論してはならない。sole-child chain では、唯一の
+child の `is_main` を省略でき、その場合は `true` と推論する。sibling が複数ある
+場合は semantic main となる node に `is_main=true` を明示しなければならない
+（それ以外の node は `false` を明示するか、省略できる）。複数 sibling の全 node
+で `is_main` が省略された曖昧な入力は拒否する。明示された値は表示順にかかわらず
+そのまま使用するため、`sort_order=0` 以外の node を main に指定できる。
+
+validator は key 一意、親の存在、同一 line、acyclic、root、ply、sibling sort order、sibling ごとに exactly one `is_main=true`、sibling USI 一意、全手合法、親 `to_sfen == 子 from_sfen`、生成 SFEN と格納 SFEN の一致を検査する。upsert は key を自然キーとして ID を解決する。既存 DB に stable key がない場合、PR-B migration が必要になる可能性が高い。
 
 ## 5. 多段分岐
 
