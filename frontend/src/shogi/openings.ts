@@ -242,6 +242,14 @@ export function openingBranchChoiceLabel(choices: OpeningMoveNode[], index: numb
   return choice.branchLabel ?? (choice === mainOpeningChoice(choices) ? "本線" : `分岐${index + 1}`);
 }
 
+/** Return the user-facing labels of the branch points traversed by an applied path. */
+export function selectedOpeningBranchPath(steps: OpeningStep[]): string {
+  const labels = steps
+    .filter((step) => step.choices.length > 1)
+    .map((step) => openingBranchChoiceLabel(step.choices, step.choices.indexOf(step.node)));
+  return labels.join(" → ") || "本線";
+}
+
 export function findOpeningChoiceIndex(choices: OpeningMoveNode[], move: Pick<Move, "usi">): number {
   return choices.findIndex((choice) => choice.usi === move.usi);
 }

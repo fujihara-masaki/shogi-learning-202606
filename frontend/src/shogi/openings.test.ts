@@ -13,6 +13,7 @@ import {
   openingFromImportedLine,
   openingBranchChoiceLabel,
   pathBeforePreviousBranch,
+  selectedOpeningBranchPath,
   type OpeningLine,
   type OpeningMoveNode,
 } from "./openings";
@@ -90,6 +91,30 @@ describe("opening branch path helpers", () => {
     expect(expectedOpeningMove(explicitMainFixture, [])?.id).toBe("one");
     expect(continueOpeningMainLine(explicitMainFixture, [])).toEqual([1, 0]);
     expect(applyOpeningPath(explicitMainFixture, [mainOpeningChoiceIndex(choices)]).steps[0].node.id).toBe("one");
+  });
+
+  it("labels only traversed branch points using semantic branch labels", () => {
+    const linear = node("linear", "7g7f");
+    const unlabeledVariation = { ...node("variation", "2g2f"), isMain: false };
+    const explicitMain = { ...node("main", "5g5f"), isMain: true, branchLabel: "本線", sortOrder: 1 };
+    const rootChoices = [unlabeledVariation, explicitMain];
+
+    expect(selectedOpeningBranchPath([{ node: unlabeledVariation, choices: rootChoices }])).toBe("分岐1");
+    expect(selectedOpeningBranchPath([{ node: explicitMain, choices: rootChoices }])).toBe("本線");
+    expect(selectedOpeningBranchPath([{ node: linear, choices: [linear] }])).toBe("本線");
+  });
+
+  it("preserves human labels across nested branch points", () => {
+    const branchA = { ...node("a", "7g7f"), branchLabel: "A", isMain: true };
+    const branchB = { ...node("b", "2g2f"), branchLabel: "B", isMain: false };
+    const nestedVariation = { ...node("a-variation", "3c3d"), isMain: false };
+    const nestedMain = { ...node("a-main", "8c8d"), isMain: true };
+
+    expect(selectedOpeningBranchPath([
+      { node: branchA, choices: [branchB, branchA] },
+      { node: nestedVariation, choices: [nestedMain, nestedVariation] },
+    ])).toBe("A → 分岐2");
+    expect(selectedOpeningBranchPath([{ node: branchB, choices: [branchB, branchA] }])).toBe("B");
   });
 
   it("returns to immediately before the previous branch", () => {

@@ -16,6 +16,7 @@ import {
   openingFromImportedLine,
   openingFromLearningSample,
   pathBeforePreviousBranch,
+  selectedOpeningBranchPath,
   type OpeningLine,
 } from "../shogi/openings";
 import { moveFromSquare } from "../shogi/tsume";
@@ -74,7 +75,7 @@ function OpeningStudyContent({ id }: { id: string | undefined }) {
   const expected = useMemo(() => (opening ? expectedOpeningMove(opening, path) : null), [opening, path]);
   const currentChoices = state?.steps.length ? state.steps[state.steps.length - 1].node.next ?? [] : opening?.moves ?? [];
   const hasBranches = currentChoices.length > 1;
-  const selectedBranchPath = state?.steps.map((step) => step.node.branchLabel).filter(Boolean).join(" → ") || "本線";
+  const selectedBranchPath = selectedOpeningBranchPath(state?.steps ?? []);
   const sourceNode = state?.steps.at(-1)?.node ?? expected;
   const currentSfen = state?.position.sfen ?? null;
 
