@@ -327,9 +327,8 @@ export function openingNodeJumpAccessibleName(opening: OpeningLine, path: number
 export function openingMainSwitchAccessibleName(opening: OpeningLine, branchPointPath: number[], selected: boolean): string {
   const location = openingBranchBreadcrumb(opening, branchPointPath);
   const identity = openingStructuralPathLabel(branchPointPath);
-  return selected
-    ? `第${branchPointPath.length + 1}手の分岐点 ${location}、${identity} の本線を選択中`
-    : `第${branchPointPath.length + 1}手の分岐点 ${location}、${identity} の本線へ切り替える`;
+  const visibleLabel = selected ? "本線を選択中" : "この分岐点の本線へ切り替える";
+  return `${visibleLabel}、第${branchPointPath.length + 1}手の分岐点 ${location}、${identity}`;
 }
 
 /** Return the user-facing labels of the branch points traversed by an applied path. */

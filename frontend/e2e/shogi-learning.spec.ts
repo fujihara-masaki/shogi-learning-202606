@@ -757,12 +757,12 @@ test("three-way opening branches behave the same from board and accessible cards
   await expect(variationDisclosure.locator('[aria-current="step"]')).toHaveCount(1);
   await expect(page.getByTestId("opening-source")).toContainText("Fixture source");
 
-  const rootMainSwitch = page.getByRole("button", { name: "第1手の分岐点 ルート、経路 ルート の本線へ切り替える", exact: true });
+  const rootMainSwitch = page.getByRole("button", { name: "この分岐点の本線へ切り替える、第1手の分岐点 ルート、経路 ルート", exact: true });
   await expect(rootMainSwitch).toHaveCount(1);
   await rootMainSwitch.click();
   await expect(page.locator(".move-history .move-usi")).toHaveText(["(7g7f)"]);
   await expect(page.getByTestId("opening-feedback")).toContainText("後の手順を破棄し、本線へ移動");
-  await expect(page.getByRole("button", { name: "第1手の分岐点 ルート、経路 ルート の本線を選択中", exact: true })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "本線を選択中、第1手の分岐点 ルート、経路 ルート", exact: true })).toBeDisabled();
 
   await siblingJump.focus();
   await variationSummary.click();

@@ -185,8 +185,12 @@ describe("opening branch path helpers", () => {
 
     const switchA = openingMainSwitchAccessibleName(accessibleFixture, [0], false);
     const switchB = openingMainSwitchAccessibleName(accessibleFixture, [1], false);
-    expect(switchA).toBe("第2手の分岐点 同じ表示名、経路 1 の本線へ切り替える");
-    expect(switchB).toBe("第2手の分岐点 同じ表示名、経路 2 の本線へ切り替える");
+    const selectedSwitch = openingMainSwitchAccessibleName(accessibleFixture, [0], true);
+    expect(switchA).toBe("この分岐点の本線へ切り替える、第2手の分岐点 同じ表示名、経路 1");
+    expect(switchB).toBe("この分岐点の本線へ切り替える、第2手の分岐点 同じ表示名、経路 2");
+    expect(switchA).toContain("この分岐点の本線へ切り替える");
+    expect(selectedSwitch).toBe("本線を選択中、第2手の分岐点 同じ表示名、経路 1");
+    expect(selectedSwitch).toContain("本線を選択中");
     expect(switchA).not.toBe(switchB);
   });
 });
