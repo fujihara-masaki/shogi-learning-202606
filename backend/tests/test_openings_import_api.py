@@ -642,6 +642,8 @@ def test_startup_migrates_legacy_opening_line_moves_unique_constraint_for_branch
                     parent_move_id INTEGER REFERENCES opening_line_moves(id) ON DELETE CASCADE,
                     sort_order INTEGER NOT NULL DEFAULT 0
                 );
+                CREATE INDEX idx_opening_line_moves_line
+                    ON opening_line_moves(line_id, ply);
                 """
             )
             conn.execute(
@@ -715,6 +717,32 @@ def test_startup_migrates_legacy_opening_line_moves_unique_constraint_for_branch
         from app.database import init_db
 
         init_db()
+
+        # The legacy index follows opening_line_moves_old during the rebuild and
+        # is dropped with it. Verify the replacement table is indexed during the
+        # migration startup itself, before a second SCHEMA execution can mask it.
+        conn = sqlite3.connect(db_path)
+        conn.row_factory = sqlite3.Row
+        try:
+            first_startup_indexes = {
+                index["name"]: index
+                for index in conn.execute("PRAGMA index_list(opening_line_moves)").fetchall()
+            }
+            assert "idx_opening_line_moves_line" in first_startup_indexes
+            assert tuple(
+                row["name"] for row in conn.execute(
+                    "PRAGMA index_info(idx_opening_line_moves_line)"
+                ).fetchall()
+            ) == ("line_id", "ply")
+            assert "idx_opening_line_moves_root_sort_order" in first_startup_indexes
+            assert first_startup_indexes["idx_opening_line_moves_root_sort_order"]["partial"] == 1
+            assert conn.execute(
+                """SELECT tbl_name FROM sqlite_master
+                   WHERE type='index' AND name='idx_opening_line_moves_line'"""
+            ).fetchone()["tbl_name"] == "opening_line_moves"
+        finally:
+            conn.close()
+
         init_db()  # startup migration is idempotent
 
         conn = sqlite3.connect(db_path)

@@ -499,12 +499,16 @@ def _ensure_opening_line_moves_schema(conn: sqlite3.Connection) -> None:
     )
 
 
-def _ensure_opening_root_sort_order_index(conn: sqlite3.Connection) -> None:
-    """Enforce sibling ordering for roots, which NULL-aware UNIQUE cannot cover."""
+def _ensure_opening_line_move_indexes(conn: sqlite3.Connection) -> None:
+    """Restore move indexes after a legacy table rebuild and enforce root order."""
     table = conn.execute(
         "SELECT 1 FROM sqlite_master WHERE type='table' AND name='opening_line_moves'"
     ).fetchone()
     if table:
+        conn.execute(
+            """CREATE INDEX IF NOT EXISTS idx_opening_line_moves_line
+               ON opening_line_moves(line_id, ply)"""
+        )
         conn.execute(
             """CREATE UNIQUE INDEX IF NOT EXISTS idx_opening_line_moves_root_sort_order
                ON opening_line_moves(line_id, sort_order)
@@ -583,7 +587,7 @@ def init_db() -> None:
         _backfill_opening_line_type_ids(conn)
         _migrate_opening_moves(conn)
         _ensure_opening_line_moves_schema(conn)
-        _ensure_opening_root_sort_order_index(conn)
+        _ensure_opening_line_move_indexes(conn)
         conn.commit()
     finally:
         conn.close()
