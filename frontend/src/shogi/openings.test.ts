@@ -15,6 +15,7 @@ import {
   openingMainPathAt,
   openingMainSwitchAccessibleName,
   openingNodeJumpAccessibleName,
+  openingStructuralPathLabel,
   openingPathState,
   openingFromImportedLine,
   openingBranchChoiceLabel,
@@ -168,22 +169,24 @@ describe("opening branch path helpers", () => {
     expect(entries.at(-1)?.path).toHaveLength(500);
   });
 
-  it("qualifies duplicate node moves and same-depth main switches with their ancestor branch paths", () => {
+  it("uses structural paths when display-identical nodes and branch points would otherwise collide", () => {
     const sharedMove = (id: string) => ({ ...node(id, "3c3d"), branchLabel: "本線", isMain: true });
-    const branchA = { ...node("accessible-a", "7g7f", [sharedMove("accessible-a-main"), node("accessible-a-var", "8c8d")]), branchLabel: "分岐A", isMain: true };
-    const branchB = { ...node("accessible-b", "2g2f", [sharedMove("accessible-b-main"), node("accessible-b-var", "8c8d")]), branchLabel: "分岐B", isMain: false };
+    const branchA = { ...node("accessible-a", "7g7f", [sharedMove("accessible-a-main"), node("accessible-a-var", "8c8d")]), branchLabel: "同じ表示名", isMain: true };
+    const branchB = { ...node("accessible-b", "2g2f", [sharedMove("accessible-b-main"), node("accessible-b-var", "8c8d")]), branchLabel: "同じ表示名", isMain: false };
     const accessibleFixture = { ...fixture, moves: [branchA, branchB] };
 
+    expect(openingStructuralPathLabel([0, 0])).toBe("経路 1-1");
+    expect(openingStructuralPathLabel([1, 0])).toBe("経路 2-1");
     const jumpA = openingNodeJumpAccessibleName(accessibleFixture, [0, 0]);
     const jumpB = openingNodeJumpAccessibleName(accessibleFixture, [1, 0]);
-    expect(jumpA).toBe("2手目 3c3d、USI 3c3d、分岐A → 本線、ここへ移動");
-    expect(jumpB).toBe("2手目 3c3d、USI 3c3d、分岐B → 本線、ここへ移動");
+    expect(jumpA).toBe("2手目 3c3d、USI 3c3d、同じ表示名 → 本線、経路 1-1、ここへ移動");
+    expect(jumpB).toBe("2手目 3c3d、USI 3c3d、同じ表示名 → 本線、経路 2-1、ここへ移動");
     expect(jumpA).not.toBe(jumpB);
 
     const switchA = openingMainSwitchAccessibleName(accessibleFixture, [0], false);
     const switchB = openingMainSwitchAccessibleName(accessibleFixture, [1], false);
-    expect(switchA).toBe("第2手の分岐点 分岐A の本線へ切り替える");
-    expect(switchB).toBe("第2手の分岐点 分岐B の本線へ切り替える");
+    expect(switchA).toBe("第2手の分岐点 同じ表示名、経路 1 の本線へ切り替える");
+    expect(switchB).toBe("第2手の分岐点 同じ表示名、経路 2 の本線へ切り替える");
     expect(switchA).not.toBe(switchB);
   });
 });

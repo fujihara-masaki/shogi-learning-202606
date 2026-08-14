@@ -304,6 +304,11 @@ export function openingBranchBreadcrumb(opening: OpeningLine, path: number[]): s
   return labels.join(" → ") || "ルート";
 }
 
+/** Return a compact, 1-based structural identity for a root-relative tree path. */
+export function openingStructuralPathLabel(path: number[]): string {
+  return `経路 ${path.length > 0 ? path.map((index) => index + 1).join("-") : "ルート"}`;
+}
+
 /** Centralized, branch-qualified accessible name for a variation node jump. */
 export function openingNodeJumpAccessibleName(opening: OpeningLine, path: number[]): string {
   let choices = opening.moves;
@@ -313,16 +318,18 @@ export function openingNodeJumpAccessibleName(opening: OpeningLine, path: number
     if (!node) break;
     choices = node.next ?? [];
   }
-  if (!node) return `${path.length}手目、不明な手、${openingBranchBreadcrumb(opening, path)}、ここへ移動`;
-  return `${path.length}手目 ${node.notation}、USI ${node.usi}、${openingBranchBreadcrumb(opening, path)}、ここへ移動`;
+  const identity = `${openingBranchBreadcrumb(opening, path)}、${openingStructuralPathLabel(path)}`;
+  if (!node) return `${path.length}手目、不明な手、${identity}、ここへ移動`;
+  return `${path.length}手目 ${node.notation}、USI ${node.usi}、${identity}、ここへ移動`;
 }
 
 /** Centralized, branch-qualified accessible name for a semantic-main switch. */
 export function openingMainSwitchAccessibleName(opening: OpeningLine, branchPointPath: number[], selected: boolean): string {
   const location = openingBranchBreadcrumb(opening, branchPointPath);
+  const identity = openingStructuralPathLabel(branchPointPath);
   return selected
-    ? `第${branchPointPath.length + 1}手の分岐点 ${location} の本線を選択中`
-    : `第${branchPointPath.length + 1}手の分岐点 ${location} の本線へ切り替える`;
+    ? `第${branchPointPath.length + 1}手の分岐点 ${location}、${identity} の本線を選択中`
+    : `第${branchPointPath.length + 1}手の分岐点 ${location}、${identity} の本線へ切り替える`;
 }
 
 /** Return the user-facing labels of the branch points traversed by an applied path. */
