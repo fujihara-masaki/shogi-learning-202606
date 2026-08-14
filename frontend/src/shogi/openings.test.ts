@@ -11,6 +11,7 @@ import {
   mainOpeningChoice,
   mainOpeningChoiceIndex,
   openingFromImportedLine,
+  openingBranchChoiceLabel,
   pathBeforePreviousBranch,
   type OpeningLine,
   type OpeningMoveNode,
@@ -157,6 +158,30 @@ describe("openingFromImportedLine", () => {
     expect(choices.map((choice) => choice.branchLabel)).not.toContain("a");
     expect(choices.map((choice) => choice.branchLabel)).not.toContain("b");
     expect(mainOpeningChoice(choices)?.id).toBe("imported-102-a");
+  });
+
+  it("derives fallback branch labels from semantic main status", () => {
+    const opening = openingFromImportedLine({
+      id: 103, name: "semantic labels", opening_type: "test", initial_sfen: "position",
+      moves: [
+        { id: 1, parent_move_id: null, usi: "7g7f", sort_order: 0, is_main: true,
+          move_key: "root", variation_group: "main" },
+        { id: 2, parent_move_id: 1, usi: "2g2f", sort_order: 0, is_main: false,
+          move_key: "variation", variation_group: "main" },
+        { id: 3, parent_move_id: 1, usi: "6g6f", sort_order: 1, is_main: true,
+          move_key: "explicit-main", variation_group: "main" },
+      ], source: { name: "fixture", license_name: "CC0", license_url: "" },
+    });
+
+    const choices = opening.moves[0].next!;
+    expect(choices.map((choice) => choice.branchLabel)).toEqual([undefined, "本線"]);
+    expect(mainOpeningChoiceIndex(choices)).toBe(1);
+    expect(choices.map((_, index) => openingBranchChoiceLabel(choices, index))).toEqual(["分岐1", "本線"]);
+    expect(`変化 ${openingBranchChoiceLabel(choices, 0)}`).not.toBe("変化 本線");
+
+    const branchHistory = choices.map((_, index) => openingBranchChoiceLabel(choices, index));
+    expect(branchHistory[0]).not.toBe("本線");
+    expect(expectedOpeningMove(opening, [0])?.id).toBe("imported-103-explicit-main");
   });
 });
 

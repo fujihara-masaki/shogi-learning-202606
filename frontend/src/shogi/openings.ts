@@ -235,6 +235,13 @@ export function mainOpeningChoiceIndex(choices: OpeningMoveNode[]): number {
   return main ? choices.indexOf(main) : -1;
 }
 
+/** Return the user-facing label for a choice at a branch point. */
+export function openingBranchChoiceLabel(choices: OpeningMoveNode[], index: number): string {
+  const choice = choices[index];
+  if (!choice) return `分岐${index + 1}`;
+  return choice.branchLabel ?? (choice === mainOpeningChoice(choices) ? "本線" : `分岐${index + 1}`);
+}
+
 export function findOpeningChoiceIndex(choices: OpeningMoveNode[], move: Pick<Move, "usi">): number {
   return choices.findIndex((choice) => choice.usi === move.usi);
 }
@@ -331,8 +338,11 @@ export function openingFromImportedLine(imported: ImportedOpeningLike): OpeningL
       .map(({ move, index }) => {
         if (ancestors.has(move.id!)) throw new Error(`定跡ツリーに循環があります: ${move.id}`);
         const choices = byParent.get(parentId) ?? [];
+        const displayLabel = move.variation_group && move.variation_group !== "main"
+          ? move.variation_group
+          : undefined;
         const branchLabel = choices.length > 1
-          ? (move.variation_group === "main" ? "本線" : move.variation_group)
+          ? (displayLabel ?? (move.is_main === true ? "本線" : undefined))
           : undefined;
         const node = decorate(move, index, branchLabel);
         node.next = buildFromParent(move.id!, new Set([...ancestors, move.id!]));

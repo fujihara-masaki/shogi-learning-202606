@@ -9,6 +9,7 @@ import {
   continueOpeningMainLine,
   mainOpeningChoice,
   mainOpeningChoiceIndex,
+  openingBranchChoiceLabel,
   expectedOpeningMove,
   findOpeningChoiceIndex,
   findOpening,
@@ -233,7 +234,7 @@ function OpeningStudyContent({ id }: { id: string | undefined }) {
                 <div className="branch-choice-list branch-card-list">
                 {currentChoices.map((choice, index) => (
                   <article key={choice.id} className={`branch-card ${choice === mainOpeningChoice(currentChoices) ? "main" : "variation"}`}>
-                    <div className="branch-card-heading"><strong>{choice === mainOpeningChoice(currentChoices) ? "本線" : "変化"}</strong><span>{choice.branchLabel || (choice === mainOpeningChoice(currentChoices) ? "本線" : `分岐${index + 1}`)}</span></div>
+                    <div className="branch-card-heading"><strong>{choice === mainOpeningChoice(currentChoices) ? "本線" : "変化"}</strong><span>{openingBranchChoiceLabel(currentChoices, index)}</span></div>
                     <p className="branch-card-move"><strong>{choice.notation}</strong> <code>{choice.usi}</code></p>
                     <p>{choice.explanation}</p>
                     {(choice.coverageStatus || choice.sourceTitle) && <p className="branch-card-provenance">{choice.coverageStatus && <>カバレッジ: {choice.coverageStatus}</>}{choice.coverageStatus && choice.sourceTitle && " / "}{choice.sourceTitle && <>出典: {choice.sourceTitle}</>}</p>}
@@ -254,7 +255,7 @@ function OpeningStudyContent({ id }: { id: string | undefined }) {
                   <div key={`${step.node.id}-branches`} className="branch-choice-list compact">
                     {step.choices.map((choice, branchIndex) => (
                       <button key={choice.id} type="button" onClick={() => switchBranch(stepIndex, branchIndex)} disabled={path[stepIndex] === branchIndex} aria-current={path[stepIndex] === branchIndex ? "step" : undefined} className={path[stepIndex] === branchIndex ? "selected" : undefined}>
-                        {choice.branchLabel || (choice === mainOpeningChoice(step.choices) ? "本線" : `分岐${branchIndex + 1}`)}{path[stepIndex] === branchIndex ? "（選択中）" : "へ切り替える"}
+                        {openingBranchChoiceLabel(step.choices, branchIndex)}{path[stepIndex] === branchIndex ? "（選択中）" : "へ切り替える"}
                       </button>
                     ))}
                   </div>
