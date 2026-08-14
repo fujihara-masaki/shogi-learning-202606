@@ -666,6 +666,17 @@ def _opening_move_nodes(opening: dict) -> list[dict]:
                 ),
             })
             parent_key = key
+
+    # The legacy syntax did not explicitly identify a semantic continuation.
+    # A following main-line move wins when present; otherwise the first
+    # displayed terminal branch becomes the continuation.  Single-child
+    # branch chains are handled by the same sibling-set rule.
+    siblings = {}
+    for node in nodes:
+        siblings.setdefault(node["parent_key"], []).append(node)
+    for children in siblings.values():
+        if not any(child["is_main"] for child in children):
+            min(children, key=lambda child: (child["sort_order"], child["key"]))["is_main"] = True
     return nodes
 
 
@@ -767,6 +778,7 @@ def seed_openings_if_empty(conn) -> None:
         opening.setdefault("comments", [f"{opening['name']}の代表手順 {i}手目です。" for i in range(1, len(opening.get("moves", [])) + 1)])
         metadata = _opening_source_metadata(opening)
         initial_sfen = opening.get("initial_sfen", shogi.STARTING_SFEN)
+        initial_sfen = shogi.STARTING_SFEN if initial_sfen.strip() == "startpos" else initial_sfen
         move_nodes = _prepare_opening_move_nodes(opening, initial_sfen)
         main_nodes = _semantic_main_nodes(move_nodes)
         main_moves = [node["usi"] for node in main_nodes]

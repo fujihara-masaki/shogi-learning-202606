@@ -27,6 +27,16 @@ TREE_SEED = {
 }
 
 
+def _seed_fixture(name, **overrides):
+    return {
+        "name": name,
+        "opening_type": "test",
+        "description": "seed compatibility fixture",
+        "tag": "seed-compatibility",
+        **overrides,
+    }
+
+
 def _line_and_rows(conn):
     line = conn.execute(
         "SELECT ol.id FROM opening_lines ol WHERE ol.source_id IS NULL ORDER BY (SELECT COUNT(*) FROM opening_line_moves m WHERE m.line_id=ol.id) DESC, ol.id LIMIT 1"
@@ -97,6 +107,111 @@ def test_stable_key_seed_persists_branch_of_branch_and_reseeds_by_natural_key(cl
         assert api_by_key["a2"]["parent_move_id"] == api_by_key["a"]["id"]
         assert api_by_key["a"]["variation_group"] == "A"
         assert api_by_key["b"]["variation_group"] == "B"
+    finally:
+        conn.close()
+
+
+@pytest.mark.parametrize(
+    "tree_fields",
+    [
+        {"move_nodes": [
+            {"key": "m1", "parent_key": None, "usi": "7g7f", "sort_order": 0,
+             "is_main": True},
+            {"key": "m2", "parent_key": "m1", "usi": "3c3d", "sort_order": 0,
+             "is_main": True},
+        ]},
+        {"moves": ["7g7f", "3c3d"], "branches": [
+            {"name": "途中分岐", "from_ply": 1, "moves": ["8c8d"]},
+        ]},
+    ],
+    ids=["stable-key", "legacy"],
+)
+def test_startpos_seed_is_canonical_everywhere_and_idempotent(client, monkeypatch, tree_fields):
+    fixture = _seed_fixture("startpos canonical fixture", initial_sfen="startpos", **tree_fields)
+    monkeypatch.setattr(seed, "SAMPLE_OPENING_LINES", [fixture])
+    conn = get_connection()
+    try:
+        seed_openings_if_empty(conn)
+        line = conn.execute(
+            "SELECT * FROM opening_lines WHERE name=?", (fixture["name"],)
+        ).fetchone()
+        first_ids = {
+            row["move_key"]: row["id"] for row in conn.execute(
+                "SELECT id, move_key FROM opening_line_moves WHERE line_id=?", (line["id"],)
+            )
+        }
+        seed_openings_if_empty(conn)
+
+        line = conn.execute("SELECT * FROM opening_lines WHERE id=?", (line["id"],)).fetchone()
+        roots = conn.execute(
+            "SELECT * FROM opening_line_moves WHERE line_id=? AND parent_move_id IS NULL",
+            (line["id"],),
+        ).fetchall()
+        initial = conn.execute(
+            "SELECT sfen FROM opening_positions WHERE line_id=? AND ply=0", (line["id"],)
+        ).fetchone()
+        second_ids = {
+            row["move_key"]: row["id"] for row in conn.execute(
+                "SELECT id, move_key FROM opening_line_moves WHERE line_id=?", (line["id"],)
+            )
+        }
+        assert line["initial_sfen"] == shogi.STARTING_SFEN
+        assert {row["from_sfen"] for row in roots} == {shogi.STARTING_SFEN}
+        assert initial["sfen"] == shogi.STARTING_SFEN
+        assert second_ids == first_ids
+        validate_opening_move_tree(conn, [line["id"]])
+    finally:
+        conn.close()
+
+
+@pytest.mark.parametrize("branch_moves", [["8c8d"], ["8c8d", "8h2b+"]])
+def test_terminal_legacy_branches_choose_one_ordered_semantic_main(client, monkeypatch, branch_moves):
+    branches = [{"name": "first", "from_ply": 3, "moves": branch_moves}]
+    if len(branch_moves) == 1:
+        branches.append({"name": "second", "from_ply": 3, "moves": ["4c4d"]})
+    fixture = _seed_fixture(
+        "terminal legacy branch fixture",
+        moves=["7g7f", "3c3d", "2g2f"],
+        branches=branches,
+    )
+    monkeypatch.setattr(seed, "SAMPLE_OPENING_LINES", [fixture])
+    conn = get_connection()
+    try:
+        seed_openings_if_empty(conn)
+        seed_openings_if_empty(conn)
+        line = conn.execute("SELECT id FROM opening_lines WHERE name=?", (fixture["name"],)).fetchone()
+        rows = conn.execute(
+            "SELECT * FROM opening_line_moves WHERE line_id=? ORDER BY ply, sort_order", (line["id"],)
+        ).fetchall()
+        by_key = {row["move_key"]: row for row in rows}
+        terminal_children = [row for row in rows if row["parent_move_id"] == by_key["main-3"]["id"]]
+        assert [row["move_key"] for row in terminal_children if row["is_main"]] == ["branch-1-1"]
+        for sibling_parent in {row["parent_move_id"] for row in rows}:
+            siblings = [row for row in rows if row["parent_move_id"] == sibling_parent]
+            assert sum(row["is_main"] for row in siblings) == 1
+        validate_opening_move_tree(conn, [line["id"]])
+    finally:
+        conn.close()
+
+
+def test_intermediate_legacy_branch_keeps_main_line_continuation(client, monkeypatch):
+    fixture = _seed_fixture(
+        "intermediate legacy branch fixture",
+        moves=["7g7f", "3c3d", "2g2f"],
+        branches=[{"name": "branch", "from_ply": 2, "moves": ["6g6f"]}],
+    )
+    monkeypatch.setattr(seed, "SAMPLE_OPENING_LINES", [fixture])
+    conn = get_connection()
+    try:
+        seed_openings_if_empty(conn)
+        line = conn.execute("SELECT id FROM opening_lines WHERE name=?", (fixture["name"],)).fetchone()
+        rows = conn.execute(
+            "SELECT * FROM opening_line_moves WHERE line_id=?", (line["id"],)
+        ).fetchall()
+        by_key = {row["move_key"]: row for row in rows}
+        children = [row for row in rows if row["parent_move_id"] == by_key["main-2"]["id"]]
+        assert [row["move_key"] for row in children if row["is_main"]] == ["main-3"]
+        validate_opening_move_tree(conn, [line["id"]])
     finally:
         conn.close()
 
