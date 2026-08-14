@@ -739,6 +739,36 @@ test("three-way opening branches behave the same from board and accessible cards
   await expect(page.getByRole("button", { name: "変化 5g5f、この変化を見る" })).toBeVisible();
   await expect(page.getByTestId("opening-feedback")).toHaveAttribute("aria-live", "polite");
 
+  const variationDisclosure = page.getByTestId("opening-variation-disclosure");
+  await expect(variationDisclosure).not.toHaveAttribute("open", "");
+  const variationSummary = variationDisclosure.locator("summary");
+  await variationSummary.focus();
+  await page.keyboard.press("Enter");
+  await expect(variationDisclosure).toHaveAttribute("open", "");
+  await expect(variationSummary).toContainText("1分岐・現在0手・本線");
+  const variationNodes = variationDisclosure.locator(".opening-variation-jump");
+  await expect(variationNodes).toHaveCount(6);
+
+  const siblingJump = page.getByRole("button", { name: "1手目 5g5f、USI 5g5f、中央へ移動" });
+  await siblingJump.focus();
+  await page.keyboard.press("Enter");
+  await expect(page.locator(".move-history .move-usi")).toHaveText(["(5g5f)"]);
+  await expect(siblingJump).toHaveAttribute("aria-current", "step");
+  await expect(variationDisclosure.locator('[aria-current="step"]')).toHaveCount(1);
+  await expect(page.getByTestId("opening-source")).toContainText("Fixture source");
+
+  await page.getByRole("button", { name: "この分岐点の本線へ切り替える" }).click();
+  await expect(page.locator(".move-history .move-usi")).toHaveText(["(7g7f)"]);
+  await expect(page.getByTestId("opening-feedback")).toContainText("後の手順を破棄し、本線へ移動");
+  await expect(page.getByRole("button", { name: "本線を選択中" })).toBeDisabled();
+
+  await siblingJump.focus();
+  await variationSummary.click();
+  await expect(variationDisclosure).not.toHaveAttribute("open", "");
+  await expect(variationSummary).toBeFocused();
+  await variationSummary.click();
+  await page.getByRole("button", { name: "最初に戻る" }).click();
+
   const board = page.getByTestId("shogi-board");
   const historyUsis = page.locator(".move-history .move-usi");
   for (const [usi, , , , from, to] of branches) {

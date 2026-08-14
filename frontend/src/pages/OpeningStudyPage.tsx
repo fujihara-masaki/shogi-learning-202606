@@ -3,6 +3,7 @@ import { Link, Navigate, useParams } from "react-router-dom";
 import { type Move, type Square } from "tsshogi";
 import { fetchBookCandidates, fetchLearningSample, fetchOpening, type BookCandidatesResponse } from "../api/client";
 import MoveHistory from "../components/MoveHistory";
+import OpeningVariationList from "../components/OpeningVariationList";
 import ShogiBoard from "../components/ShogiBoard";
 import {
   applyOpeningPath,
@@ -142,6 +143,22 @@ function OpeningStudyContent({ id }: { id: string | undefined }) {
     setLastMoveFrom(null);
   }
 
+  function jumpToVariation(nextPath: number[], node: { notation: string }) {
+    setPath(nextPath);
+    setFeedback(`${nextPath.length}手目 ${node.notation}へ移動しました`);
+    setHintVisible(false);
+    setLastMoveTo(null);
+    setLastMoveFrom(null);
+  }
+
+  function switchVariationMain(nextPath: number[]) {
+    setPath(nextPath);
+    setFeedback("この分岐点より後の手順を破棄し、本線へ移動しました");
+    setHintVisible(false);
+    setLastMoveTo(null);
+    setLastMoveFrom(null);
+  }
+
   function undo() {
     setPath((prev) => prev.slice(0, -1));
     setFeedback(null);
@@ -264,6 +281,13 @@ function OpeningStudyContent({ id }: { id: string | undefined }) {
               </div>
             )}
           </section>
+          <OpeningVariationList
+            opening={opening}
+            path={path}
+            steps={state.steps}
+            onJump={jumpToVariation}
+            onSwitchMain={switchVariationMain}
+          />
           {sourceNode && (
             <section className="opening-source-note" aria-label="データ出典" data-testid="opening-source">
               <h2>データ出典</h2>

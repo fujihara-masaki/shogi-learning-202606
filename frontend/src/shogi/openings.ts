@@ -235,6 +235,55 @@ export function mainOpeningChoiceIndex(choices: OpeningMoveNode[]): number {
   return main ? choices.indexOf(main) : -1;
 }
 
+export interface OpeningTreeEntry {
+  node: OpeningMoveNode;
+  path: number[];
+  choices: OpeningMoveNode[];
+  level: number;
+}
+
+/** Enumerate every tree node with its unique root-relative index path. */
+export function enumerateOpeningTree(opening: OpeningLine): OpeningTreeEntry[] {
+  const entries: OpeningTreeEntry[] = [];
+  const visit = (choices: OpeningMoveNode[], parentPath: number[]) => {
+    choices.forEach((node, index) => {
+      const path = [...parentPath, index];
+      entries.push({ node, path, choices, level: path.length });
+      visit(node.next ?? [], path);
+    });
+  };
+  visit(opening.moves, []);
+  return entries;
+}
+
+export function countOpeningBranchPoints(opening: OpeningLine): number {
+  let count = opening.moves.length > 1 ? 1 : 0;
+  for (const { node } of enumerateOpeningTree(opening)) {
+    if ((node.next?.length ?? 0) > 1) count += 1;
+  }
+  return count;
+}
+
+/** Classify a tree path relative to the currently applied path. */
+export function openingPathState(nodePath: number[], currentPath: number[]): "current" | "ancestor" | "other" {
+  if (nodePath.length > currentPath.length || nodePath.some((index, depth) => currentPath[depth] !== index)) return "other";
+  return nodePath.length === currentPath.length ? "current" : "ancestor";
+}
+
+/** Discard everything after a branch point and select its semantic main choice. */
+export function openingMainPathAt(opening: OpeningLine, branchPointPath: number[]): number[] {
+  let choices = opening.moves;
+  const validParentPath: number[] = [];
+  for (const index of branchPointPath) {
+    const node = choices[index];
+    if (!node) return validParentPath;
+    validParentPath.push(index);
+    choices = node.next ?? [];
+  }
+  const mainIndex = mainOpeningChoiceIndex(choices);
+  return mainIndex < 0 ? validParentPath : [...validParentPath, mainIndex];
+}
+
 /** Return the user-facing label for a choice at a branch point. */
 export function openingBranchChoiceLabel(choices: OpeningMoveNode[], index: number): string {
   const choice = choices[index];
