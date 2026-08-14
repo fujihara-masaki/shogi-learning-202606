@@ -1,4 +1,5 @@
-import { useRef, useState, type SyntheticEvent } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState, type SyntheticEvent } from "react";
+import { equalVariationNodeProps } from "./openingVariationMemo";
 import {
   countOpeningBranchPoints,
   mainOpeningChoiceIndex,
@@ -6,7 +7,6 @@ import {
   openingMainSwitchAccessibleName,
   openingMainPathAt,
   openingNodeJumpAccessibleName,
-  openingPathState,
   selectedOpeningBranchPath,
   type OpeningLine,
   type OpeningMoveNode,
@@ -23,10 +23,50 @@ interface Props {
   defaultExpanded?: boolean;
 }
 
+interface VariationLevelModel {
+  choices: OpeningMoveNode[];
+  parentPath: number[];
+  nodes: VariationNodeModel[];
+}
+
+interface VariationNodeModel {
+  node: OpeningMoveNode;
+  index: number;
+  path: number[];
+  label: string;
+  child: VariationLevelModel | null;
+}
+
+function buildLevel(choices: OpeningMoveNode[], parentPath: number[]): VariationLevelModel {
+  return {
+    choices,
+    parentPath,
+    nodes: choices.map((node, index) => {
+      const path = [...parentPath, index];
+      return {
+        node,
+        index,
+        path,
+        label: openingBranchChoiceLabel(choices, index),
+        child: node.next?.length ? buildLevel(node.next, path) : null,
+      };
+    }),
+  };
+}
+
 export default function OpeningVariationList({ opening, path, steps, onJump, onSwitchMain, defaultExpanded = false }: Props) {
   const [expanded, setExpanded] = useState(defaultExpanded);
   const summaryRef = useRef<HTMLElement>(null);
-  const branchCount = countOpeningBranchPoints(opening);
+  const onJumpRef = useRef(onJump);
+  const onSwitchMainRef = useRef(onSwitchMain);
+  useEffect(() => {
+    onJumpRef.current = onJump;
+    onSwitchMainRef.current = onSwitchMain;
+  }, [onJump, onSwitchMain]);
+  const stableOnJump = useCallback<Props["onJump"]>((...args) => onJumpRef.current(...args), []);
+  const stableOnSwitchMain = useCallback<Props["onSwitchMain"]>((...args) => onSwitchMainRef.current(...args), []);
+  const branchCount = useMemo(() => countOpeningBranchPoints(opening), [opening]);
+  const tree = useMemo(() => buildLevel(opening.moves, []), [opening]);
 
   function handleToggle(event: SyntheticEvent<HTMLDetailsElement>) {
     const open = event.currentTarget.open;
@@ -44,7 +84,7 @@ export default function OpeningVariationList({ opening, path, steps, onJump, onS
         {expanded && (
           <div className="opening-variation-content">
             <p className="muted">各手を選ぶと、その局面まで盤面・棋譜・出典を移動します。</p>
-            <VariationLevel opening={opening} choices={opening.moves} parentPath={[]} currentPath={path} onJump={onJump} onSwitchMain={onSwitchMain} />
+            <VariationLevel opening={opening} level={tree} activePath={path} onJump={stableOnJump} onSwitchMain={stableOnSwitchMain} />
           </div>
         )}
       </details>
@@ -53,62 +93,80 @@ export default function OpeningVariationList({ opening, path, steps, onJump, onS
 }
 
 interface LevelProps extends Pick<Props, "opening" | "onJump" | "onSwitchMain"> {
-  choices: OpeningMoveNode[];
-  parentPath: number[];
-  currentPath: number[];
+  level: VariationLevelModel;
+  /** Path suffix below this level; null means this entire subtree is unrelated to the current path. */
+  activePath: readonly number[] | null;
 }
 
-function VariationLevel({ opening, choices, parentPath, currentPath, onJump, onSwitchMain }: LevelProps) {
-  const mainIndex = mainOpeningChoiceIndex(choices);
-  const selectedIndex = currentPath.length > parentPath.length && parentPath.every((value, index) => currentPath[index] === value)
-    ? currentPath[parentPath.length]
-    : -1;
+function VariationLevel({ opening, level, activePath, onJump, onSwitchMain }: LevelProps) {
+  const mainIndex = mainOpeningChoiceIndex(level.choices);
+  const selectedIndex = activePath?.[0] ?? -1;
   return (
     <>
-      {choices.length > 1 && (
+      {level.choices.length > 1 && (
         <div className="opening-variation-branch-action">
-          <span>第{parentPath.length + 1}手の分岐点</span>
+          <span>第{level.parentPath.length + 1}手の分岐点</span>
           <button
             type="button"
-            aria-label={openingMainSwitchAccessibleName(opening, parentPath, selectedIndex === mainIndex)}
+            aria-label={openingMainSwitchAccessibleName(opening, level.parentPath, selectedIndex === mainIndex)}
             aria-pressed={selectedIndex === mainIndex}
             disabled={selectedIndex === mainIndex}
-            onClick={() => onSwitchMain(openingMainPathAt(opening, parentPath))}
+            onClick={() => onSwitchMain(openingMainPathAt(opening, level.parentPath))}
           >
             {selectedIndex === mainIndex ? "本線を選択中" : "この分岐点の本線へ切り替える"}
           </button>
         </div>
       )}
       <ol className="opening-variation-tree">
-        {choices.map((node, index) => {
-          const nodePath = [...parentPath, index];
-          const state = openingPathState(nodePath, currentPath);
-          const label = openingBranchChoiceLabel(choices, index);
+        {level.nodes.map((model) => {
+          const selected = selectedIndex === model.index;
+          const state = !selected ? "other" : activePath!.length === 1 ? "current" : "ancestor";
           return (
-            <li key={node.id} className={`opening-variation-node ${state}`}>
-              <span className="opening-variation-level">第{nodePath.length}手</span>
-              <button
-                type="button"
-                className="opening-variation-jump"
-                aria-current={state === "current" ? "step" : undefined}
-                aria-label={openingNodeJumpAccessibleName(opening, nodePath)}
-                onClick={() => onJump(nodePath, node)}
-              >
-                <strong>{node.notation}</strong> <code>{node.usi}</code> <span className="branch-badge">{label}</span>
-                {state === "current" && <span className="variation-state-label">現在</span>}
-                {state === "ancestor" && <span className="variation-state-label"><span className="visually-hidden">現在局面までに通過した手、</span>通過</span>}
-              </button>
-              {(node.coverageStatus || node.sourceTitle) && (
-                <span className="opening-variation-source">
-                  {node.coverageStatus && <span className="coverage-badge">{node.coverageStatus}</span>}
-                  {node.sourceTitle && (node.sourceUrl ? <a href={node.sourceUrl} target="_blank" rel="noreferrer">出典: {node.sourceTitle}</a> : <span>出典: {node.sourceTitle}</span>)}
-                </span>
-              )}
-              {(node.next?.length ?? 0) > 0 && <VariationLevel opening={opening} choices={node.next!} parentPath={nodePath} currentPath={currentPath} onJump={onJump} onSwitchMain={onSwitchMain} />}
-            </li>
+            <VariationNode
+              key={model.node.id}
+              opening={opening}
+              model={model}
+              state={state}
+              childActivePath={selected && activePath!.length > 1 ? activePath!.slice(1) : null}
+              onJump={onJump}
+              onSwitchMain={onSwitchMain}
+            />
           );
         })}
       </ol>
     </>
   );
 }
+
+interface NodeProps extends Pick<Props, "opening" | "onJump" | "onSwitchMain"> {
+  model: VariationNodeModel;
+  state: "current" | "ancestor" | "other";
+  childActivePath: readonly number[] | null;
+}
+
+const VariationNode = memo(function VariationNode({ opening, model, state, childActivePath, onJump, onSwitchMain }: NodeProps) {
+  const { node, path, label, child } = model;
+  return (
+    <li className={`opening-variation-node ${state}`}>
+      <span className="opening-variation-level">第{path.length}手</span>
+      <button
+        type="button"
+        className="opening-variation-jump"
+        aria-current={state === "current" ? "step" : undefined}
+        aria-label={openingNodeJumpAccessibleName(opening, path)}
+        onClick={() => onJump(path, node)}
+      >
+        <strong>{node.notation}</strong> <code>{node.usi}</code> <span className="branch-badge">{label}</span>
+        {state === "current" && <span className="variation-state-label">現在</span>}
+        {state === "ancestor" && <span className="variation-state-label"><span className="visually-hidden">現在局面までに通過した手、</span>通過</span>}
+      </button>
+      {(node.coverageStatus || node.sourceTitle) && (
+        <span className="opening-variation-source">
+          {node.coverageStatus && <span className="coverage-badge">{node.coverageStatus}</span>}
+          {node.sourceTitle && (node.sourceUrl ? <a href={node.sourceUrl} target="_blank" rel="noreferrer">出典: {node.sourceTitle}</a> : <span>出典: {node.sourceTitle}</span>)}
+        </span>
+      )}
+      {child && <VariationLevel opening={opening} level={child} activePath={childActivePath} onJump={onJump} onSwitchMain={onSwitchMain} />}
+    </li>
+  );
+}, equalVariationNodeProps);
