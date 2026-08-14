@@ -8,8 +8,12 @@ import {
   expectedOpeningMove,
   flattenMainLine,
   findOpeningChoiceIndex,
+  mainOpeningChoice,
+  mainOpeningChoiceIndex,
   openingFromImportedLine,
+  openingBranchChoiceLabel,
   pathBeforePreviousBranch,
+  selectedOpeningBranchPath,
   type OpeningLine,
   type OpeningMoveNode,
 } from "./openings";
@@ -78,6 +82,41 @@ describe("opening branch path helpers", () => {
     expect(applyOpeningPath(fixture, continueOpeningMainLine(fixture, [2])).moves.map((move) => move.usi)).toEqual(["5g5f", "5c5d"]);
   });
 
+  it("uses the explicit semantic main index consistently for display and playback", () => {
+    const choices = fixture.moves.map((choice, index) => ({ ...choice, isMain: index === 1 }));
+    const explicitMainFixture = { ...fixture, moves: choices };
+
+    expect(mainOpeningChoice(choices)?.id).toBe("one");
+    expect(mainOpeningChoiceIndex(choices)).toBe(1);
+    expect(expectedOpeningMove(explicitMainFixture, [])?.id).toBe("one");
+    expect(continueOpeningMainLine(explicitMainFixture, [])).toEqual([1, 0]);
+    expect(applyOpeningPath(explicitMainFixture, [mainOpeningChoiceIndex(choices)]).steps[0].node.id).toBe("one");
+  });
+
+  it("labels only traversed branch points using semantic branch labels", () => {
+    const linear = node("linear", "7g7f");
+    const unlabeledVariation = { ...node("variation", "2g2f"), isMain: false };
+    const explicitMain = { ...node("main", "5g5f"), isMain: true, branchLabel: "本線", sortOrder: 1 };
+    const rootChoices = [unlabeledVariation, explicitMain];
+
+    expect(selectedOpeningBranchPath([{ node: unlabeledVariation, choices: rootChoices }])).toBe("分岐1");
+    expect(selectedOpeningBranchPath([{ node: explicitMain, choices: rootChoices }])).toBe("本線");
+    expect(selectedOpeningBranchPath([{ node: linear, choices: [linear] }])).toBe("本線");
+  });
+
+  it("preserves human labels across nested branch points", () => {
+    const branchA = { ...node("a", "7g7f"), branchLabel: "A", isMain: true };
+    const branchB = { ...node("b", "2g2f"), branchLabel: "B", isMain: false };
+    const nestedVariation = { ...node("a-variation", "3c3d"), isMain: false };
+    const nestedMain = { ...node("a-main", "8c8d"), isMain: true };
+
+    expect(selectedOpeningBranchPath([
+      { node: branchA, choices: [branchB, branchA] },
+      { node: nestedVariation, choices: [nestedMain, nestedVariation] },
+    ])).toBe("A → 分岐2");
+    expect(selectedOpeningBranchPath([{ node: branchB, choices: [branchB, branchA] }])).toBe("B");
+  });
+
   it("returns to immediately before the previous branch", () => {
     expect(pathBeforePreviousBranch(fixture, [2, 0])).toEqual([]);
     expect(pathBeforePreviousBranch(fixture, [])).toEqual([]);
@@ -98,6 +137,76 @@ describe("openingFromImportedLine", () => {
     expect(opening.id).toBe("12");
     expect(opening.category).toBe("中飛車");
     expect(flattenMainLine(opening).map((move) => move.usi)).toEqual(["7g7f", "3c3d", "2h5h"]);
+  });
+
+  it("builds direct-parent multi-level trees, keeps transpositions separate, and follows explicit main", () => {
+    const move = (id: number, parent_move_id: number | null, usi: string, sort_order: number, is_main: boolean, to_sfen: string) => ({
+      id, parent_move_id, usi, sort_order, is_main, move_key: `m${id}`,
+      from_sfen: "position", to_sfen, variation_group: is_main ? "main" : `v${id}`,
+    });
+    const opening = openingFromImportedLine({
+      id: 101, name: "tree", opening_type: "test", initial_sfen: "position",
+      moves: [
+        move(1, null, "7g7f", 0, true, "p1"),
+        move(2, 1, "3c3d", 0, false, "transposed"),
+        move(3, 1, "8c8d", 1, false, "p-b"),
+        move(4, 1, "4a3b", 2, true, "p-main"),
+        move(5, 2, "2g2f", 0, true, "a1"),
+        move(6, 2, "5g5f", 1, false, "a2"),
+        move(7, 3, "6g6f", 0, true, "transposed"),
+        move(8, 3, "9g9f", 1, false, "b2"),
+      ], source: { name: "fixture", license_name: "CC0", license_url: "" },
+    });
+    expect(opening.moves[0].next?.map((node) => node.id)).toEqual([
+      "imported-101-m2", "imported-101-m3", "imported-101-m4",
+    ]);
+    expect(expectedOpeningMove(opening, [0])?.id).toBe("imported-101-m4");
+    expect(continueOpeningMainLine(opening, [])).toEqual([0, 2]);
+    expect(opening.moves[0].next?.[0].next?.[0]).not.toBe(opening.moves[0].next?.[1].next?.[0]);
+  });
+
+  it("uses persisted branch display labels rather than internal stable keys", () => {
+    const opening = openingFromImportedLine({
+      id: 102, name: "labels", opening_type: "test", initial_sfen: "position",
+      moves: [
+        { id: 1, parent_move_id: null, usi: "7g7f", sort_order: 0, is_main: true,
+          move_key: "m1", variation_group: "main" },
+        { id: 2, parent_move_id: 1, usi: "2g2f", sort_order: 0, is_main: false,
+          move_key: "b", variation_group: "B" },
+        { id: 3, parent_move_id: 1, usi: "6g6f", sort_order: 1, is_main: true,
+          move_key: "a", variation_group: "A" },
+      ], source: { name: "fixture", license_name: "CC0", license_url: "" },
+    });
+
+    const choices = opening.moves[0].next!;
+    expect(choices.map((choice) => choice.branchLabel)).toEqual(["B", "A"]);
+    expect(choices.map((choice) => choice.branchLabel)).not.toContain("a");
+    expect(choices.map((choice) => choice.branchLabel)).not.toContain("b");
+    expect(mainOpeningChoice(choices)?.id).toBe("imported-102-a");
+  });
+
+  it("derives fallback branch labels from semantic main status", () => {
+    const opening = openingFromImportedLine({
+      id: 103, name: "semantic labels", opening_type: "test", initial_sfen: "position",
+      moves: [
+        { id: 1, parent_move_id: null, usi: "7g7f", sort_order: 0, is_main: true,
+          move_key: "root", variation_group: "main" },
+        { id: 2, parent_move_id: 1, usi: "2g2f", sort_order: 0, is_main: false,
+          move_key: "variation", variation_group: "main" },
+        { id: 3, parent_move_id: 1, usi: "6g6f", sort_order: 1, is_main: true,
+          move_key: "explicit-main", variation_group: "main" },
+      ], source: { name: "fixture", license_name: "CC0", license_url: "" },
+    });
+
+    const choices = opening.moves[0].next!;
+    expect(choices.map((choice) => choice.branchLabel)).toEqual([undefined, "本線"]);
+    expect(mainOpeningChoiceIndex(choices)).toBe(1);
+    expect(choices.map((_, index) => openingBranchChoiceLabel(choices, index))).toEqual(["分岐1", "本線"]);
+    expect(`変化 ${openingBranchChoiceLabel(choices, 0)}`).not.toBe("変化 本線");
+
+    const branchHistory = choices.map((_, index) => openingBranchChoiceLabel(choices, index));
+    expect(branchHistory[0]).not.toBe("本線");
+    expect(expectedOpeningMove(opening, [0])?.id).toBe("imported-103-explicit-main");
   });
 });
 

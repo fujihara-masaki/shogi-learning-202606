@@ -280,6 +280,7 @@ export interface OpeningSummary {
 }
 
 export interface ImportedOpeningMove {
+  id: number;
   ply: number;
   usi: string;
   from_sfen: string;
@@ -288,6 +289,8 @@ export interface ImportedOpeningMove {
   variation_group: string;
   parent_move_id: number | null;
   sort_order: number;
+  move_key: string;
+  is_main: boolean;
 }
 
 export interface ImportedOpeningPosition {

@@ -1,0 +1,531 @@
+import sqlite3
+
+import pytest
+import shogi
+
+from app.database import get_connection
+from app import seed
+from app.seed import _prepare_opening_move_nodes, seed_openings_if_empty, validate_opening_move_tree
+
+
+TREE_SEED = {
+    "name": "stable-key multi-level fixture",
+    "opening_type": "test",
+    "description": "stable key tree fixture",
+    "tag": "stable-key-tree",
+    "move_nodes": [
+        {"key": "m1", "parent_key": None, "usi": "7g7f", "sort_order": 0, "is_main": True},
+        {"key": "m2", "parent_key": "m1", "usi": "3c3d", "sort_order": 0, "is_main": True},
+        # Display B first, but follow A as the semantic main choice.
+        {"key": "b", "parent_key": "m2", "usi": "2g2f", "sort_order": 0, "is_main": False,
+         "branch_key": "b", "branch_label": "B", "comment": "explicit B comment"},
+        {"key": "a", "parent_key": "m2", "usi": "6g6f", "sort_order": 1, "is_main": True,
+         "branch_key": "a", "branch_label": "A"},
+        {"key": "a1", "parent_key": "a", "usi": "8c8d", "sort_order": 0, "is_main": False},
+        {"key": "a2", "parent_key": "a", "usi": "4c4d", "sort_order": 1, "is_main": True},
+    ],
+}
+
+
+def _seed_fixture(name, **overrides):
+    return {
+        "name": name,
+        "opening_type": "test",
+        "description": "seed compatibility fixture",
+        "tag": "seed-compatibility",
+        **overrides,
+    }
+
+
+def _line_and_rows(conn):
+    line = conn.execute(
+        "SELECT ol.id FROM opening_lines ol WHERE ol.source_id IS NULL ORDER BY (SELECT COUNT(*) FROM opening_line_moves m WHERE m.line_id=ol.id) DESC, ol.id LIMIT 1"
+    ).fetchone()
+    rows = conn.execute(
+        "SELECT * FROM opening_line_moves WHERE line_id=? ORDER BY ply, id", (line["id"],)
+    ).fetchall()
+    return line["id"], rows
+
+
+def test_seed_tree_is_direct_valid_and_reseed_is_idempotent(client):
+    conn = get_connection()
+    try:
+        before = conn.execute("SELECT COUNT(*) AS count FROM opening_line_moves").fetchone()["count"]
+        seed_openings_if_empty(conn)
+        conn.commit()
+        after = conn.execute("SELECT COUNT(*) AS count FROM opening_line_moves").fetchone()["count"]
+        assert after == before
+        validate_opening_move_tree(conn)
+        line_id, rows = _line_and_rows(conn)
+        assert all(row["parent_move_id"] is not None for row in rows if row["ply"] > 1)
+        detail = client.get(f"/api/openings/{line_id}").json()
+        assert {"id", "parent_move_id", "move_key", "is_main", "sort_order"} <= detail["moves"][0].keys()
+    finally:
+        conn.close()
+
+
+def test_stable_key_seed_persists_branch_of_branch_and_reseeds_by_natural_key(client, monkeypatch):
+    monkeypatch.setattr(seed, "SAMPLE_OPENING_LINES", [TREE_SEED])
+    conn = get_connection()
+    try:
+        seed_openings_if_empty(conn)
+        conn.commit()
+        line = conn.execute("SELECT id FROM opening_lines WHERE name=?", (TREE_SEED["name"],)).fetchone()
+        rows = conn.execute(
+            "SELECT * FROM opening_line_moves WHERE line_id=? ORDER BY ply, sort_order", (line["id"],)
+        ).fetchall()
+        first_ids = {row["move_key"]: row["id"] for row in rows}
+
+        seed_openings_if_empty(conn)
+        conn.commit()
+        rows = conn.execute(
+            "SELECT * FROM opening_line_moves WHERE line_id=? ORDER BY ply, sort_order", (line["id"],)
+        ).fetchall()
+        assert {row["move_key"]: row["id"] for row in rows} == first_ids
+        assert len(rows) == len(TREE_SEED["move_nodes"])
+
+        by_key = {row["move_key"]: row for row in rows}
+        assert by_key["a1"]["parent_move_id"] == by_key["a"]["id"]
+        assert by_key["a2"]["parent_move_id"] == by_key["a"]["id"]
+        assert by_key["a"]["sort_order"] == 1 and by_key["a"]["is_main"] == 1
+        assert by_key["b"]["sort_order"] == 0 and by_key["b"]["is_main"] == 0
+        assert by_key["a"]["variation_group"] == "A"
+        assert by_key["b"]["variation_group"] == "B"
+        assert by_key["a"]["comment"] == ""
+        assert by_key["b"]["comment"] == "explicit B comment"
+        for row in rows:
+            if row["parent_move_id"] is not None:
+                parent = next(candidate for candidate in rows if candidate["id"] == row["parent_move_id"])
+                assert row["ply"] == parent["ply"] + 1
+                assert row["from_sfen"] == parent["to_sfen"]
+        validate_opening_move_tree(conn, [line["id"]])
+
+        detail = client.get(f"/api/openings/{line['id']}")
+        assert detail.status_code == 200
+        api_by_key = {row["move_key"]: row for row in detail.json()["moves"]}
+        assert api_by_key["a1"]["parent_move_id"] == api_by_key["a"]["id"]
+        assert api_by_key["a2"]["parent_move_id"] == api_by_key["a"]["id"]
+        assert api_by_key["a"]["variation_group"] == "A"
+        assert api_by_key["b"]["variation_group"] == "B"
+    finally:
+        conn.close()
+
+
+def test_linear_stable_key_seed_infers_omitted_main_status(client, monkeypatch):
+    fixture = _seed_fixture(
+        "implicit linear stable-key main",
+        move_nodes=[
+            {"key": "m1", "parent_key": None, "usi": "7g7f", "sort_order": 0},
+            {"key": "m2", "parent_key": "m1", "usi": "3c3d", "sort_order": 0},
+            {"key": "m3", "parent_key": "m2", "usi": "2g2f", "sort_order": 0},
+        ],
+    )
+    monkeypatch.setattr(seed, "SAMPLE_OPENING_LINES", [fixture])
+    conn = get_connection()
+    try:
+        seed_openings_if_empty(conn)
+        line = conn.execute("SELECT id FROM opening_lines WHERE name=?", (fixture["name"],)).fetchone()
+        rows = conn.execute(
+            "SELECT * FROM opening_line_moves WHERE line_id=? ORDER BY ply", (line["id"],)
+        ).fetchall()
+        assert [row["is_main"] for row in rows] == [1, 1, 1]
+        validate_opening_move_tree(conn, [line["id"]])
+    finally:
+        conn.close()
+
+
+def test_stable_key_seed_infers_sole_child_inside_nested_branch():
+    nodes = _prepare_opening_move_nodes({"move_nodes": [
+        {"key": "root", "parent_key": None, "usi": "7g7f", "sort_order": 0},
+        {"key": "branch", "parent_key": "root", "usi": "3c3d", "sort_order": 0,
+         "is_main": True},
+        {"key": "alternative", "parent_key": "root", "usi": "8c8d", "sort_order": 1,
+         "is_main": False},
+        {"key": "nested", "parent_key": "branch", "usi": "2g2f", "sort_order": 0},
+        {"key": "leaf", "parent_key": "nested", "usi": "8c8d", "sort_order": 0},
+    ]}, shogi.STARTING_SFEN)
+
+    by_key = {node["key"]: node for node in nodes}
+    assert by_key["nested"]["is_main"] is True
+    assert by_key["leaf"]["is_main"] is True
+
+
+def test_stable_key_siblings_require_explicit_main_without_using_sort_order():
+    with pytest.raises(ValueError, match="multiple siblings require exactly one explicit is_main=true"):
+        _prepare_opening_move_nodes({"move_nodes": [
+            {"key": "root", "parent_key": None, "usi": "7g7f", "sort_order": 0},
+            {"key": "first", "parent_key": "root", "usi": "3c3d", "sort_order": 0},
+            {"key": "second", "parent_key": "root", "usi": "8c8d", "sort_order": 1},
+        ]}, shogi.STARTING_SFEN)
+
+
+def test_stable_key_explicit_main_is_independent_of_sibling_sort_order():
+    nodes = _prepare_opening_move_nodes({"move_nodes": [
+        {"key": "root", "parent_key": None, "usi": "7g7f", "sort_order": 0},
+        {"key": "variation", "parent_key": "root", "usi": "3c3d", "sort_order": 0,
+         "is_main": False},
+        {"key": "main", "parent_key": "root", "usi": "8c8d", "sort_order": 1,
+         "is_main": True},
+    ]}, shogi.STARTING_SFEN)
+
+    by_key = {node["key"]: node for node in nodes}
+    assert by_key["variation"]["is_main"] is False
+    assert by_key["main"]["is_main"] is True
+
+
+@pytest.mark.parametrize(
+    "tree_fields",
+    [
+        {"move_nodes": [
+            {"key": "m1", "parent_key": None, "usi": "7g7f", "sort_order": 0,
+             "is_main": True},
+            {"key": "m2", "parent_key": "m1", "usi": "3c3d", "sort_order": 0,
+             "is_main": True},
+        ]},
+        {"moves": ["7g7f", "3c3d"], "branches": [
+            {"name": "途中分岐", "from_ply": 1, "moves": ["8c8d"]},
+        ]},
+    ],
+    ids=["stable-key", "legacy"],
+)
+def test_startpos_seed_is_canonical_everywhere_and_idempotent(client, monkeypatch, tree_fields):
+    fixture = _seed_fixture("startpos canonical fixture", initial_sfen="startpos", **tree_fields)
+    monkeypatch.setattr(seed, "SAMPLE_OPENING_LINES", [fixture])
+    conn = get_connection()
+    try:
+        seed_openings_if_empty(conn)
+        line = conn.execute(
+            "SELECT * FROM opening_lines WHERE name=?", (fixture["name"],)
+        ).fetchone()
+        first_ids = {
+            row["move_key"]: row["id"] for row in conn.execute(
+                "SELECT id, move_key FROM opening_line_moves WHERE line_id=?", (line["id"],)
+            )
+        }
+        seed_openings_if_empty(conn)
+
+        line = conn.execute("SELECT * FROM opening_lines WHERE id=?", (line["id"],)).fetchone()
+        roots = conn.execute(
+            "SELECT * FROM opening_line_moves WHERE line_id=? AND parent_move_id IS NULL",
+            (line["id"],),
+        ).fetchall()
+        initial = conn.execute(
+            "SELECT sfen FROM opening_positions WHERE line_id=? AND ply=0", (line["id"],)
+        ).fetchone()
+        second_ids = {
+            row["move_key"]: row["id"] for row in conn.execute(
+                "SELECT id, move_key FROM opening_line_moves WHERE line_id=?", (line["id"],)
+            )
+        }
+        assert line["initial_sfen"] == shogi.STARTING_SFEN
+        assert {row["from_sfen"] for row in roots} == {shogi.STARTING_SFEN}
+        assert initial["sfen"] == shogi.STARTING_SFEN
+        assert second_ids == first_ids
+        validate_opening_move_tree(conn, [line["id"]])
+    finally:
+        conn.close()
+
+
+@pytest.mark.parametrize("branch_moves", [["8c8d"], ["8c8d", "8h2b+"]])
+def test_terminal_legacy_branches_choose_one_ordered_semantic_main(client, monkeypatch, branch_moves):
+    branches = [{"name": "first", "from_ply": 3, "moves": branch_moves}]
+    if len(branch_moves) == 1:
+        branches.append({"name": "second", "from_ply": 3, "moves": ["4c4d"]})
+    fixture = _seed_fixture(
+        "terminal legacy branch fixture",
+        moves=["7g7f", "3c3d", "2g2f"],
+        branches=branches,
+    )
+    monkeypatch.setattr(seed, "SAMPLE_OPENING_LINES", [fixture])
+    conn = get_connection()
+    try:
+        seed_openings_if_empty(conn)
+        seed_openings_if_empty(conn)
+        line = conn.execute("SELECT id FROM opening_lines WHERE name=?", (fixture["name"],)).fetchone()
+        rows = conn.execute(
+            "SELECT * FROM opening_line_moves WHERE line_id=? ORDER BY ply, sort_order", (line["id"],)
+        ).fetchall()
+        by_key = {row["move_key"]: row for row in rows}
+        terminal_children = [row for row in rows if row["parent_move_id"] == by_key["main-3"]["id"]]
+        assert [row["move_key"] for row in terminal_children if row["is_main"]] == ["branch-1-1"]
+        for sibling_parent in {row["parent_move_id"] for row in rows}:
+            siblings = [row for row in rows if row["parent_move_id"] == sibling_parent]
+            assert sum(row["is_main"] for row in siblings) == 1
+        validate_opening_move_tree(conn, [line["id"]])
+    finally:
+        conn.close()
+
+
+def test_intermediate_legacy_branch_keeps_main_line_continuation(client, monkeypatch):
+    fixture = _seed_fixture(
+        "intermediate legacy branch fixture",
+        moves=["7g7f", "3c3d", "2g2f"],
+        branches=[{"name": "branch", "from_ply": 2, "moves": ["6g6f"]}],
+    )
+    monkeypatch.setattr(seed, "SAMPLE_OPENING_LINES", [fixture])
+    conn = get_connection()
+    try:
+        seed_openings_if_empty(conn)
+        line = conn.execute("SELECT id FROM opening_lines WHERE name=?", (fixture["name"],)).fetchone()
+        rows = conn.execute(
+            "SELECT * FROM opening_line_moves WHERE line_id=?", (line["id"],)
+        ).fetchall()
+        by_key = {row["move_key"]: row for row in rows}
+        children = [row for row in rows if row["parent_move_id"] == by_key["main-2"]["id"]]
+        assert [row["move_key"] for row in children if row["is_main"]] == ["main-3"]
+        validate_opening_move_tree(conn, [line["id"]])
+    finally:
+        conn.close()
+
+
+def test_legacy_root_branches_preserve_main_order_and_direct_parent_chain(client, monkeypatch):
+    """Pre-PR-B seeds treated from_ply=0 branches as NULL-parent roots."""
+    fixture = _seed_fixture(
+        "legacy root branch fixture",
+        moves=["7g7f", "3c3d"],
+        branches=[
+            {"name": "root one", "from_ply": 0, "moves": ["2g2f", "8c8d", "2f2e"]},
+            {"name": "root two", "from_ply": 0, "moves": ["6g6f"]},
+        ],
+    )
+    monkeypatch.setattr(seed, "SAMPLE_OPENING_LINES", [fixture])
+    conn = get_connection()
+    try:
+        seed_openings_if_empty(conn)
+        line = conn.execute(
+            "SELECT * FROM opening_lines WHERE name=?", (fixture["name"],)
+        ).fetchone()
+        first_ids = {
+            row["move_key"]: row["id"] for row in conn.execute(
+                "SELECT id, move_key FROM opening_line_moves WHERE line_id=?", (line["id"],)
+            )
+        }
+        seed_openings_if_empty(conn)
+        rows = conn.execute(
+            "SELECT * FROM opening_line_moves WHERE line_id=? ORDER BY ply, sort_order",
+            (line["id"],),
+        ).fetchall()
+        by_key = {row["move_key"]: row for row in rows}
+        roots = [row for row in rows if row["parent_move_id"] is None]
+
+        assert [row["move_key"] for row in roots] == ["main-1", "branch-1-1", "branch-2-1"]
+        assert [row["sort_order"] for row in roots] == [0, 1, 2]
+        assert [row["move_key"] for row in roots if row["is_main"]] == ["main-1"]
+        assert {row["from_sfen"] for row in roots} == {line["initial_sfen"]}
+        assert by_key["branch-1-2"]["parent_move_id"] == by_key["branch-1-1"]["id"]
+        assert by_key["branch-1-3"]["parent_move_id"] == by_key["branch-1-2"]["id"]
+        for key in ("branch-1-2", "branch-1-3"):
+            row = by_key[key]
+            parent = next(candidate for candidate in rows if candidate["id"] == row["parent_move_id"])
+            assert parent["ply"] + 1 == row["ply"]
+            assert parent["to_sfen"] == row["from_sfen"]
+        assert {row["move_key"]: row["id"] for row in rows} == first_ids
+        validate_opening_move_tree(conn, [line["id"]])
+    finally:
+        conn.close()
+
+
+def test_stable_key_reseed_prunes_obsolete_nodes_and_positions(client, monkeypatch):
+    monkeypatch.setattr(seed, "SAMPLE_OPENING_LINES", [TREE_SEED])
+    conn = get_connection()
+    try:
+        seed_openings_if_empty(conn)
+        line = conn.execute("SELECT id FROM opening_lines WHERE name=?", (TREE_SEED["name"],)).fetchone()
+        original = {
+            row["move_key"]: row["id"]
+            for row in conn.execute(
+                "SELECT id, move_key FROM opening_line_moves WHERE line_id=?", (line["id"],)
+            )
+        }
+
+        revised = {**TREE_SEED, "move_nodes": [
+            *TREE_SEED["move_nodes"][:2],
+            # Reuse removed B's USI under a new stable key.
+            {"key": "c", "parent_key": "m2", "usi": "2g2f", "sort_order": 0,
+             "is_main": False, "branch_key": "c", "branch_label": "C"},
+            TREE_SEED["move_nodes"][3],
+        ]}
+        monkeypatch.setattr(seed, "SAMPLE_OPENING_LINES", [revised])
+        seed_openings_if_empty(conn)
+        seed_openings_if_empty(conn)
+        conn.commit()
+
+        rows = conn.execute(
+            "SELECT * FROM opening_line_moves WHERE line_id=? ORDER BY ply, sort_order", (line["id"],)
+        ).fetchall()
+        by_key = {row["move_key"]: row for row in rows}
+        assert set(by_key) == {"m1", "m2", "a", "c"}
+        assert by_key["m1"]["id"] == original["m1"]
+        assert by_key["m2"]["id"] == original["m2"]
+        assert by_key["a"]["id"] == original["a"]
+        assert by_key["a"]["parent_move_id"] == by_key["m2"]["id"]
+        assert all(row["sort_order"] >= 0 for row in rows)
+        assert conn.execute(
+            "SELECT MAX(ply) AS max_ply FROM opening_positions WHERE line_id=?", (line["id"],)
+        ).fetchone()["max_ply"] == 3
+        validate_opening_move_tree(conn, [line["id"]])
+
+        api_keys = {
+            row["move_key"] for row in client.get(f"/api/openings/{line['id']}").json()["moves"]
+        }
+        assert api_keys == set(by_key)
+    finally:
+        conn.close()
+
+
+def test_legacy_compatibility_row_is_claimed_once_with_resolved_parent(client, monkeypatch):
+    tree = {
+        **TREE_SEED,
+        "name": "single legacy claim fixture",
+        "move_nodes": [
+            {"key": "left", "parent_key": None, "usi": "7g7f", "sort_order": 0,
+             "is_main": True},
+            {"key": "right", "parent_key": None, "usi": "2g2f", "sort_order": 1,
+             "is_main": False},
+            {"key": "left-child", "parent_key": "left", "usi": "3c3d", "sort_order": 0,
+             "is_main": True, "branch_label": "同名"},
+            {"key": "right-child", "parent_key": "right", "usi": "3c3d", "sort_order": 0,
+             "is_main": True, "branch_label": "同名"},
+        ],
+    }
+    monkeypatch.setattr(seed, "SAMPLE_OPENING_LINES", [tree])
+    conn = get_connection()
+    try:
+        seed_openings_if_empty(conn)
+        line = conn.execute("SELECT id FROM opening_lines WHERE name=?", (tree["name"],)).fetchone()
+        rows = {
+            row["move_key"]: row
+            for row in conn.execute("SELECT * FROM opening_line_moves WHERE line_id=?", (line["id"],))
+        }
+        legacy_id = rows["left-child"]["id"]
+        conn.execute("DELETE FROM opening_line_moves WHERE id=?", (rows["right-child"]["id"],))
+        conn.execute(
+            "UPDATE opening_line_moves SET move_key=? WHERE id=?",
+            (f"legacy-{legacy_id}", legacy_id),
+        )
+
+        seed_openings_if_empty(conn)
+        first = {
+            row["move_key"]: row
+            for row in conn.execute("SELECT * FROM opening_line_moves WHERE line_id=?", (line["id"],))
+        }
+        seed_openings_if_empty(conn)
+        second_ids = {
+            row["move_key"]: row["id"]
+            for row in conn.execute("SELECT * FROM opening_line_moves WHERE line_id=?", (line["id"],))
+        }
+
+        assert first["left-child"]["id"] == legacy_id
+        assert first["right-child"]["id"] != legacy_id
+        assert first["left-child"]["id"] != first["right-child"]["id"]
+        assert first["left-child"]["parent_move_id"] == first["left"]["id"]
+        assert first["right-child"]["parent_move_id"] == first["right"]["id"]
+        assert second_ids == {key: row["id"] for key, row in first.items()}
+        validate_opening_move_tree(conn, [line["id"]])
+        conn.commit()
+        api_keys = {
+            row["move_key"] for row in client.get(f"/api/openings/{line['id']}").json()["moves"]
+        }
+        assert {"left-child", "right-child"} <= api_keys
+    finally:
+        conn.close()
+
+
+@pytest.mark.parametrize(
+    ("nodes", "message"),
+    [
+        ([{"key": "x", "parent_key": "missing", "usi": "7g7f", "is_main": True}], "missing.*parent_key"),
+        ([{"key": "x", "parent_key": None, "usi": "7g7f", "is_main": True},
+          {"key": "x", "parent_key": None, "usi": "2g2f", "is_main": False}], "duplicate.*key"),
+        ([{"key": "x", "parent_key": "y", "usi": "7g7f", "is_main": True},
+          {"key": "y", "parent_key": "x", "usi": "3c3d", "is_main": True}], "cycle"),
+        ([{"key": "x", "parent_key": None, "usi": "7g7g", "is_main": True}], "illegal.*USI"),
+    ],
+)
+def test_stable_key_seed_rejects_invalid_graphs(nodes, message):
+    with pytest.raises(ValueError, match=message):
+        _prepare_opening_move_nodes({"move_nodes": nodes}, shogi.STARTING_SFEN)
+
+
+def test_root_sort_order_is_unique_but_distinct_root_orders_are_allowed(client):
+    conn = get_connection()
+    try:
+        line_id, rows = _line_and_rows(conn)
+        root = next(row for row in rows if row["parent_move_id"] is None)
+        values = (line_id, root["ply"], root["usi"], root["from_sfen"], root["to_sfen"], "extra-root")
+        sql = """INSERT INTO opening_line_moves
+                 (line_id, ply, usi, from_sfen, to_sfen, variation_group,
+                  parent_move_id, sort_order, move_key, is_main)
+                 VALUES (?, ?, ?, ?, ?, ?, NULL, ?, ?, ?)"""
+        with pytest.raises(sqlite3.IntegrityError):
+            conn.execute(sql, (*values, root["sort_order"], "duplicate-root", 0))
+
+        distinct_order = root["sort_order"] + 1
+        conn.execute(sql, (*values, distinct_order, "distinct-root", 0))
+        assert conn.execute(
+            """SELECT 1 FROM opening_line_moves
+               WHERE line_id=? AND parent_move_id IS NULL AND sort_order=?""",
+            (line_id, distinct_order),
+        ).fetchone()
+    finally:
+        conn.rollback()
+        conn.close()
+
+
+def test_tree_validator_normalizes_root_and_initial_positions(client):
+    conn = get_connection()
+    try:
+        line_id, rows = _line_and_rows(conn)
+        root = next(row for row in rows if row["parent_move_id"] is None)
+
+        # The persisted full SFEN and its startpos alias describe one position.
+        conn.execute("UPDATE opening_lines SET initial_sfen='startpos' WHERE id=?", (line_id,))
+        validate_opening_move_tree(conn, [line_id])
+        conn.execute(
+            "UPDATE opening_lines SET initial_sfen=? WHERE id=?",
+            (shogi.STARTING_SFEN, line_id),
+        )
+        conn.execute("UPDATE opening_line_moves SET from_sfen='startpos' WHERE id=?", (root["id"],))
+        validate_opening_move_tree(conn, [line_id])
+
+        # Use another valid position and a legal move from it; validation must
+        # still reject the root because it is unrelated to the line's initial position.
+        board = shogi.Board()
+        board.push_usi("7g7f")
+        unrelated_from = board.sfen()
+        board.push_usi("3c3d")
+        conn.execute(
+            "UPDATE opening_line_moves SET usi='3c3d', from_sfen=?, to_sfen=? WHERE id=?",
+            (unrelated_from, board.sfen(), root["id"]),
+        )
+        with pytest.raises(ValueError, match="root/initial SFEN mismatch"):
+            validate_opening_move_tree(conn, [line_id])
+    finally:
+        conn.rollback()
+        conn.close()
+
+
+@pytest.mark.parametrize(
+    ("mutation", "message"),
+    [
+        ("UPDATE opening_line_moves SET is_main=0 WHERE line_id=? AND parent_move_id IS NULL", "exactly one main"),
+        ("UPDATE opening_line_moves SET is_main=1 WHERE line_id=? AND parent_move_id=(SELECT parent_move_id FROM opening_line_moves WHERE line_id=? AND parent_move_id IS NOT NULL GROUP BY parent_move_id HAVING COUNT(*) > 1 LIMIT 1)", "exactly one main"),
+        ("UPDATE opening_line_moves SET parent_move_id=999999 WHERE id=(SELECT id FROM opening_line_moves WHERE line_id=? ORDER BY ply DESC LIMIT 1)", "invalid opening parent"),
+        ("UPDATE opening_line_moves SET parent_move_id=id WHERE id=(SELECT id FROM opening_line_moves WHERE line_id=? ORDER BY ply DESC LIMIT 1)", "opening cycle"),
+        ("UPDATE opening_line_moves SET from_sfen='invalid sfen' WHERE id=(SELECT id FROM opening_line_moves WHERE line_id=? ORDER BY ply DESC LIMIT 1)", "SFEN mismatch"),
+        ("UPDATE opening_line_moves SET usi='7g7g' WHERE id=(SELECT id FROM opening_line_moves WHERE line_id=? ORDER BY ply DESC LIMIT 1)", "illegal opening move"),
+    ],
+)
+def test_tree_validator_rejects_broken_contract(client, mutation, message):
+    conn = get_connection()
+    try:
+        line_id, _ = _line_and_rows(conn)
+        if message == "invalid opening parent":
+            conn.execute("PRAGMA foreign_keys=OFF")
+        placeholders = mutation.count("?")
+        conn.execute(mutation, tuple(line_id for _ in range(placeholders)))
+        with pytest.raises((ValueError, Exception), match=message):
+            validate_opening_move_tree(conn, [line_id])
+    finally:
+        conn.rollback()
+        conn.close()

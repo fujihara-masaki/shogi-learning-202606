@@ -530,11 +530,8 @@ def seed_opening_catalog_if_empty(conn) -> None:
 def find_duplicate_opening_sibling_moves(conn, line_ids=None) -> list[dict]:
     """Return duplicate USI moves that compete from the same seeded position.
 
-    The current opening replay contract treats moves with the same ``from_sfen``
-    in a line as siblings.  Keep this check in Python rather than adding a
-    database uniqueness constraint: future tree/transposition representations
-    may legitimately need more than ``line_id``, ``from_sfen`` and ``usi`` to
-    identify a node.
+    Siblings are nodes with the same direct parent (roots share NULL).  SFEN is
+    deliberately not identity: transposed paths remain separate tree nodes.
     """
     params = []
     line_filter = ""
@@ -547,18 +544,247 @@ def find_duplicate_opening_sibling_moves(conn, line_ids=None) -> list[dict]:
 
     rows = conn.execute(
         f"""
-        SELECT olm.line_id, ol.name AS line_name, olm.from_sfen, olm.usi,
+        SELECT olm.line_id, ol.name AS line_name, olm.parent_move_id, olm.usi,
                COUNT(*) AS duplicate_count
         FROM opening_line_moves AS olm
         JOIN opening_lines AS ol ON ol.id = olm.line_id
         {line_filter}
-        GROUP BY olm.line_id, ol.name, olm.from_sfen, olm.usi
+        GROUP BY olm.line_id, ol.name, olm.parent_move_id, olm.usi
         HAVING COUNT(*) > 1
-        ORDER BY olm.line_id, olm.from_sfen, olm.usi
+        ORDER BY olm.line_id, olm.parent_move_id, olm.usi
         """,
         params,
     ).fetchall()
     return [dict(row) for row in rows]
+
+
+def validate_opening_move_tree(conn, line_ids=None) -> None:
+    """Validate the persisted direct-parent tree and explicit-main contract."""
+    import shogi
+
+    params = []
+    where = ""
+    if line_ids is not None:
+        ids = sorted({int(value) for value in line_ids})
+        if not ids:
+            return
+        where = f"WHERE line_id IN ({','.join('?' for _ in ids)})"
+        params = ids
+    rows = conn.execute(f"SELECT * FROM opening_line_moves {where} ORDER BY line_id, id", params).fetchall()
+    line_rows = conn.execute(
+        f"SELECT id, initial_sfen FROM opening_lines "
+        + (f"WHERE id IN ({','.join('?' for _ in params)})" if line_ids is not None else ""),
+        params,
+    ).fetchall()
+    initial_positions = {}
+    for line in line_rows:
+        initial_sfen = shogi.STARTING_SFEN if line["initial_sfen"].strip() == "startpos" else line["initial_sfen"]
+        initial_positions[line["id"]] = " ".join(shogi.Board(initial_sfen).sfen().split()[:3])
+    by_id = {row["id"]: row for row in rows}
+    keys = set()
+    siblings = {}
+    for row in rows:
+        key = (row["line_id"], row["move_key"])
+        if not row["move_key"] or key in keys:
+            raise ValueError("opening move_key must be non-empty and unique within a line")
+        keys.add(key)
+        seen = set()
+        cursor = row
+        while cursor["parent_move_id"] is not None:
+            if cursor["id"] in seen:
+                raise ValueError(f"opening cycle: {row['move_key']}")
+            seen.add(cursor["id"])
+            cursor = by_id.get(cursor["parent_move_id"])
+            if cursor is None:
+                break
+        parent = by_id.get(row["parent_move_id"]) if row["parent_move_id"] is not None else None
+        if row["parent_move_id"] is not None and parent is None:
+            raise ValueError(f"invalid opening parent: {row['move_key']}")
+        if parent is not None:
+            if parent["line_id"] != row["line_id"]:
+                raise ValueError(f"opening parent belongs to another line: {row['move_key']}")
+            if row["ply"] != parent["ply"] + 1:
+                raise ValueError(f"opening ply mismatch: {row['move_key']}")
+            if parent["to_sfen"] != row["from_sfen"]:
+                raise ValueError(f"opening parent/child SFEN mismatch: {row['move_key']}")
+        else:
+            if row["ply"] != 1:
+                raise ValueError(f"only ply-one opening moves may be roots: {row['move_key']}")
+            root_sfen = shogi.STARTING_SFEN if row["from_sfen"].strip() == "startpos" else row["from_sfen"]
+            root_position = " ".join(shogi.Board(root_sfen).sfen().split()[:3])
+            if root_position != initial_positions[row["line_id"]]:
+                raise ValueError(f"opening root/initial SFEN mismatch: {row['move_key']}")
+        from_sfen = shogi.STARTING_SFEN if row["from_sfen"].strip() == "startpos" else row["from_sfen"]
+        board = shogi.Board(from_sfen)
+        move = shogi.Move.from_usi(row["usi"])
+        if move not in board.legal_moves:
+            raise ValueError(f"illegal opening move: {row['move_key']} {row['usi']}")
+        board.push(move)
+        if board.sfen() != row["to_sfen"]:
+            raise ValueError(f"opening generated SFEN mismatch: {row['move_key']}")
+        siblings.setdefault((row["line_id"], row["parent_move_id"]), []).append(row)
+    for group in siblings.values():
+        if sum(int(row["is_main"]) for row in group) != 1:
+            raise ValueError("each opening sibling set must contain exactly one main move")
+        if len({row["sort_order"] for row in group}) != len(group):
+            raise ValueError("opening sibling sort_order must be unique")
+        if len({row["usi"] for row in group}) != len(group):
+            raise ValueError("opening sibling USI must be unique")
+
+
+def _opening_move_nodes(opening: dict) -> list[dict]:
+    """Return the canonical stable-key tree for either supported seed syntax."""
+    if "move_nodes" in opening:
+        return [dict(node) for node in opening["move_nodes"]]
+
+    nodes = []
+    comments = opening.get("comments", [])
+    for index, usi in enumerate(opening.get("moves", [])):
+        nodes.append({
+            "key": f"main-{index + 1}",
+            "parent_key": f"main-{index}" if index else None,
+            "usi": usi,
+            "sort_order": 0,
+            "is_main": True,
+            "variation_group": "main",
+            "comment": comments[index] if index < len(comments) else "",
+        })
+    for branch_index, branch in enumerate(opening.get("branches", []), start=1):
+        from_ply = int(branch["from_ply"])
+        # The pre-PR-B adapter represented a branch from the initial position
+        # as a root sibling (parent_move_id=NULL), not as a child of a
+        # nonexistent main-0 node.
+        parent_key = None if from_ply == 0 else f"main-{from_ply}"
+        for offset, usi in enumerate(branch["moves"], start=1):
+            key = f"branch-{branch_index}-{offset}"
+            nodes.append({
+                "key": key,
+                "parent_key": parent_key,
+                "usi": usi,
+                "sort_order": branch_index if offset == 1 else 0,
+                "is_main": offset != 1,
+                "variation_group": branch["name"],
+                "comment": (
+                    branch.get("note", f"{branch['name']} {offset}手目です。")
+                    if offset == 1 else f"{branch['name']} {offset}手目です。"
+                ),
+            })
+            parent_key = key
+
+    # The legacy syntax did not explicitly identify a semantic continuation.
+    # A following main-line move wins when present; otherwise the first
+    # displayed terminal branch becomes the continuation.  Single-child
+    # branch chains are handled by the same sibling-set rule.
+    siblings = {}
+    for node in nodes:
+        siblings.setdefault(node["parent_key"], []).append(node)
+    for children in siblings.values():
+        if not any(child["is_main"] for child in children):
+            min(children, key=lambda child: (child["sort_order"], child["key"]))["is_main"] = True
+    return nodes
+
+
+def _prepare_opening_move_nodes(opening: dict, initial_sfen: str) -> list[dict]:
+    """Validate a seed tree and derive its DB parent, ply, and SFEN fields."""
+    import shogi
+
+    nodes = _opening_move_nodes(opening)
+    by_key = {}
+    for node in nodes:
+        key = node.get("key")
+        if not isinstance(key, str) or not key:
+            raise ValueError("opening move node key must be a non-empty string")
+        if key in by_key:
+            raise ValueError(f"duplicate opening move node key: {key}")
+        by_key[key] = node
+    for node in nodes:
+        parent_key = node.get("parent_key")
+        if parent_key is not None and parent_key not in by_key:
+            raise ValueError(f"missing opening move node parent_key: {parent_key}")
+
+    visiting = set()
+    prepared = {}
+
+    def prepare(key):
+        if key in prepared:
+            return prepared[key]
+        if key in visiting:
+            raise ValueError(f"opening move node cycle: {key}")
+        visiting.add(key)
+        source = by_key[key]
+        parent_key = source.get("parent_key")
+        parent = prepare(parent_key) if parent_key is not None else None
+        from_sfen = parent["to_sfen"] if parent else initial_sfen
+        board = shogi.Board(shogi.STARTING_SFEN if from_sfen.strip() == "startpos" else from_sfen)
+        try:
+            move = shogi.Move.from_usi(source["usi"])
+        except (ValueError, TypeError) as exc:
+            raise ValueError(f"illegal opening move node USI: {key} {source.get('usi')}") from exc
+        if move not in board.legal_moves:
+            raise ValueError(f"illegal opening move node USI: {key} {source['usi']}")
+        board.push(move)
+        result = {
+            **source,
+            "parent_key": parent_key,
+            "ply": parent["ply"] + 1 if parent else 1,
+            "from_sfen": shogi.STARTING_SFEN if from_sfen.strip() == "startpos" else from_sfen,
+            "to_sfen": board.sfen(),
+            "sort_order": int(source.get("sort_order", 0)),
+            # Keep omission distinct from an explicit false until sibling
+            # cardinality is known.  Display order must never imply semantic
+            # main status for a branching stable-key seed.
+            "is_main": bool(source["is_main"]) if "is_main" in source else None,
+            # variation_group is the existing persisted display-label field.
+            # Stable branch keys identify nodes; they must not leak into the UI
+            # when the seed provides a separate human-readable label.
+            "variation_group": source.get(
+                "variation_group", source.get("branch_label", source.get("branch_key", "main"))
+            ),
+            "comment": source.get("comment", ""),
+        }
+        visiting.remove(key)
+        prepared[key] = result
+        return result
+
+    for key in by_key:
+        prepare(key)
+
+    siblings = {}
+    for node in prepared.values():
+        siblings.setdefault(node["parent_key"], []).append(node)
+    for children in siblings.values():
+        if len({child["sort_order"] for child in children}) != len(children):
+            raise ValueError("opening move node sibling sort_order must be unique")
+        if len(children) == 1 and children[0]["is_main"] is None:
+            children[0]["is_main"] = True
+        elif len(children) > 1 and all(child["is_main"] is None for child in children):
+            raise ValueError(
+                "opening move node siblings are ambiguous; multiple siblings "
+                "require exactly one explicit is_main=true"
+            )
+        if sum(child["is_main"] is True for child in children) != 1:
+            raise ValueError("opening move node siblings must have exactly one is_main")
+        for child in children:
+            if child["is_main"] is None:
+                child["is_main"] = False
+        if len({child["usi"] for child in children}) != len(children):
+            raise ValueError("opening move node sibling USI must be unique")
+
+    # Parents always precede children, independent of input order.
+    return sorted(prepared.values(), key=lambda node: (node["ply"], node["sort_order"], node["key"]))
+
+
+def _semantic_main_nodes(nodes: list[dict]) -> list[dict]:
+    children = {}
+    for node in nodes:
+        children.setdefault(node["parent_key"], []).append(node)
+    result = []
+    parent_key = None
+    while parent_key in children:
+        main = next(node for node in children[parent_key] if node["is_main"])
+        result.append(main)
+        parent_key = main["key"]
+    return result
 
 
 def seed_openings_if_empty(conn) -> None:
@@ -566,9 +792,15 @@ def seed_openings_if_empty(conn) -> None:
 
     seeded_line_ids = []
     for opening in SAMPLE_OPENING_LINES:
-        opening.setdefault("comments", [f"{opening['name']}の代表手順 {i}手目です。" for i in range(1, len(opening["moves"]) + 1)])
+        opening.setdefault("comments", [f"{opening['name']}の代表手順 {i}手目です。" for i in range(1, len(opening.get("moves", [])) + 1)])
         metadata = _opening_source_metadata(opening)
-        positions, move_rows = _opening_snapshots(shogi.STARTING_SFEN, opening["moves"])
+        initial_sfen = opening.get("initial_sfen", shogi.STARTING_SFEN)
+        initial_sfen = shogi.STARTING_SFEN if initial_sfen.strip() == "startpos" else initial_sfen
+        move_nodes = _prepare_opening_move_nodes(opening, initial_sfen)
+        main_nodes = _semantic_main_nodes(move_nodes)
+        main_moves = [node["usi"] for node in main_nodes]
+        main_comments = [node["comment"] for node in main_nodes]
+        positions, _ = _opening_snapshots(initial_sfen, main_moves)
         type_row = conn.execute(
             "SELECT id FROM opening_types WHERE name_ja = ?", (opening.get("opening_type_name", opening["name"]),)
         ).fetchone()
@@ -597,9 +829,9 @@ def seed_openings_if_empty(conn) -> None:
                 (
                     type_id,
                     opening["opening_type"],
-                    shogi.STARTING_SFEN,
-                    json.dumps(opening["moves"], ensure_ascii=False),
-                    json.dumps(opening["comments"], ensure_ascii=False),
+                    initial_sfen,
+                    json.dumps(main_moves, ensure_ascii=False),
+                    json.dumps(main_comments, ensure_ascii=False),
                     json.dumps([opening["tag"]], ensure_ascii=False),
                     metadata["source_url"],
                     metadata["source_title"],
@@ -625,9 +857,9 @@ def seed_openings_if_empty(conn) -> None:
                     type_id,
                     opening["name"],
                     opening["opening_type"],
-                    shogi.STARTING_SFEN,
-                    json.dumps(opening["moves"], ensure_ascii=False),
-                    json.dumps(opening["comments"], ensure_ascii=False),
+                    initial_sfen,
+                    json.dumps(main_moves, ensure_ascii=False),
+                    json.dumps(main_comments, ensure_ascii=False),
                     json.dumps([opening["tag"]], ensure_ascii=False),
                     metadata["source_url"],
                     metadata["source_title"],
@@ -657,84 +889,103 @@ def seed_openings_if_empty(conn) -> None:
                     "INSERT INTO opening_positions(line_id, ply, sfen) VALUES (?, ?, ?)",
                     (line_id, ply, sfen),
                 )
+        conn.execute(
+            "DELETE FROM opening_positions WHERE line_id = ? AND ply >= ?",
+            (line_id, len(positions)),
+        )
 
-        for ply, usi, before, after in move_rows:
-            comment = opening["comments"][ply - 1]
-            move_row = conn.execute(
-                """
-                SELECT id
-                FROM opening_line_moves
-                WHERE line_id = ? AND ply = ? AND variation_group = 'main' AND sort_order = 0
-                """,
-                (line_id, ply),
+        existing_ids = {}
+        claimed_legacy_ids = set()
+        for node in move_nodes:
+            row = conn.execute(
+                "SELECT id FROM opening_line_moves WHERE line_id=? AND move_key=?",
+                (line_id, node["key"]),
             ).fetchone()
-            if move_row:
+            if row is not None:
+                existing_ids[node["key"]] = int(row["id"])
+
+        # A user-defined stable key may itself start with ``legacy-``. Reserve
+        # every row already matched by its natural key, and only treat the
+        # exact ``legacy-<id>`` form emitted by the schema migration as a
+        # compatibility candidate below.
+        claimed_legacy_ids.update(existing_ids.values())
+
+        for node in move_nodes:
+            if node["key"] in existing_ids:
+                continue
+            parent_key = node["parent_key"]
+            parent_id = existing_ids.get(parent_key)
+            # Do not force a structural match when a non-root parent itself is
+            # new: its database identity is not known yet.
+            if parent_key is not None and parent_id is None:
+                continue
+            parent_clause = "parent_move_id IS NULL" if parent_id is None else "parent_move_id=?"
+            params = [
+                line_id, node["ply"], node["variation_group"], node["sort_order"], node["usi"],
+            ]
+            if parent_id is not None:
+                params.append(parent_id)
+            candidates = conn.execute(
+                f"""SELECT id FROM opening_line_moves
+                    WHERE line_id=? AND ply=? AND variation_group=? AND sort_order=? AND usi=?
+                      AND {parent_clause} AND move_key = 'legacy-' || id
+                    ORDER BY id""",
+                params,
+            ).fetchall()
+            row = next(
+                (candidate for candidate in candidates
+                 if int(candidate["id"]) not in claimed_legacy_ids),
+                None,
+            )
+            if row is not None:
+                claimed_id = int(row["id"])
+                claimed_legacy_ids.add(claimed_id)
+                existing_ids[node["key"]] = claimed_id
+
+        # Avoid transient sibling-unique conflicts if an existing seed changes
+        # its parent or display order. Stable move_key remains the natural key.
+        conn.execute(
+            "UPDATE opening_line_moves SET sort_order = -1000000000 - id WHERE line_id = ?",
+            (line_id,),
+        )
+        id_by_key = {}
+        for node in move_nodes:
+            parent_id = id_by_key.get(node["parent_key"])
+            current_id = existing_ids.get(node["key"])
+            values = (
+                node["ply"], node["usi"], node["from_sfen"], node["to_sfen"], node["comment"],
+                node["variation_group"], parent_id, node["sort_order"], int(node["is_main"]),
+            )
+            if current_id is not None:
                 conn.execute(
-                    """
-                    UPDATE opening_line_moves
-                    SET usi = ?, from_sfen = ?, to_sfen = ?, comment = ?
-                    WHERE id = ?
-                    """,
-                    (usi, before, after, comment, move_row["id"]),
+                    """UPDATE opening_line_moves
+                       SET ply=?, usi=?, from_sfen=?, to_sfen=?, comment=?, variation_group=?,
+                           parent_move_id=?, sort_order=?, move_key=?, is_main=? WHERE id=?""",
+                    (*values[:-1], node["key"], values[-1], current_id),
                 )
             else:
-                conn.execute(
-                    """
-                    INSERT INTO opening_line_moves(line_id, ply, usi, from_sfen, to_sfen, comment, variation_group, sort_order)
-                    VALUES (?, ?, ?, ?, ?, ?, 'main', 0)
-                    """,
-                    (line_id, ply, usi, before, after, comment),
+                cur = conn.execute(
+                    """INSERT INTO opening_line_moves
+                       (line_id, ply, usi, from_sfen, to_sfen, comment, variation_group,
+                        parent_move_id, sort_order, move_key, is_main)
+                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    (line_id, *values[:-1], node["key"], values[-1]),
                 )
+                current_id = int(cur.lastrowid)
+            id_by_key[node["key"]] = current_id
 
-        main_sfen_by_ply = {ply: sfen for ply, sfen in enumerate(positions)}
-        main_move_id_by_ply = {
-            row["ply"]: row["id"]
-            for row in conn.execute(
-                """
-                SELECT id, ply FROM opening_line_moves
-                WHERE line_id = ? AND variation_group = 'main'
-                """,
-                (line_id,),
-            ).fetchall()
-        }
-        for branch_index, branch in enumerate(opening.get("branches", []), start=1):
-            branch_name = branch["name"]
-            from_ply = int(branch["from_ply"])
-            board = shogi.Board(main_sfen_by_ply[from_ply])
-            parent_move_id = main_move_id_by_ply.get(from_ply)
-            for offset, usi in enumerate(branch["moves"], start=1):
-                branch_ply = from_ply + offset
-                before = board.sfen()
-                move = shogi.Move.from_usi(usi)
-                if move not in board.legal_moves:
-                    raise ValueError(f"サンプル定跡分岐手が不正です: {opening['name']} {branch_name} {usi}")
-                board.push(move)
-                after = board.sfen()
-                comment = branch.get("note", f"{branch_name} {offset}手目です。") if offset == 1 else f"{branch_name} {offset}手目です。"
-                move_row = conn.execute(
-                    """
-                    SELECT id FROM opening_line_moves
-                    WHERE line_id = ? AND ply = ? AND variation_group = ? AND sort_order = ?
-                    """,
-                    (line_id, branch_ply, branch_name, branch_index),
-                ).fetchone()
-                if move_row:
-                    conn.execute(
-                        """
-                        UPDATE opening_line_moves
-                        SET usi = ?, from_sfen = ?, to_sfen = ?, comment = ?, parent_move_id = ?
-                        WHERE id = ?
-                        """,
-                        (usi, before, after, comment, parent_move_id, move_row["id"]),
-                    )
-                else:
-                    conn.execute(
-                        """
-                        INSERT INTO opening_line_moves(line_id, ply, usi, from_sfen, to_sfen, comment, variation_group, parent_move_id, sort_order)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-                        """,
-                        (line_id, branch_ply, usi, before, after, comment, branch_name, parent_move_id, branch_index),
-                    )
+        # The stable-key seed is the canonical snapshot for this line.  Prune
+        # only after every retained node has been upserted and reparented, so an
+        # obsolete parent's ON DELETE CASCADE cannot remove a retained child.
+        retained_ids = tuple(id_by_key.values())
+        if retained_ids:
+            placeholders = ", ".join("?" for _ in retained_ids)
+            conn.execute(
+                f"DELETE FROM opening_line_moves WHERE line_id = ? AND id NOT IN ({placeholders})",
+                (line_id, *retained_ids),
+            )
+        else:
+            conn.execute("DELETE FROM opening_line_moves WHERE line_id = ?", (line_id,))
 
         tag_row = conn.execute(
             "SELECT id FROM opening_tags WHERE line_id = ? AND tag = ?",
@@ -758,6 +1009,7 @@ def seed_openings_if_empty(conn) -> None:
             for row in duplicates
         )
         raise ValueError(f"サンプル定跡に同一 sibling USI の重複があります: {details}")
+    validate_opening_move_tree(conn, seeded_line_ids)
 
 
 def seed_if_empty() -> None:

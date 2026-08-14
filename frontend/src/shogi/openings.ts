@@ -9,6 +9,8 @@ export interface OpeningMoveNode {
   aim: string;
   hint: string;
   branchLabel?: string;
+  isMain?: boolean;
+  sortOrder?: number;
   sourceUrl?: string;
   sourceTitle?: string;
   license?: string;
@@ -169,7 +171,7 @@ export function countMainLineMoves(opening: OpeningLine): number {
   let choices = opening.moves;
   while (choices.length > 0) {
     count += 1;
-    choices = choices[0].next ?? [];
+    choices = mainOpeningChoice(choices)?.next ?? [];
   }
   return count;
 }
@@ -178,7 +180,7 @@ export function flattenMainLine(opening: OpeningLine): OpeningMoveNode[] {
   const line: OpeningMoveNode[] = [];
   let choices = opening.moves;
   while (choices.length > 0) {
-    const node = choices[0];
+    const node = mainOpeningChoice(choices)!;
     line.push(node);
     choices = node.next ?? [];
   }
@@ -220,7 +222,32 @@ export function expectedOpeningMove(opening: OpeningLine, path: number[]): Openi
     if (!node) return null;
     choices = node.next ?? [];
   }
-  return choices[0] ?? null;
+  return mainOpeningChoice(choices);
+}
+
+export function mainOpeningChoice(choices: OpeningMoveNode[]): OpeningMoveNode | null {
+  return choices.find((choice) => choice.isMain === true) ?? choices[0] ?? null;
+}
+
+/** Return the array index of the semantic main choice, with the legacy first-choice fallback. */
+export function mainOpeningChoiceIndex(choices: OpeningMoveNode[]): number {
+  const main = mainOpeningChoice(choices);
+  return main ? choices.indexOf(main) : -1;
+}
+
+/** Return the user-facing label for a choice at a branch point. */
+export function openingBranchChoiceLabel(choices: OpeningMoveNode[], index: number): string {
+  const choice = choices[index];
+  if (!choice) return `分岐${index + 1}`;
+  return choice.branchLabel ?? (choice === mainOpeningChoice(choices) ? "本線" : `分岐${index + 1}`);
+}
+
+/** Return the user-facing labels of the branch points traversed by an applied path. */
+export function selectedOpeningBranchPath(steps: OpeningStep[]): string {
+  const labels = steps
+    .filter((step) => step.choices.length > 1)
+    .map((step) => openingBranchChoiceLabel(step.choices, step.choices.indexOf(step.node)));
+  return labels.join(" → ") || "本線";
 }
 
 export function findOpeningChoiceIndex(choices: OpeningMoveNode[], move: Pick<Move, "usi">): number {
@@ -238,8 +265,10 @@ export function continueOpeningMainLine(opening: OpeningLine, path: number[]): n
     choices = node.next ?? [];
   }
   while (choices.length > 0) {
-    nextPath.push(0);
-    choices = choices[0].next ?? [];
+    const mainIndex = mainOpeningChoiceIndex(choices);
+    const main = choices[mainIndex];
+    nextPath.push(mainIndex);
+    choices = main.next ?? [];
   }
   return nextPath;
 }
@@ -262,7 +291,7 @@ export interface ImportedOpeningLike {
   name: string;
   opening_type: string;
   initial_sfen: string;
-  moves: Array<{ usi: string; comment?: string; from_sfen?: string; to_sfen?: string; variation_group?: string; sort_order?: number }>;
+  moves: Array<{ id?: number; usi: string; comment?: string; from_sfen?: string; to_sfen?: string; variation_group?: string; parent_move_id?: number | null; sort_order?: number; move_key?: string; is_main?: boolean }>;
   tags?: Array<{ label?: string; tag: string }>;
   source?: {
     name: string;
@@ -283,11 +312,13 @@ export interface ImportedOpeningLike {
 export function openingFromImportedLine(imported: ImportedOpeningLike): OpeningLine {
   const sourceLabel = imported.source?.source_title || imported.source?.name || "インポートデータ";
   const licenseLabel = imported.source?.license || imported.source?.license_name || "";
-  const decorate = (move: { usi: string; comment?: string; variation_group?: string }, index: number, branchLabel?: string): OpeningMoveNode => ({
-    id: `imported-${imported.id}-${move.variation_group ?? "main"}-${index + 1}-${move.usi}`,
+  const decorate = (move: ImportedOpeningLike["moves"][number], index: number, branchLabel?: string): OpeningMoveNode => ({
+    id: `imported-${imported.id}-${move.move_key ?? move.id ?? `${index + 1}-${move.usi}`}`,
     usi: move.usi,
     notation: move.usi,
     branchLabel,
+    isMain: move.is_main,
+    sortOrder: move.sort_order,
     explanation: move.comment || "Wikipediaで確認できる範囲の定跡手です。",
     aim: licenseLabel ? `出典: ${sourceLabel} / ライセンス: ${licenseLabel}` : `出典: ${sourceLabel}`,
     hint: `USI ${move.usi} の手を指します。`,
@@ -300,6 +331,31 @@ export function openingFromImportedLine(imported: ImportedOpeningLike): OpeningL
     sourceLicense: imported.source?.source_license,
     sourceRetrievedAt: imported.source?.source_retrieved_at,
   });
+
+  const hasDirectTree = imported.moves.every((move) => typeof move.id === "number" && "parent_move_id" in move);
+  const byParent = new Map<number | null, Array<{ move: ImportedOpeningLike["moves"][number]; index: number }>>();
+  for (const [index, move] of imported.moves.entries()) {
+    if (!hasDirectTree) break;
+    const bucket = byParent.get(move.parent_move_id ?? null) ?? [];
+    bucket.push({ move, index });
+    byParent.set(move.parent_move_id ?? null, bucket);
+  }
+  const buildFromParent = (parentId: number | null, ancestors: Set<number>): OpeningMoveNode[] =>
+    (byParent.get(parentId) ?? [])
+      .sort((a, b) => (a.move.sort_order ?? 0) - (b.move.sort_order ?? 0) || (a.move.move_key ?? "").localeCompare(b.move.move_key ?? "") || (a.move.id! - b.move.id!))
+      .map(({ move, index }) => {
+        if (ancestors.has(move.id!)) throw new Error(`定跡ツリーに循環があります: ${move.id}`);
+        const choices = byParent.get(parentId) ?? [];
+        const displayLabel = move.variation_group && move.variation_group !== "main"
+          ? move.variation_group
+          : undefined;
+        const branchLabel = choices.length > 1
+          ? (displayLabel ?? (move.is_main === true ? "本線" : undefined))
+          : undefined;
+        const node = decorate(move, index, branchLabel);
+        node.next = buildFromParent(move.id!, new Set([...ancestors, move.id!]));
+        return node;
+      });
 
   const movesByFrom = new Map<string, Array<{ move: ImportedOpeningLike["moves"][number]; index: number }>>();
   for (const [index, move] of imported.moves.entries()) {
@@ -324,7 +380,7 @@ export function openingFromImportedLine(imported: ImportedOpeningLike): OpeningL
       });
   };
 
-  const tree = imported.moves.some((move) => "from_sfen" in move && move.from_sfen)
+  const tree = hasDirectTree ? buildFromParent(null, new Set()) : imported.moves.some((move) => "from_sfen" in move && move.from_sfen)
     ? buildFromSfen(imported.initial_sfen, new Set([imported.initial_sfen]))
     : [];
 
