@@ -13,6 +13,8 @@ import {
   enumerateOpeningTree,
   countOpeningBranchPoints,
   openingMainPathAt,
+  openingMainSwitchAccessibleName,
+  openingNodeJumpAccessibleName,
   openingPathState,
   openingFromImportedLine,
   openingBranchChoiceLabel,
@@ -164,6 +166,25 @@ describe("opening branch path helpers", () => {
     const entries = enumerateOpeningTree(deep);
     expect(entries).toHaveLength(500);
     expect(entries.at(-1)?.path).toHaveLength(500);
+  });
+
+  it("qualifies duplicate node moves and same-depth main switches with their ancestor branch paths", () => {
+    const sharedMove = (id: string) => ({ ...node(id, "3c3d"), branchLabel: "本線", isMain: true });
+    const branchA = { ...node("accessible-a", "7g7f", [sharedMove("accessible-a-main"), node("accessible-a-var", "8c8d")]), branchLabel: "分岐A", isMain: true };
+    const branchB = { ...node("accessible-b", "2g2f", [sharedMove("accessible-b-main"), node("accessible-b-var", "8c8d")]), branchLabel: "分岐B", isMain: false };
+    const accessibleFixture = { ...fixture, moves: [branchA, branchB] };
+
+    const jumpA = openingNodeJumpAccessibleName(accessibleFixture, [0, 0]);
+    const jumpB = openingNodeJumpAccessibleName(accessibleFixture, [1, 0]);
+    expect(jumpA).toBe("2手目 3c3d、USI 3c3d、分岐A → 本線、ここへ移動");
+    expect(jumpB).toBe("2手目 3c3d、USI 3c3d、分岐B → 本線、ここへ移動");
+    expect(jumpA).not.toBe(jumpB);
+
+    const switchA = openingMainSwitchAccessibleName(accessibleFixture, [0], false);
+    const switchB = openingMainSwitchAccessibleName(accessibleFixture, [1], false);
+    expect(switchA).toBe("第2手の分岐点 分岐A の本線へ切り替える");
+    expect(switchB).toBe("第2手の分岐点 分岐B の本線へ切り替える");
+    expect(switchA).not.toBe(switchB);
   });
 });
 

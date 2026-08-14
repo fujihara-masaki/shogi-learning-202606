@@ -3,7 +3,9 @@ import {
   countOpeningBranchPoints,
   mainOpeningChoiceIndex,
   openingBranchChoiceLabel,
+  openingMainSwitchAccessibleName,
   openingMainPathAt,
+  openingNodeJumpAccessibleName,
   openingPathState,
   selectedOpeningBranchPath,
   type OpeningLine,
@@ -68,6 +70,7 @@ function VariationLevel({ opening, choices, parentPath, currentPath, onJump, onS
           <span>第{parentPath.length + 1}手の分岐点</span>
           <button
             type="button"
+            aria-label={openingMainSwitchAccessibleName(opening, parentPath, selectedIndex === mainIndex)}
             aria-pressed={selectedIndex === mainIndex}
             disabled={selectedIndex === mainIndex}
             onClick={() => onSwitchMain(openingMainPathAt(opening, parentPath))}
@@ -88,7 +91,7 @@ function VariationLevel({ opening, choices, parentPath, currentPath, onJump, onS
                 type="button"
                 className="opening-variation-jump"
                 aria-current={state === "current" ? "step" : undefined}
-                aria-label={`${nodePath.length}手目 ${node.notation}、USI ${node.usi}、${label}へ移動`}
+                aria-label={openingNodeJumpAccessibleName(opening, nodePath)}
                 onClick={() => onJump(nodePath, node)}
               >
                 <strong>{node.notation}</strong> <code>{node.usi}</code> <span className="branch-badge">{label}</span>

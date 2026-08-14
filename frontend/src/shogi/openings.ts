@@ -291,6 +291,40 @@ export function openingBranchChoiceLabel(choices: OpeningMoveNode[], index: numb
   return choice.branchLabel ?? (choice === mainOpeningChoice(choices) ? "本線" : `分岐${index + 1}`);
 }
 
+/** Describe the branch choices traversed from root to a node or branch point. */
+export function openingBranchBreadcrumb(opening: OpeningLine, path: number[]): string {
+  const labels: string[] = [];
+  let choices = opening.moves;
+  for (const index of path) {
+    const node = choices[index];
+    if (!node) break;
+    if (choices.length > 1) labels.push(openingBranchChoiceLabel(choices, index));
+    choices = node.next ?? [];
+  }
+  return labels.join(" → ") || "ルート";
+}
+
+/** Centralized, branch-qualified accessible name for a variation node jump. */
+export function openingNodeJumpAccessibleName(opening: OpeningLine, path: number[]): string {
+  let choices = opening.moves;
+  let node: OpeningMoveNode | undefined;
+  for (const index of path) {
+    node = choices[index];
+    if (!node) break;
+    choices = node.next ?? [];
+  }
+  if (!node) return `${path.length}手目、不明な手、${openingBranchBreadcrumb(opening, path)}、ここへ移動`;
+  return `${path.length}手目 ${node.notation}、USI ${node.usi}、${openingBranchBreadcrumb(opening, path)}、ここへ移動`;
+}
+
+/** Centralized, branch-qualified accessible name for a semantic-main switch. */
+export function openingMainSwitchAccessibleName(opening: OpeningLine, branchPointPath: number[], selected: boolean): string {
+  const location = openingBranchBreadcrumb(opening, branchPointPath);
+  return selected
+    ? `第${branchPointPath.length + 1}手の分岐点 ${location} の本線を選択中`
+    : `第${branchPointPath.length + 1}手の分岐点 ${location} の本線へ切り替える`;
+}
+
 /** Return the user-facing labels of the branch points traversed by an applied path. */
 export function selectedOpeningBranchPath(steps: OpeningStep[]): string {
   const labels = steps
