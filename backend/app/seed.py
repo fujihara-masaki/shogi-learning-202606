@@ -650,7 +650,11 @@ def _opening_move_nodes(opening: dict) -> list[dict]:
             "comment": comments[index] if index < len(comments) else "",
         })
     for branch_index, branch in enumerate(opening.get("branches", []), start=1):
-        parent_key = f"main-{int(branch['from_ply'])}"
+        from_ply = int(branch["from_ply"])
+        # The pre-PR-B adapter represented a branch from the initial position
+        # as a root sibling (parent_move_id=NULL), not as a child of a
+        # nonexistent main-0 node.
+        parent_key = None if from_ply == 0 else f"main-{from_ply}"
         for offset, usi in enumerate(branch["moves"], start=1):
             key = f"branch-{branch_index}-{offset}"
             nodes.append({

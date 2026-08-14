@@ -278,6 +278,53 @@ def test_intermediate_legacy_branch_keeps_main_line_continuation(client, monkeyp
         conn.close()
 
 
+def test_legacy_root_branches_preserve_main_order_and_direct_parent_chain(client, monkeypatch):
+    """Pre-PR-B seeds treated from_ply=0 branches as NULL-parent roots."""
+    fixture = _seed_fixture(
+        "legacy root branch fixture",
+        moves=["7g7f", "3c3d"],
+        branches=[
+            {"name": "root one", "from_ply": 0, "moves": ["2g2f", "8c8d", "2f2e"]},
+            {"name": "root two", "from_ply": 0, "moves": ["6g6f"]},
+        ],
+    )
+    monkeypatch.setattr(seed, "SAMPLE_OPENING_LINES", [fixture])
+    conn = get_connection()
+    try:
+        seed_openings_if_empty(conn)
+        line = conn.execute(
+            "SELECT * FROM opening_lines WHERE name=?", (fixture["name"],)
+        ).fetchone()
+        first_ids = {
+            row["move_key"]: row["id"] for row in conn.execute(
+                "SELECT id, move_key FROM opening_line_moves WHERE line_id=?", (line["id"],)
+            )
+        }
+        seed_openings_if_empty(conn)
+        rows = conn.execute(
+            "SELECT * FROM opening_line_moves WHERE line_id=? ORDER BY ply, sort_order",
+            (line["id"],),
+        ).fetchall()
+        by_key = {row["move_key"]: row for row in rows}
+        roots = [row for row in rows if row["parent_move_id"] is None]
+
+        assert [row["move_key"] for row in roots] == ["main-1", "branch-1-1", "branch-2-1"]
+        assert [row["sort_order"] for row in roots] == [0, 1, 2]
+        assert [row["move_key"] for row in roots if row["is_main"]] == ["main-1"]
+        assert {row["from_sfen"] for row in roots} == {line["initial_sfen"]}
+        assert by_key["branch-1-2"]["parent_move_id"] == by_key["branch-1-1"]["id"]
+        assert by_key["branch-1-3"]["parent_move_id"] == by_key["branch-1-2"]["id"]
+        for key in ("branch-1-2", "branch-1-3"):
+            row = by_key[key]
+            parent = next(candidate for candidate in rows if candidate["id"] == row["parent_move_id"])
+            assert parent["ply"] + 1 == row["ply"]
+            assert parent["to_sfen"] == row["from_sfen"]
+        assert {row["move_key"]: row["id"] for row in rows} == first_ids
+        validate_opening_move_tree(conn, [line["id"]])
+    finally:
+        conn.close()
+
+
 def test_stable_key_reseed_prunes_obsolete_nodes_and_positions(client, monkeypatch):
     monkeypatch.setattr(seed, "SAMPLE_OPENING_LINES", [TREE_SEED])
     conn = get_connection()
