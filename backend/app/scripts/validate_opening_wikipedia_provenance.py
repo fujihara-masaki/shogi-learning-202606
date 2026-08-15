@@ -37,11 +37,15 @@ def _error(code: str, record: dict[str, Any] | None = None, path: str | None = N
 
 
 def _note_claims_unrecorded_move(note: str, omitted_after: str | None) -> bool:
-    if not omitted_after:
-        return False
     recorded_claims = ("手順化", "収録済み", "収録した", "収録しています")
     exclusion = ("未収録", "収録していない", "手順化していない")
-    return any(word in note for word in recorded_claims) and not any(word in note for word in exclusion)
+    has_recorded_claim = any(word in note for word in recorded_claims)
+    if not has_recorded_claim or any(word in note for word in exclusion):
+        return False
+    if omitted_after:
+        return True
+    continuation_markers = ("実戦以下", "続く", "続いて", "その後", "以降")
+    return any(marker in note for marker in continuation_markers)
 
 
 def _semantic_errors(record: dict[str, Any]) -> list[ValidationError]:
@@ -198,6 +202,7 @@ def _seed_errors(artifact: dict[str, Any], seed_lines: list[dict[str, Any]]) -> 
     records = {record.get("line_name"): record for record in artifact.get("records", []) if record.get("subject_kind") == "move_line"}
     errors: list[ValidationError] = []
     normalized: list[tuple[dict[str, Any], dict[str, Any]]] = []
+    seen_names: set[str] = set()
     for index, raw_line in enumerate(seed_lines):
         path = f"seed_lines[{index}]"
         if not isinstance(raw_line, dict):
@@ -207,6 +212,10 @@ def _seed_errors(artifact: dict[str, Any], seed_lines: list[dict[str, Any]]) -> 
         if not isinstance(name, str) or not name:
             errors.append(ValidationError("seed_entry_invalid", path=path))
             continue
+        if name in seen_names:
+            errors.append(_error("duplicate_seed_line_name", records.get(name), path))
+            continue
+        seen_names.add(name)
         try:
             metadata = _opening_source_metadata(raw_line)
         except (ValueError, TypeError, AttributeError, KeyError):

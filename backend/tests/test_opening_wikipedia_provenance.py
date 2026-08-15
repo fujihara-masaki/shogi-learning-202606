@@ -40,6 +40,37 @@ def test_invalid_masuda_note_has_stable_error_code():
     assert [error.code for error in validate_artifact(artifact)] == artifact["expected_errors"]
 
 
+def test_invalid_continuation_note_is_rejected_without_omitted_boundary():
+    artifact = json.loads((DOCS / "fixtures/opening-wikipedia-provenance-invalid-masuda.json").read_text())
+    artifact["omitted_after"] = None
+    assert "note_claims_unrecorded_move" in {error.code for error in validate_artifact(artifact)}
+
+
+def test_node_continuation_evidence_is_rejected_without_omitted_boundary():
+    artifact = _valid_record_artifact()
+    record = artifact["records"][0]
+    record["coverage_boundary"]["omitted_after"] = None
+    record["nodes"][0]["provenance"]["evidence_note"] = "▲4八玉、および実戦以下▲7六飛を手順化。"
+    assert "note_claims_unrecorded_move" in {error.code for error in validate_artifact(artifact)}
+
+
+@pytest.mark.parametrize(
+    "note",
+    [
+        "▲4八玉までを収録。続く▲7六飛は未収録。",
+        "引用sectionの終端である▲4八玉までを収録した。",
+    ],
+)
+def test_terminal_recording_note_does_not_claim_unrecorded_move(note):
+    artifact = _valid_record_artifact()
+    record = artifact["records"][0]
+    record["coverage_boundary"]["omitted_after"] = None
+    record["evidence_note"] = note
+    for node in record["nodes"]:
+        node["provenance"]["evidence_note"] = note
+    assert "note_claims_unrecorded_move" not in {error.code for error in validate_artifact(artifact)}
+
+
 def test_canonical_artifact_matches_every_wikipedia_seed_node():
     artifact = json.loads((DOCS / "opening-wikipedia-provenance-audit.json").read_text())
     assert validate_artifact(artifact, SCHEMA, SAMPLE_OPENING_LINES) == []
@@ -194,6 +225,18 @@ def test_seed_entry_without_name_is_stable_validation_error():
         if error.code == "seed_entry_invalid"
     ]
     assert invalid == [ValidationError("seed_entry_invalid", path="seed_lines[0]")]
+
+
+def test_duplicate_seed_line_name_is_rejected_and_not_double_counted():
+    artifact = json.loads((DOCS / "opening-wikipedia-provenance-audit.json").read_text())
+    seed_lines = deepcopy(SAMPLE_OPENING_LINES)
+    seed_lines[1] = deepcopy(seed_lines[0])
+    errors = validate_artifact(artifact, None, seed_lines)
+    duplicates = [error for error in errors if error.code == "duplicate_seed_line_name"]
+    assert len(duplicates) == 1
+    assert duplicates[0].record_id == artifact["records"][0]["record_id"]
+    assert duplicates[0].path == "seed_lines[1]"
+    assert "seed_line_count_mismatch" in {error.code for error in errors}
 
 
 def test_non_dict_seed_entry_is_stable_validation_error():
