@@ -1,0 +1,883 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/fujihara-masaki/shogi-learning-202606/blob/main/docs/opening-wikipedia-provenance-audit.schema.json",
+  "title": "Wikipedia opening provenance audit",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "artifact_type",
+    "generated_on",
+    "seed_snapshot",
+    "records"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "1.0.0"
+    },
+    "artifact_type": {
+      "const": "wikipedia_opening_provenance_audit"
+    },
+    "generated_on": {
+      "type": "string",
+      "format": "date"
+    },
+    "seed_snapshot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "commit",
+        "source_file",
+        "line_count",
+        "node_count"
+      ],
+      "properties": {
+        "commit": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$"
+        },
+        "source_file": {
+          "const": "backend/app/seed.py"
+        },
+        "line_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "node_count": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "records": {
+      "type": "array",
+      "items": {
+        "oneOf": [
+          {
+            "$ref": "#/definitions/catalogItem"
+          },
+          {
+            "$ref": "#/definitions/moveLine"
+          }
+        ]
+      }
+    },
+    "expected_errors": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    }
+  },
+  "definitions": {
+    "nullableString": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source_type",
+        "source_title",
+        "requested_url",
+        "canonical_url",
+        "source_section",
+        "revision_id",
+        "revision_timestamp",
+        "retrieved_at",
+        "source_license"
+      ],
+      "properties": {
+        "source_type": {
+          "enum": [
+            "wikipedia",
+            "wikibooks"
+          ]
+        },
+        "source_title": {
+          "type": "string",
+          "minLength": 1
+        },
+        "requested_url": {
+          "type": "string",
+          "pattern": "^https://"
+        },
+        "canonical_url": {
+          "$ref": "#/definitions/nullableString"
+        },
+        "source_section": {
+          "$ref": "#/definitions/nullableString"
+        },
+        "revision_id": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1
+        },
+        "revision_timestamp": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time"
+        },
+        "retrieved_at": {
+          "type": "string",
+          "format": "date"
+        },
+        "source_license": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "verification": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "method",
+        "checked_on",
+        "note"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "verified",
+            "unavailable",
+            "needs_review"
+          ]
+        },
+        "method": {
+          "type": "string",
+          "minLength": 1
+        },
+        "checked_on": {
+          "type": "string",
+          "format": "date"
+        },
+        "note": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "segment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "provenance_class",
+        "start_ply",
+        "end_ply",
+        "source_section",
+        "evidence_note"
+      ],
+      "properties": {
+        "provenance_class": {
+          "enum": [
+            "explicit_sequence",
+            "diagram_reconstruction"
+          ]
+        },
+        "start_ply": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "end_ply": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "source_section": {
+          "$ref": "#/definitions/nullableString"
+        },
+        "evidence_note": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "nodeProvenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "provenance_class",
+        "source_section",
+        "evidence_note",
+        "review_status"
+      ],
+      "properties": {
+        "provenance_class": {
+          "enum": [
+            "explicit_sequence",
+            "diagram_reconstruction",
+            null
+          ]
+        },
+        "source_section": {
+          "$ref": "#/definitions/nullableString"
+        },
+        "evidence_note": {
+          "type": "string",
+          "minLength": 1
+        },
+        "review_status": {
+          "enum": [
+            "verified",
+            "unavailable",
+            "needs_review"
+          ]
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "review_status": {
+                "const": "verified"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "provenance_class": {
+                "enum": [
+                  "explicit_sequence",
+                  "diagram_reconstruction"
+                ]
+              },
+              "source_section": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        }
+      ]
+    },
+    "moveNode": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "move_key",
+        "parent_key",
+        "usi",
+        "is_main",
+        "sort_order",
+        "variation_group",
+        "provenance"
+      ],
+      "properties": {
+        "move_key": {
+          "type": "string",
+          "minLength": 1
+        },
+        "parent_key": {
+          "$ref": "#/definitions/nullableString"
+        },
+        "usi": {
+          "type": "string",
+          "minLength": 4
+        },
+        "is_main": {
+          "type": "boolean"
+        },
+        "sort_order": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "variation_group": {
+          "type": "string",
+          "minLength": 1
+        },
+        "provenance": {
+          "$ref": "#/definitions/nodeProvenance"
+        }
+      }
+    },
+    "catalogItem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "record_id",
+        "subject_kind",
+        "catalog_name",
+        "seed_locator",
+        "provenance_class",
+        "coverage",
+        "source",
+        "evidence_note",
+        "verification",
+        "audit_issues"
+      ],
+      "properties": {
+        "record_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "subject_kind": {
+          "const": "catalog_item"
+        },
+        "catalog_name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "seed_locator": {
+          "type": "string",
+          "minLength": 1
+        },
+        "provenance_class": {
+          "const": "name_only"
+        },
+        "coverage": {
+          "const": "name_only"
+        },
+        "source": {
+          "$ref": "#/definitions/source"
+        },
+        "evidence_note": {
+          "type": "string",
+          "minLength": 1
+        },
+        "verification": {
+          "$ref": "#/definitions/verification"
+        },
+        "audit_issues": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      },
+      "allOf": [
+        {
+          "$ref": "#/definitions/verifiedCommonSourceConstraint"
+        },
+        {
+          "$ref": "#/definitions/unavailableSourceConstraint"
+        }
+      ]
+    },
+    "moveLine": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "record_id",
+        "subject_kind",
+        "line_name",
+        "seed_locator",
+        "move_count",
+        "moves",
+        "node_count",
+        "nodes",
+        "provenance_class",
+        "coverage",
+        "legacy_coverage_status",
+        "source",
+        "coverage_boundary",
+        "evidence_note",
+        "segments",
+        "verification",
+        "audit_issues"
+      ],
+      "properties": {
+        "record_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "subject_kind": {
+          "const": "move_line"
+        },
+        "line_name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "seed_locator": {
+          "type": "string",
+          "minLength": 1
+        },
+        "move_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "moves": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 4
+          }
+        },
+        "node_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "nodes": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/definitions/moveNode"
+          }
+        },
+        "provenance_class": {
+          "enum": [
+            "explicit_sequence",
+            "diagram_reconstruction",
+            "mixed"
+          ]
+        },
+        "coverage": {
+          "enum": [
+            "complete_for_cited_sequence",
+            "partial_explicit_sequence",
+            "diagram_reconstruction",
+            "mixed"
+          ]
+        },
+        "legacy_coverage_status": {
+          "type": "string"
+        },
+        "source": {
+          "$ref": "#/definitions/source"
+        },
+        "coverage_boundary": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "covered_through_ply",
+            "covered_through_move",
+            "omitted_after"
+          ],
+          "properties": {
+            "covered_through_ply": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "covered_through_move": {
+              "type": "string",
+              "minLength": 4
+            },
+            "omitted_after": {
+              "$ref": "#/definitions/nullableString"
+            }
+          }
+        },
+        "evidence_note": {
+          "type": "string",
+          "minLength": 1
+        },
+        "segments": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/segment"
+          }
+        },
+        "verification": {
+          "$ref": "#/definitions/verification"
+        },
+        "audit_issues": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "provenance_class": {
+                "const": "explicit_sequence"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "coverage": {
+                "enum": [
+                  "complete_for_cited_sequence",
+                  "partial_explicit_sequence"
+                ]
+              },
+              "segments": {
+                "maxItems": 0
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "provenance_class": {
+                "const": "diagram_reconstruction"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "coverage": {
+                "const": "diagram_reconstruction"
+              },
+              "segments": {
+                "maxItems": 0
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "provenance_class": {
+                "const": "mixed"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "coverage": {
+                "const": "mixed"
+              },
+              "segments": {
+                "anyOf": [
+                  {
+                    "maxItems": 0
+                  },
+                  {
+                    "minItems": 2,
+                    "allOf": [
+                      {
+                        "contains": {
+                          "properties": {
+                            "provenance_class": {
+                              "const": "explicit_sequence"
+                            }
+                          }
+                        }
+                      },
+                      {
+                        "contains": {
+                          "properties": {
+                            "provenance_class": {
+                              "const": "diagram_reconstruction"
+                            }
+                          }
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "$ref": "#/definitions/verifiedCommonSourceConstraint"
+        },
+        {
+          "$ref": "#/definitions/verifiedMoveSectionConstraint"
+        },
+        {
+          "if": {
+            "allOf": [
+              {
+                "properties": {
+                  "provenance_class": {
+                    "const": "mixed"
+                  }
+                }
+              },
+              {
+                "properties": {
+                  "segments": {
+                    "maxItems": 0
+                  }
+                }
+              }
+            ]
+          },
+          "then": {
+            "properties": {
+              "audit_issues": {
+                "contains": {
+                  "const": "mixed_segment_boundary_unresolved"
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "verification": {
+                "properties": {
+                  "status": {
+                    "const": "verified"
+                  }
+                }
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "nodes": {
+                "items": {
+                  "properties": {
+                    "provenance": {
+                      "properties": {
+                        "provenance_class": {
+                          "enum": [
+                            "explicit_sequence",
+                            "diagram_reconstruction"
+                          ]
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "allOf": [
+              {
+                "properties": {
+                  "provenance_class": {
+                    "const": "mixed"
+                  }
+                }
+              },
+              {
+                "properties": {
+                  "verification": {
+                    "properties": {
+                      "status": {
+                        "const": "verified"
+                      }
+                    }
+                  }
+                }
+              }
+            ]
+          },
+          "then": {
+            "properties": {
+              "segments": {
+                "minItems": 2,
+                "allOf": [
+                  {
+                    "contains": {
+                      "properties": {
+                        "provenance_class": {
+                          "const": "explicit_sequence"
+                        },
+                        "source_section": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      }
+                    }
+                  },
+                  {
+                    "contains": {
+                      "properties": {
+                        "provenance_class": {
+                          "const": "diagram_reconstruction"
+                        },
+                        "source_section": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      }
+                    }
+                  }
+                ],
+                "items": {
+                  "allOf": [
+                    {
+                      "$ref": "#/definitions/segment"
+                    },
+                    {
+                      "properties": {
+                        "source_section": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "not": {
+              "allOf": [
+                {
+                  "properties": {
+                    "provenance_class": {
+                      "const": "mixed"
+                    }
+                  }
+                },
+                {
+                  "properties": {
+                    "verification": {
+                      "properties": {
+                        "status": {
+                          "enum": [
+                            "unavailable",
+                            "needs_review"
+                          ]
+                        }
+                      }
+                    }
+                  }
+                },
+                {
+                  "properties": {
+                    "segments": {
+                      "maxItems": 0
+                    }
+                  }
+                },
+                {
+                  "properties": {
+                    "audit_issues": {
+                      "contains": {
+                        "const": "mixed_segment_boundary_unresolved"
+                      }
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          "then": {
+            "properties": {
+              "nodes": {
+                "items": {
+                  "properties": {
+                    "provenance": {
+                      "properties": {
+                        "provenance_class": {
+                          "enum": [
+                            "explicit_sequence",
+                            "diagram_reconstruction"
+                          ]
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "$ref": "#/definitions/unavailableSourceConstraint"
+        }
+      ]
+    },
+    "verifiedMoveSectionConstraint": {
+      "if": {
+        "properties": {
+          "verification": {
+            "properties": {
+              "status": {
+                "const": "verified"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "source": {
+            "properties": {
+              "source_section": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        }
+      }
+    },
+    "verifiedCommonSourceConstraint": {
+      "if": {
+        "properties": {
+          "verification": {
+            "properties": {
+              "status": {
+                "const": "verified"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "source": {
+            "properties": {
+              "canonical_url": {
+                "type": "string",
+                "pattern": "^https://"
+              },
+              "revision_id": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "revision_timestamp": {
+                "type": "string",
+                "format": "date-time"
+              }
+            }
+          }
+        }
+      }
+    },
+    "unavailableSourceConstraint": {
+      "if": {
+        "properties": {
+          "verification": {
+            "properties": {
+              "status": {
+                "const": "unavailable"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "source": {
+            "properties": {
+              "canonical_url": {
+                "type": "null"
+              },
+              "revision_id": {
+                "type": "null"
+              },
+              "revision_timestamp": {
+                "type": "null"
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

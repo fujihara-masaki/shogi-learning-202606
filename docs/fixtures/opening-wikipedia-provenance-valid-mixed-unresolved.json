@@ -1,0 +1,85 @@
+{
+  "schema_version": "1.0.0",
+  "artifact_type": "wikipedia_opening_provenance_audit",
+  "generated_on": "2026-08-15",
+  "seed_snapshot": {
+    "commit": "3d4b48fe7464b7e36145a51dfdee1d2d2bfe8d51",
+    "source_file": "backend/app/seed.py",
+    "line_count": 1,
+    "node_count": 2
+  },
+  "records": [
+    {
+      "record_id": "fixture:mixed-unresolved",
+      "subject_kind": "move_line",
+      "line_name": "取得不能で境界未解決のmixed例",
+      "seed_locator": "docs fixture",
+      "move_count": 2,
+      "moves": [
+        "7g7f",
+        "3c3d"
+      ],
+      "node_count": 2,
+      "nodes": [
+        {
+          "move_key": "main-1",
+          "parent_key": null,
+          "usi": "7g7f",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": null,
+            "source_section": null,
+            "evidence_note": "A/B境界未確認のため分類を断定しない。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-2",
+          "parent_key": "main-1",
+          "usi": "3c3d",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": null,
+            "source_section": null,
+            "evidence_note": "A/B境界未確認のため分類を断定しない。",
+            "review_status": "unavailable"
+          }
+        }
+      ],
+      "provenance_class": "mixed",
+      "coverage": "mixed",
+      "legacy_coverage_status": "fixture: unavailable mixed",
+      "source": {
+        "source_type": "wikipedia",
+        "source_title": "Wikipedia 取得不能例",
+        "requested_url": "https://ja.wikipedia.org/wiki/取得不能例",
+        "canonical_url": null,
+        "source_section": null,
+        "revision_id": null,
+        "revision_timestamp": null,
+        "retrieved_at": "2026-08-15",
+        "source_license": "CC BY-SA 4.0"
+      },
+      "coverage_boundary": {
+        "covered_through_ply": 2,
+        "covered_through_move": "3c3d",
+        "omitted_after": null
+      },
+      "evidence_note": "A/B混在は判明しているが、取得不能のためsegment境界は未確認。",
+      "segments": [],
+      "verification": {
+        "status": "unavailable",
+        "method": "fixture-controlled unavailable evidence",
+        "checked_on": "2026-08-15",
+        "note": "未知sectionを捏造せず表現できることを検証する。"
+      },
+      "audit_issues": [
+        "mixed_segment_boundary_unresolved"
+      ]
+    }
+  ]
+}

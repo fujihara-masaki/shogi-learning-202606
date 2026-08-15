@@ -1,0 +1,40 @@
+{
+  "schema_version": "1.0.0",
+  "artifact_type": "wikipedia_opening_provenance_audit",
+  "generated_on": "2026-08-15",
+  "seed_snapshot": {
+    "commit": "3d4b48fe7464b7e36145a51dfdee1d2d2bfe8d51",
+    "source_file": "backend/app/seed.py",
+    "line_count": 0,
+    "node_count": 0
+  },
+  "records": [
+    {
+      "record_id": "catalog:verified-whole-page-example",
+      "subject_kind": "catalog_item",
+      "catalog_name": "記事全体で確認した名称の例",
+      "seed_locator": "fixture",
+      "provenance_class": "name_only",
+      "coverage": "name_only",
+      "source": {
+        "source_type": "wikipedia",
+        "source_title": "Wikipedia 検証済み名称例",
+        "requested_url": "https://ja.wikipedia.org/wiki/検証済み名称例",
+        "canonical_url": "https://ja.wikipedia.org/wiki/検証済み名称例",
+        "source_section": null,
+        "revision_id": 123456789,
+        "revision_timestamp": "2026-08-14T12:34:56Z",
+        "retrieved_at": "2026-08-15",
+        "source_license": "CC BY-SA 4.0"
+      },
+      "evidence_note": "特定sectionではなく記事ページ全体で名称の存在を確認したfixture。",
+      "verification": {
+        "status": "verified",
+        "method": "fixture-controlled whole-page evidence",
+        "checked_on": "2026-08-15",
+        "note": "verified catalogでsectionが不要な経路を検証する。"
+      },
+      "audit_issues": []
+    }
+  ]
+}

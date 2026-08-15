@@ -1,0 +1,40 @@
+{
+  "schema_version": "1.0.0",
+  "artifact_type": "wikipedia_opening_provenance_audit",
+  "generated_on": "2026-08-15",
+  "seed_snapshot": {
+    "commit": "3d4b48fe7464b7e36145a51dfdee1d2d2bfe8d51",
+    "source_file": "backend/app/seed.py",
+    "line_count": 0,
+    "node_count": 0
+  },
+  "records": [
+    {
+      "record_id": "catalog:example",
+      "subject_kind": "catalog_item",
+      "catalog_name": "名称だけの例",
+      "seed_locator": "fixture",
+      "provenance_class": "name_only",
+      "coverage": "name_only",
+      "source": {
+        "source_type": "wikipedia",
+        "source_title": "Wikipedia 例",
+        "requested_url": "https://ja.wikipedia.org/wiki/例",
+        "canonical_url": null,
+        "source_section": null,
+        "revision_id": null,
+        "revision_timestamp": null,
+        "retrieved_at": "2026-08-15",
+        "source_license": "CC BY-SA 4.0"
+      },
+      "evidence_note": "名称の存在だけを表し、着手は保持しない。",
+      "verification": {
+        "status": "unavailable",
+        "method": "fixture",
+        "checked_on": "2026-08-15",
+        "note": "Cを表現できることを検証するfixture。"
+      },
+      "audit_issues": []
+    }
+  ]
+}

@@ -1,0 +1,99 @@
+{
+  "schema_version": "1.0.0",
+  "artifact_type": "wikipedia_opening_provenance_audit",
+  "generated_on": "2026-08-15",
+  "seed_snapshot": {
+    "commit": "3d4b48fe7464b7e36145a51dfdee1d2d2bfe8d51",
+    "source_file": "backend/app/seed.py",
+    "line_count": 1,
+    "node_count": 3
+  },
+  "records": [
+    {
+      "record_id": "fixture:explicit-sequence",
+      "subject_kind": "move_line",
+      "line_name": "本文連続手順のvalid例",
+      "seed_locator": "docs fixture",
+      "move_count": 3,
+      "moves": [
+        "7g7f",
+        "3c3d",
+        "7f7e"
+      ],
+      "node_count": 3,
+      "nodes": [
+        {
+          "move_key": "main-1",
+          "parent_key": null,
+          "usi": "7g7f",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "explicit_sequence",
+            "source_section": "検証用手順",
+            "evidence_note": "本文に明示された第1手。",
+            "review_status": "verified"
+          }
+        },
+        {
+          "move_key": "main-2",
+          "parent_key": "main-1",
+          "usi": "3c3d",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "explicit_sequence",
+            "source_section": "検証用手順",
+            "evidence_note": "本文に明示された第2手。",
+            "review_status": "verified"
+          }
+        },
+        {
+          "move_key": "main-3",
+          "parent_key": "main-2",
+          "usi": "7f7e",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "explicit_sequence",
+            "source_section": "検証用手順",
+            "evidence_note": "本文に明示された第3手で引用列の終端。",
+            "review_status": "verified"
+          }
+        }
+      ],
+      "provenance_class": "explicit_sequence",
+      "coverage": "complete_for_cited_sequence",
+      "legacy_coverage_status": "fixture: complete cited sequence",
+      "source": {
+        "source_type": "wikipedia",
+        "source_title": "Wikipedia 検証用記事",
+        "requested_url": "https://ja.wikipedia.org/wiki/検証用記事",
+        "canonical_url": "https://ja.wikipedia.org/wiki/検証用記事",
+        "source_section": "検証用手順",
+        "revision_id": 123456789,
+        "revision_timestamp": "2026-08-14T12:34:56Z",
+        "retrieved_at": "2026-08-15",
+        "source_license": "CC BY-SA 4.0"
+      },
+      "coverage_boundary": {
+        "covered_through_ply": 3,
+        "covered_through_move": "7f7e",
+        "omitted_after": null
+      },
+      "evidence_note": "引用sectionに連続明示された3手を終端まで収録した検証用fixture。",
+      "segments": [],
+      "verification": {
+        "status": "verified",
+        "method": "fixture-controlled revision evidence",
+        "checked_on": "2026-08-15",
+        "note": "validatorの完全valid経路を検査する固定fixture。"
+      },
+      "audit_issues": []
+    }
+  ],
+  "expected_errors": []
+}
