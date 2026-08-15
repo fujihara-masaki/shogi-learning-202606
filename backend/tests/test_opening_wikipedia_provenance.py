@@ -196,6 +196,36 @@ def test_invalid_seed_move_becomes_stable_validation_error(invalid_move):
     assert invalid[0].path == "seed"
 
 
+def test_none_initial_sfen_becomes_stable_validation_error():
+    artifact = json.loads((DOCS / "opening-wikipedia-provenance-audit.json").read_text())
+    seed_lines = deepcopy(SAMPLE_OPENING_LINES)
+    seed_lines[0]["initial_sfen"] = None
+    errors = validate_artifact(artifact, None, seed_lines)
+    invalid = [error for error in errors if error.code == "seed_tree_invalid"]
+    assert invalid
+    assert invalid[0].record_id == artifact["records"][0]["record_id"]
+    assert invalid[0].path == "seed"
+
+
+def test_none_move_node_sort_order_becomes_stable_validation_error():
+    artifact = json.loads((DOCS / "opening-wikipedia-provenance-audit.json").read_text())
+    seed_lines = deepcopy(SAMPLE_OPENING_LINES)
+    seed_lines[0]["move_nodes"] = [
+        {
+            "key": "main-1",
+            "parent_key": None,
+            "usi": "7g7f",
+            "sort_order": None,
+            "is_main": True,
+        }
+    ]
+    errors = validate_artifact(artifact, None, seed_lines)
+    invalid = [error for error in errors if error.code == "seed_tree_invalid"]
+    assert invalid
+    assert invalid[0].record_id == artifact["records"][0]["record_id"]
+    assert invalid[0].path == "seed"
+
+
 def test_invalid_seed_line_does_not_stop_validation_of_following_lines():
     artifact = json.loads((DOCS / "opening-wikipedia-provenance-audit.json").read_text())
     seed_lines = deepcopy(SAMPLE_OPENING_LINES)
