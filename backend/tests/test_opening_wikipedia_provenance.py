@@ -102,6 +102,20 @@ def test_multiple_virtual_root_children_are_valid_with_one_semantic_main():
     assert "node_not_connected_to_virtual_root" not in errors
 
 
+def test_verified_move_line_rejects_unverified_node():
+    artifact = _valid_record_artifact()
+    artifact["records"][0]["nodes"][1]["provenance"]["review_status"] = "needs_review"
+    codes = {error.code for error in validate_artifact(artifact)}
+    assert "verified_line_node_unverified" in codes
+
+
+def test_non_mixed_main_chain_must_match_declared_moves_without_seed_check():
+    artifact = _valid_record_artifact()
+    artifact["records"][0]["nodes"][1]["usi"] = "2g2f"
+    codes = {error.code for error in validate_artifact(artifact)}
+    assert "semantic_main_chain_mismatch" in codes
+
+
 def test_seed_snapshot_line_count_drift_is_rejected():
     artifact = json.loads((DOCS / "opening-wikipedia-provenance-audit.json").read_text())
     artifact["seed_snapshot"]["line_count"] += 1

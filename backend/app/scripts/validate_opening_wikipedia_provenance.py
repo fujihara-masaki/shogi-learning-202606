@@ -95,6 +95,8 @@ def _semantic_errors(record: dict[str, Any]) -> list[ValidationError]:
         if parent is not None and parent not in keys:
             errors.append(_error("parent_key_missing", record, f"nodes[{index}]"))
         node_provenance = node.get("provenance", {})
+        if status == "verified" and node_provenance.get("review_status") != "verified":
+            errors.append(_error("verified_line_node_unverified", record, f"nodes[{index}]"))
         if node_provenance.get("review_status") == "verified" and not node_provenance.get("source_section"):
             errors.append(_error("verified_node_source_section_missing", record, f"nodes[{index}]"))
         if node_provenance.get("review_status") == "verified" and node_provenance.get("provenance_class") not in {
@@ -133,6 +135,27 @@ def _semantic_errors(record: dict[str, Any]) -> list[ValidationError]:
                 # states the resulting invariant failure explicitly.
                 errors.append(_error("node_not_connected_to_virtual_root", record, f"nodes[{start_key}]"))
 
+    # Reconstruct the semantic main chain for every move-line.  Array order is
+    # only serialization order and branches may occur anywhere in ``nodes``.
+    main_chain: list[dict[str, Any]] = []
+    parent_key = None
+    visited_main: set[str] = set()
+    while parent_key in siblings:
+        main_children = [node for node in siblings[parent_key] if node.get("is_main") is True]
+        if len(main_children) != 1:
+            # sibling_main_count_invalid above carries the structural detail.
+            break
+        node = main_children[0]
+        move_key = node.get("move_key")
+        if move_key in visited_main:
+            errors.append(_error("semantic_main_chain_cycle", record))
+            break
+        visited_main.add(move_key)
+        main_chain.append(node)
+        parent_key = move_key
+    if len(main_chain) != len(moves) or [node.get("usi") for node in main_chain] != moves:
+        errors.append(_error("semantic_main_chain_mismatch", record))
+
     segments = record.get("segments", [])
     if provenance == "mixed":
         unresolved = "mixed_segment_boundary_unresolved" in record.get("audit_issues", [])
@@ -145,29 +168,6 @@ def _semantic_errors(record: dict[str, Any]) -> list[ValidationError]:
             covered = [ply for segment in segments for ply in range(segment.get("start_ply", 0), segment.get("end_ply", -1) + 1)]
             if covered != list(range(1, len(moves) + 1)):
                 errors.append(_error("mixed_segment_range_invalid", record))
-            # Segments describe the semantic main line, not array positions.  In
-            # particular, branch nodes may appear anywhere in the snapshot.
-            children: dict[str | None, list[dict[str, Any]]] = {}
-            for node in nodes:
-                children.setdefault(node.get("parent_key"), []).append(node)
-            main_chain = []
-            parent_key = None
-            visited_main: set[str] = set()
-            while parent_key in children:
-                main_children = [node for node in children[parent_key] if node.get("is_main") is True]
-                if len(main_children) != 1:
-                    errors.append(_error("semantic_main_chain_invalid", record))
-                    break
-                node = main_children[0]
-                move_key = node.get("move_key")
-                if move_key in visited_main:
-                    errors.append(_error("semantic_main_chain_cycle", record))
-                    break
-                visited_main.add(move_key)
-                main_chain.append(node)
-                parent_key = move_key
-            if len(main_chain) != len(moves) or [node.get("usi") for node in main_chain] != moves:
-                errors.append(_error("semantic_main_chain_mismatch", record))
             for ply, node in enumerate(main_chain, start=1):
                 matching = [s for s in segments if s["start_ply"] <= ply <= s["end_ply"]]
                 if matching and node.get("provenance", {}).get("provenance_class") != matching[0]["provenance_class"]:
