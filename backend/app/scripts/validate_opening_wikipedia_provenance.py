@@ -265,18 +265,29 @@ def validate_artifact(data: dict[str, Any], schema: dict[str, Any] | None = None
     return errors
 
 
+def validate_production_artifact(data: dict[str, Any], schema: dict[str, Any] | None) -> list[ValidationError]:
+    """Validate an artifact through the production path, including the seed.
+
+    ``validate_artifact(..., seed_lines=None)`` remains useful for deliberately
+    synthetic semantic fixtures.  Production callers must use this entry point
+    so positionally invalid or drifted moves cannot pass merely by changing both
+    ``moves`` and the node snapshot to the same value.
+    """
+    from app.seed import SAMPLE_OPENING_LINES
+
+    return validate_artifact(data, schema, SAMPLE_OPENING_LINES)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("artifact", type=Path)
     parser.add_argument("--schema", type=Path, required=True)
-    parser.add_argument("--check-seed", action="store_true")
+    # Retained as a no-op for compatibility with the D1 command documented
+    # during review.  The production CLI now *always* checks the seed.
+    parser.add_argument("--check-seed", action="store_true", help=argparse.SUPPRESS)
     args = parser.parse_args()
     data, schema = json.loads(args.artifact.read_text()), json.loads(args.schema.read_text())
-    seed_lines = None
-    if args.check_seed:
-        from app.seed import SAMPLE_OPENING_LINES
-        seed_lines = SAMPLE_OPENING_LINES
-    errors = validate_artifact(data, schema, seed_lines)
+    errors = validate_production_artifact(data, schema)
     print(json.dumps({"valid": not errors, "errors": [error.as_dict() for error in errors]}, ensure_ascii=False))
     return bool(errors)
 

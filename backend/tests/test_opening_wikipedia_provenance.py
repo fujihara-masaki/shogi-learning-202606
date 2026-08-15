@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from app.scripts.validate_opening_wikipedia_provenance import validate_artifact
+from app.scripts.validate_opening_wikipedia_provenance import validate_artifact, validate_production_artifact
 from app.seed import SAMPLE_OPENING_LINES
 
 
@@ -36,6 +36,30 @@ def test_invalid_masuda_note_has_stable_error_code():
 def test_canonical_artifact_matches_every_wikipedia_seed_node():
     artifact = json.loads((DOCS / "opening-wikipedia-provenance-audit.json").read_text())
     assert validate_artifact(artifact, SCHEMA, SAMPLE_OPENING_LINES) == []
+
+
+def test_production_validation_always_checks_canonical_seed():
+    artifact = json.loads((DOCS / "opening-wikipedia-provenance-audit.json").read_text())
+    record = artifact["records"][0]
+    record["moves"][0] = "1a1b"
+    main_root = next(node for node in record["nodes"] if node["parent_key"] is None and node["is_main"])
+    main_root["usi"] = "1a1b"
+
+    # The synthetic semantic-only API sees matching declarations, while the
+    # production entry point must compare them with SAMPLE_OPENING_LINES.
+    assert "semantic_main_chain_mismatch" not in {error.code for error in validate_artifact(artifact)}
+    codes = {error.code for error in validate_production_artifact(artifact, None)}
+    assert {"seed_main_moves_mismatch", "seed_node_tree_mismatch"} <= codes
+
+
+def test_canonical_seed_snapshot_references_audited_revision():
+    artifact = json.loads((DOCS / "opening-wikipedia-provenance-audit.json").read_text())
+    assert artifact["seed_snapshot"] == {
+        "commit": "8a0ec732a799f95b58546feb4f9e0413b8af61a7",
+        "source_file": "backend/app/seed.py",
+        "line_count": 34,
+        "node_count": 328,
+    }
 
 
 @pytest.mark.parametrize(

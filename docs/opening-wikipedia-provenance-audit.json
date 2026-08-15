@@ -2,7 +2,7 @@
   "schema_version": "1.0.0",
   "artifact_type": "wikipedia_opening_provenance_audit",
   "seed_snapshot": {
-    "commit": "3d4b48fe7464b7e36145a51dfdee1d2d2bfe8d51",
+    "commit": "8a0ec732a799f95b58546feb4f9e0413b8af61a7",
     "source_file": "backend/app/seed.py",
     "line_count": 34,
     "node_count": 328
