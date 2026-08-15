@@ -797,7 +797,10 @@ test("three-way opening branches behave the same from board and accessible cards
   const selectedBranch = page.getByRole("button", { name: "中央（選択中）" });
   await expect(selectedBranch).toBeDisabled();
   await expect(selectedBranch).toHaveAttribute("aria-current", "step");
-  await page.getByRole("button", { name: "本線へ切り替える" }).click();
+  await page
+    .getByTestId("opening-branches")
+    .getByRole("button", { name: "本線へ切り替える", exact: true })
+    .click();
   await expect(historyUsis).toHaveText(["(7g7f)"]);
   await page.getByRole("button", { name: "一手戻る" }).click();
   await page.getByRole("button", { name: "本線を一手進む" }).click();
