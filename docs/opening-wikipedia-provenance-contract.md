@@ -63,7 +63,7 @@ record は `subject_kind` を discriminator とする `catalog_item` / `move_lin
 
 move-line の `covered_through_ply` は収録済み終端の 1-origin ply、`covered_through_move` はその USI、`omitted_after` は判明している未収録の後続（なければ `null`）である。終端は `covered_through_ply == move_count == len(moves)` かつ `covered_through_move == moves[-1]` を満たす。
 
-verified M は `segments` を2件以上持ち、各要素に `provenance_class`（A/B のみ）、包含的 `start_ply` / `end_ply`、`source_section`, `evidence_note` を持つ。範囲は 1 から `move_count` までを隙間・重複なく覆い、昇順で、AとBを各1件以上含む。同じsectionでも根拠種別が変わる境界で分割する。外部取得不能な`unavailable` / `needs_review` MでA/B境界を確認できない場合に限り、`segments: []`とnodeの`provenance_class: null`を許し、`mixed_segment_boundary_unresolved` audit issueを必須とする。境界を推測して仮segmentを作ってはならない。`review_status: verified`のnodeとverified move-lineの全nodeはA/Bいずれかが必須である。verified Mは全segmentのsectionが非空でなければならず、D1 validatorは未解決境界、範囲不備、未分類node、未解決sectionをrejectする。A/B の単一 provenance line は必ず `segments: []` とし、schemaもnon-empty配列を拒否する。
+verified M は `segments` を2件以上持ち、各要素に `provenance_class`（A/B のみ）、包含的 `start_ply` / `end_ply`、`source_section`, `evidence_note` を持つ。範囲は 1 から `move_count` までを隙間・重複なく覆い、昇順で、AとBを各1件以上含む。同じsectionでも根拠種別が変わる境界で分割する。外部取得不能な`unavailable` / `needs_review` MでA/B境界を確認できない場合に限り、`segments: []`とnodeの`provenance_class: null`を許し、`mixed_segment_boundary_unresolved` audit issueを必須とする。schemaもこの4条件をすべて満たす場合だけnodeの`null`を許し、それ以外のA/B/M lineでは全nodeをA/Bいずれかに制約する。境界を推測して仮segmentを作ってはならない。`review_status: verified`のnodeとverified move-lineの全nodeはA/Bいずれかが必須である。verified Mは全segmentのsectionが非空でなければならず、D1 validatorは未解決境界、範囲不備、未分類node、未解決sectionをrejectする。A/B の単一 provenance line は必ず `segments: []` とし、schemaもnon-empty配列を拒否する。
 
 ### 5.4 main / branch node snapshot
 

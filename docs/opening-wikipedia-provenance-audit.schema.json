@@ -698,6 +698,71 @@
               }
             }
           }
+        },
+        {
+          "if": {
+            "not": {
+              "allOf": [
+                {
+                  "properties": {
+                    "provenance_class": {
+                      "const": "mixed"
+                    }
+                  }
+                },
+                {
+                  "properties": {
+                    "verification": {
+                      "properties": {
+                        "status": {
+                          "enum": [
+                            "unavailable",
+                            "needs_review"
+                          ]
+                        }
+                      }
+                    }
+                  }
+                },
+                {
+                  "properties": {
+                    "segments": {
+                      "maxItems": 0
+                    }
+                  }
+                },
+                {
+                  "properties": {
+                    "audit_issues": {
+                      "contains": {
+                        "const": "mixed_segment_boundary_unresolved"
+                      }
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          "then": {
+            "properties": {
+              "nodes": {
+                "items": {
+                  "properties": {
+                    "provenance": {
+                      "properties": {
+                        "provenance_class": {
+                          "enum": [
+                            "explicit_sequence",
+                            "diagram_reconstruction"
+                          ]
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
         }
       ]
     },
