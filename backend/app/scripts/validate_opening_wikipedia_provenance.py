@@ -103,6 +103,8 @@ def _semantic_errors(record: dict[str, Any]) -> list[ValidationError]:
             "explicit_sequence", "diagram_reconstruction"
         }:
             errors.append(_error("verified_node_provenance_invalid", record, f"nodes[{index}]"))
+        if provenance in {"explicit_sequence", "diagram_reconstruction"} and node_provenance.get("provenance_class") != provenance:
+            errors.append(_error("node_line_provenance_mismatch", record, f"nodes[{index}]"))
 
     siblings: dict[str | None, list[dict[str, Any]]] = {}
     for node in nodes:
@@ -240,7 +242,7 @@ def _seed_errors(artifact: dict[str, Any], seed_lines: list[dict[str, Any]]) -> 
 
 def validate_artifact(data: dict[str, Any], schema: dict[str, Any] | None = None, seed_lines: list[dict[str, Any]] | None = None) -> list[ValidationError]:
     errors: list[ValidationError] = []
-    if schema is not None and "fixture_version" not in data:
+    if schema is not None:
         from jsonschema import Draft7Validator, FormatChecker
 
         validator = Draft7Validator(schema, format_checker=FormatChecker())
@@ -273,6 +275,9 @@ def validate_production_artifact(data: dict[str, Any], schema: dict[str, Any] | 
     so positionally invalid or drifted moves cannot pass merely by changing both
     ``moves`` and the node snapshot to the same value.
     """
+    if schema is None:
+        return [ValidationError("production_schema_required")]
+
     from app.seed import SAMPLE_OPENING_LINES
 
     return validate_artifact(data, schema, SAMPLE_OPENING_LINES)

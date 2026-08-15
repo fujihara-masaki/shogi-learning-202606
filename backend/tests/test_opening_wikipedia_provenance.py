@@ -48,8 +48,21 @@ def test_production_validation_always_checks_canonical_seed():
     # The synthetic semantic-only API sees matching declarations, while the
     # production entry point must compare them with SAMPLE_OPENING_LINES.
     assert "semantic_main_chain_mismatch" not in {error.code for error in validate_artifact(artifact)}
-    codes = {error.code for error in validate_production_artifact(artifact, None)}
+    codes = {error.code for error in validate_production_artifact(artifact, SCHEMA)}
     assert {"seed_main_moves_mismatch", "seed_node_tree_mismatch"} <= codes
+
+
+def test_production_validation_requires_schema():
+    artifact = json.loads((DOCS / "opening-wikipedia-provenance-audit.json").read_text())
+    assert [error.code for error in validate_production_artifact(artifact, None)] == ["production_schema_required"]
+
+
+def test_fixture_version_cannot_bypass_production_schema_validation():
+    artifact = json.loads((DOCS / "opening-wikipedia-provenance-audit.json").read_text())
+    artifact["fixture_version"] = "legacy-bypass-attempt"
+    artifact.pop("generated_on")
+    codes = {error.code for error in validate_production_artifact(artifact, SCHEMA)}
+    assert "schema_validation_error" in codes
 
 
 def test_canonical_seed_snapshot_references_audited_revision():
@@ -169,6 +182,23 @@ def test_non_mixed_main_chain_must_match_declared_moves_without_seed_check():
     artifact["records"][0]["nodes"][1]["usi"] = "2g2f"
     codes = {error.code for error in validate_artifact(artifact)}
     assert "semantic_main_chain_mismatch" in codes
+
+
+def test_explicit_line_rejects_diagram_node_provenance():
+    artifact = _valid_record_artifact()
+    artifact["records"][0]["nodes"][1]["provenance"]["provenance_class"] = "diagram_reconstruction"
+    assert "node_line_provenance_mismatch" in {error.code for error in validate_artifact(artifact)}
+
+
+def test_diagram_line_rejects_explicit_node_provenance():
+    artifact = _valid_record_artifact()
+    record = artifact["records"][0]
+    record["provenance_class"] = "diagram_reconstruction"
+    record["coverage"] = "diagram_reconstruction"
+    for node in record["nodes"]:
+        node["provenance"]["provenance_class"] = "diagram_reconstruction"
+    record["nodes"][1]["provenance"]["provenance_class"] = "explicit_sequence"
+    assert "node_line_provenance_mismatch" in {error.code for error in validate_artifact(artifact)}
 
 
 def test_seed_snapshot_line_count_drift_is_rejected():
