@@ -194,8 +194,7 @@
           "minimum": 1
         },
         "source_section": {
-          "type": "string",
-          "minLength": 1
+          "$ref": "#/definitions/nullableString"
         },
         "evidence_note": {
           "type": "string",
@@ -479,6 +478,9 @@
                   "complete_for_cited_sequence",
                   "partial_explicit_sequence"
                 ]
+              },
+              "segments": {
+                "maxItems": 0
               }
             }
           }
@@ -495,6 +497,9 @@
             "properties": {
               "coverage": {
                 "const": "diagram_reconstruction"
+              },
+              "segments": {
+                "maxItems": 0
               }
             }
           }

@@ -63,7 +63,7 @@ record は `subject_kind` を discriminator とする `catalog_item` / `move_lin
 
 move-line の `covered_through_ply` は収録済み終端の 1-origin ply、`covered_through_move` はその USI、`omitted_after` は判明している未収録の後続（なければ `null`）である。終端は `covered_through_ply == move_count == len(moves)` かつ `covered_through_move == moves[-1]` を満たす。
 
-M は `segments` を2件以上持ち、各要素に `provenance_class`（A/B のみ）、包含的 `start_ply` / `end_ply`、`source_section`, `evidence_note` を持つ。範囲は 1 から `move_count` までを隙間・重複なく覆い、昇順で、少なくとも A と B を各1件含む。同じ section でも根拠種別が変わる境界で分割する。A/B の単一 provenance line は `segments: []` とする。
+M は `segments` を2件以上持ち、各要素に `provenance_class`（A/B のみ）、包含的 `start_ply` / `end_ply`、`source_section`, `evidence_note` を持つ。範囲は 1 から `move_count` までを隙間・重複なく覆い、昇順で、少なくとも A と B を各1件含む。同じ section でも根拠種別が変わる境界で分割する。外部取得不能な `unavailable` / `needs_review` recordでは未知のsegment sectionを推測せず`null`にできる。一方、`verified`なMは**全segment**の`source_section`が非空でなければならず、D1 validatorは未解決sectionをrejectする。A/B の単一 provenance line は必ず `segments: []` とし、schemaもnon-empty配列を拒否する。
 
 ### 5.4 main / branch node snapshot
 
@@ -94,4 +94,4 @@ PR-D1 の production validator は最低限、次を失敗にする。
 
 ## 8. fixture の期待値
 
-[`fixtures/opening-wikipedia-provenance-valid.json`](fixtures/opening-wikipedia-provenance-valid.json) はsource、verified revision/section/license、coverage boundary、canonical node treeをすべて持つproduction `move_line` fixtureで、`expected_errors: []`まで含めてproduction schemaに適合する。[`fixtures/opening-wikipedia-provenance-valid-name-only.json`](fixtures/opening-wikipedia-provenance-valid-name-only.json) はproduction schemaに適合するC/catalog artifactであり、move fieldを持たない。top-levelの任意`expected_errors`はfixtureに期待するD1 validator error codeの配列で、通常のaudit artifactは省略する。invalid Masuda fixtureはproduction artifactそのものではなく、意図的なsemantic違反と期待error codeを固定するvalidator入力である。
+[`fixtures/opening-wikipedia-provenance-valid.json`](fixtures/opening-wikipedia-provenance-valid.json) はsource、verified revision/section/license、coverage boundary、canonical node treeをすべて持つproduction `move_line` fixtureで、`expected_errors: []`まで含めてproduction schemaに適合する。[`fixtures/opening-wikipedia-provenance-valid-name-only.json`](fixtures/opening-wikipedia-provenance-valid-name-only.json) はproduction schemaに適合するC/catalog artifactであり、move fieldを持たない。[`fixtures/opening-wikipedia-provenance-valid-mixed-unavailable.json`](fixtures/opening-wikipedia-provenance-valid-mixed-unavailable.json) は取得不能なMのsegment sectionを`null`のまま保持できるschema fixtureである。top-levelの任意`expected_errors`はfixtureに期待するD1 validator error codeの配列で、通常のaudit artifactは省略する。invalid Masuda fixtureはproduction artifactそのものではなく、意図的なsemantic違反と期待error codeを固定するvalidator入力である。
