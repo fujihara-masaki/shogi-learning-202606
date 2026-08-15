@@ -1,4 +1,5 @@
 import json
+from copy import deepcopy
 from pathlib import Path
 
 import pytest
@@ -35,6 +36,56 @@ def test_invalid_masuda_note_has_stable_error_code():
 def test_canonical_artifact_matches_every_wikipedia_seed_node():
     artifact = json.loads((DOCS / "opening-wikipedia-provenance-audit.json").read_text())
     assert validate_artifact(artifact, SCHEMA, SAMPLE_OPENING_LINES) == []
+
+
+@pytest.mark.parametrize(
+    ("field", "code"),
+    [
+        ("source_url", "seed_metadata_source_url_mismatch"),
+        ("source_title", "seed_metadata_source_title_mismatch"),
+        ("source_type", "seed_metadata_source_type_mismatch"),
+        ("source_section", "seed_metadata_source_section_mismatch"),
+        ("source_license", "seed_metadata_source_license_mismatch"),
+        ("source_note", "seed_metadata_source_note_mismatch"),
+        ("coverage_status", "seed_metadata_coverage_status_mismatch"),
+    ],
+)
+def test_seed_metadata_drift_has_stable_error_code(field, code):
+    artifact = json.loads((DOCS / "opening-wikipedia-provenance-audit.json").read_text())
+    seed_lines = deepcopy(SAMPLE_OPENING_LINES)
+    seed_lines[0][field] = "intentional validator regression drift"
+    assert code in {error.code for error in validate_artifact(artifact, None, seed_lines)}
+
+
+def test_seed_retrieved_date_is_not_compared_with_audit_attempt_date():
+    artifact = json.loads((DOCS / "opening-wikipedia-provenance-audit.json").read_text())
+    seed_lines = deepcopy(SAMPLE_OPENING_LINES)
+    seed_lines[0]["source_retrieved_at"] = "2000-01-01"
+    assert validate_artifact(artifact, None, seed_lines) == []
+
+
+def test_verified_mixed_segments_follow_semantic_main_chain_not_node_order():
+    artifact = json.loads((DOCS / "fixtures/opening-wikipedia-provenance-valid-mixed-verified.json").read_text())
+    record = artifact["records"][0]
+    branch = deepcopy(record["nodes"][0])
+    branch.update(
+        move_key="branch-1",
+        parent_key="main-1",
+        usi="2g2f",
+        is_main=False,
+        sort_order=1,
+        variation_group="検証分岐",
+    )
+    branch["provenance"] = {
+        "provenance_class": "diagram_reconstruction",
+        "source_section": "検証用図示分岐",
+        "evidence_note": "分岐node自身の図示根拠。",
+        "review_status": "verified",
+    }
+    record["nodes"] = [record["nodes"][1], branch, record["nodes"][0]]
+    record["node_count"] += 1
+    artifact["seed_snapshot"]["node_count"] += 1
+    assert validate_artifact(artifact, SCHEMA) == []
 
 
 def test_masuda_boundary_and_metadata_only_change_are_fixed():

@@ -96,6 +96,10 @@ def _semantic_errors(record: dict[str, Any]) -> list[ValidationError]:
         node_provenance = node.get("provenance", {})
         if node_provenance.get("review_status") == "verified" and not node_provenance.get("source_section"):
             errors.append(_error("verified_node_source_section_missing", record, f"nodes[{index}]"))
+        if node_provenance.get("review_status") == "verified" and node_provenance.get("provenance_class") not in {
+            "explicit_sequence", "diagram_reconstruction"
+        }:
+            errors.append(_error("verified_node_provenance_invalid", record, f"nodes[{index}]"))
 
     segments = record.get("segments", [])
     if provenance == "mixed":
@@ -109,11 +113,27 @@ def _semantic_errors(record: dict[str, Any]) -> list[ValidationError]:
             covered = [ply for segment in segments for ply in range(segment.get("start_ply", 0), segment.get("end_ply", -1) + 1)]
             if covered != list(range(1, len(moves) + 1)):
                 errors.append(_error("mixed_segment_range_invalid", record))
-            for index, node in enumerate(nodes):
-                ply = index + 1
+            # Segments describe the semantic main line, not array positions.  In
+            # particular, branch nodes may appear anywhere in the snapshot.
+            children: dict[str | None, list[dict[str, Any]]] = {}
+            for node in nodes:
+                children.setdefault(node.get("parent_key"), []).append(node)
+            main_chain = []
+            parent_key = None
+            while parent_key in children:
+                main_children = [node for node in children[parent_key] if node.get("is_main") is True]
+                if len(main_children) != 1:
+                    errors.append(_error("semantic_main_chain_invalid", record))
+                    break
+                node = main_children[0]
+                main_chain.append(node)
+                parent_key = node.get("move_key")
+            if len(main_chain) != len(moves) or [node.get("usi") for node in main_chain] != moves:
+                errors.append(_error("semantic_main_chain_mismatch", record))
+            for ply, node in enumerate(main_chain, start=1):
                 matching = [s for s in segments if s["start_ply"] <= ply <= s["end_ply"]]
                 if matching and node.get("provenance", {}).get("provenance_class") != matching[0]["provenance_class"]:
-                    errors.append(_error("node_segment_provenance_mismatch", record, f"nodes[{index}]"))
+                    errors.append(_error("node_segment_provenance_mismatch", record, f"nodes[{node.get('move_key')}]"))
         elif not (status in {"unavailable", "needs_review"} and unresolved):
             errors.append(_error("mixed_segments_missing", record))
     elif segments:
@@ -127,8 +147,11 @@ def _seed_errors(artifact: dict[str, Any], seed_lines: list[dict[str, Any]]) -> 
 
     from app.seed import _opening_source_metadata
 
-    wikipedia = [line for line in seed_lines if _opening_source_metadata(line).get("source_type") in {"wikipedia", "wikibooks"}]
     records = {record.get("line_name"): record for record in artifact.get("records", []) if record.get("subject_kind") == "move_line"}
+    # Membership comes from the canonical audit, rather than mutable source
+    # metadata, so changing source_type/source_url cannot make a line disappear
+    # from the comparison it is meant to fail.
+    wikipedia = [line for line in seed_lines if line.get("name") in records]
     errors: list[ValidationError] = []
     if len(records) != len(wikipedia):
         errors.append(_error("seed_line_count_mismatch"))
@@ -145,6 +168,20 @@ def _seed_errors(artifact: dict[str, Any], seed_lines: list[dict[str, Any]]) -> 
             errors.append(_error("seed_node_tree_mismatch", record))
         if record.get("moves") != line.get("moves"):
             errors.append(_error("seed_main_moves_mismatch", record))
+        metadata = _opening_source_metadata(line)
+        source = record.get("source", {})
+        comparisons = {
+            "source_url": (metadata.get("source_url"), source.get("requested_url")),
+            "source_title": (metadata.get("source_title"), source.get("source_title")),
+            "source_type": (metadata.get("source_type"), source.get("source_type")),
+            "source_section": (metadata.get("source_section") or None, source.get("source_section") or None),
+            "source_license": (metadata.get("source_license"), source.get("source_license")),
+            "source_note": (metadata.get("source_note"), record.get("evidence_note")),
+            "coverage_status": (metadata.get("coverage_status"), record.get("legacy_coverage_status")),
+        }
+        for field, (seed_value, audit_value) in comparisons.items():
+            if seed_value != audit_value:
+                errors.append(_error(f"seed_metadata_{field}_mismatch", record, field))
     if artifact.get("seed_snapshot", {}).get("node_count") != sum(len(r.get("nodes", [])) for r in records.values()):
         errors.append(_error("seed_snapshot_node_count_mismatch"))
     return errors
