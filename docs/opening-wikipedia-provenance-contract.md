@@ -57,7 +57,7 @@ record は `subject_kind` を discriminator とする `catalog_item` / `move_lin
 | `retrieved_at` | 必須。取得を試みた UTC calendar date (`YYYY-MM-DD`) |
 | `source_license` | 必須。取得時に確認した、または現行 seed が主張する license。後者は verification note で区別 |
 
-`verification.status` は `verified`, `needs_review`, `unavailable`。verified catalog/move共通でcanonical URLとrevision ID/timestampを必須とし、verified move-lineだけはさらにsource sectionを必須とする。verified catalogのsectionはnullableである。取得不能なら値を捏造せず`null`とし、方法、日付、理由をnoteに残す。擬似的な時刻精度を避けるため、artifact生成日は`generated_on`、確認日は`verification.checked_on`というdate-only fieldにする。revision timestampだけはsourceが提供する実時刻を保持する。
+`verification.status` は `verified`, `needs_review`, `unavailable`。`verified`はcatalog/move共通でcanonical URLとrevision ID/timestampに有効値を必須とし、verified move-lineだけはさらにsource sectionを必須とする。verified catalogのsectionはnullableである。`unavailable`は取得不能なcurrent値を捏造しないため、canonical URL、revision ID、revision timestampをすべて`null`に固定するが、seed由来の未検証section、license、requested URLは保持できる。`needs_review`は取得済みだが確認未完了のmetadataを保持できるよう、この3 fieldの`null`/有効値をどちらもschemaで許し、D1 validatorが意味的妥当性を確認する。取得方法、日付、理由はnoteに残す。擬似的な時刻精度を避けるため、artifact生成日は`generated_on`、確認日は`verification.checked_on`というdate-only fieldにする。revision timestampだけはsourceが提供する実時刻を保持する。
 
 ### 5.3 coverage boundary と M segment
 

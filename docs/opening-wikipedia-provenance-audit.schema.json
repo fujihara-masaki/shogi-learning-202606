@@ -359,6 +359,9 @@
       "allOf": [
         {
           "$ref": "#/definitions/verifiedCommonSourceConstraint"
+        },
+        {
+          "$ref": "#/definitions/unavailableSourceConstraint"
         }
       ]
     },
@@ -782,6 +785,9 @@
               }
             }
           }
+        },
+        {
+          "$ref": "#/definitions/unavailableSourceConstraint"
         }
       ]
     },
@@ -837,6 +843,36 @@
               "revision_timestamp": {
                 "type": "string",
                 "format": "date-time"
+              }
+            }
+          }
+        }
+      }
+    },
+    "unavailableSourceConstraint": {
+      "if": {
+        "properties": {
+          "verification": {
+            "properties": {
+              "status": {
+                "const": "unavailable"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "source": {
+            "properties": {
+              "canonical_url": {
+                "type": "null"
+              },
+              "revision_id": {
+                "type": "null"
+              },
+              "revision_timestamp": {
+                "type": "null"
               }
             }
           }
