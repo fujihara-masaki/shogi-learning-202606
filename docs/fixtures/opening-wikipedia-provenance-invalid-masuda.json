@@ -2,10 +2,20 @@
   "fixture_version": "1.0.0",
   "provenance_class": "explicit_sequence",
   "coverage": "partial_explicit_sequence",
-  "moves": ["7g7f", "3c3d", "7f7e", "8c8d", "2h7h", "8d8e", "5i4h"],
+  "moves": [
+    "7g7f",
+    "3c3d",
+    "7f7e",
+    "8c8d",
+    "2h7h",
+    "8d8e",
+    "5i4h"
+  ],
   "covered_through_ply": 7,
   "covered_through_move": "5i4h",
   "source_note": "▲4八玉、および実戦以下▲7六飛を手順化。",
-  "omitted_after": null,
-  "expected_errors": ["note_claims_unrecorded_move"]
+  "omitted_after": "7h7f",
+  "expected_errors": [
+    "note_claims_unrecorded_move"
+  ]
 }

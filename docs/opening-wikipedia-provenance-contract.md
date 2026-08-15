@@ -94,4 +94,4 @@ PR-D1 の production validator は最低限、次を失敗にする。
 
 ## 8. fixture の期待値
 
-[`fixtures/opening-wikipedia-provenance-valid.json`](fixtures/opening-wikipedia-provenance-valid.json) は終端境界が一致する A のsemantic最小例である。[`fixtures/opening-wikipedia-provenance-valid-name-only.json`](fixtures/opening-wikipedia-provenance-valid-name-only.json) はproduction schemaに適合するC/catalog artifactであり、move fieldを持たない。invalid fixture は JSON としては正しく、意図的にsemantic contractに違反する。fixtureの`expected_errors`は将来のvalidatorの安定したerror code契約であり、production audit schemaの対象外とする。
+[`fixtures/opening-wikipedia-provenance-valid.json`](fixtures/opening-wikipedia-provenance-valid.json) はsource、verified revision/section/license、coverage boundary、canonical node treeをすべて持つproduction `move_line` fixtureで、`expected_errors: []`まで含めてproduction schemaに適合する。[`fixtures/opening-wikipedia-provenance-valid-name-only.json`](fixtures/opening-wikipedia-provenance-valid-name-only.json) はproduction schemaに適合するC/catalog artifactであり、move fieldを持たない。top-levelの任意`expected_errors`はfixtureに期待するD1 validator error codeの配列で、通常のaudit artifactは省略する。invalid Masuda fixtureはproduction artifactそのものではなく、意図的なsemantic違反と期待error codeを固定するvalidator入力である。
