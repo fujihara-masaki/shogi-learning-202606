@@ -10,6 +10,13 @@ import {
   findOpeningChoiceIndex,
   mainOpeningChoice,
   mainOpeningChoiceIndex,
+  enumerateOpeningTree,
+  countOpeningBranchPoints,
+  openingMainPathAt,
+  openingMainSwitchAccessibleName,
+  openingNodeJumpAccessibleName,
+  openingStructuralPathLabel,
+  openingPathState,
   openingFromImportedLine,
   openingBranchChoiceLabel,
   pathBeforePreviousBranch,
@@ -120,6 +127,71 @@ describe("opening branch path helpers", () => {
   it("returns to immediately before the previous branch", () => {
     expect(pathBeforePreviousBranch(fixture, [2, 0])).toEqual([]);
     expect(pathBeforePreviousBranch(fixture, [])).toEqual([]);
+  });
+
+  it("enumerates every node as a root-relative path for forward, backward, and sibling jumps", () => {
+    expect(enumerateOpeningTree(fixture).map(({ node, path }) => [node.id, path])).toEqual([
+      ["zero", [0]], ["zero-next", [0, 0]],
+      ["one", [1]], ["one-next", [1, 0]],
+      ["two", [2]], ["two-next", [2, 0]],
+    ]);
+    expect(applyOpeningPath(fixture, [0, 0]).steps.at(-1)?.node.id).toBe("zero-next");
+    expect(applyOpeningPath(fixture, [0]).steps.at(-1)?.node.id).toBe("zero");
+    expect(applyOpeningPath(fixture, [2, 0]).steps.at(-1)?.node.id).toBe("two-next");
+    expect(countOpeningBranchPoints(fixture)).toBe(1);
+  });
+
+  it("distinguishes only the current node from its ancestors", () => {
+    expect(openingPathState([0], [0, 0])).toBe("ancestor");
+    expect(openingPathState([0, 0], [0, 0])).toBe("current");
+    expect(openingPathState([1], [0, 0])).toBe("other");
+    expect(openingPathState([0, 0, 0], [0, 0])).toBe("other");
+  });
+
+  it("switches semantic main at multiple depths and discards the later path", () => {
+    const nestedMain = { ...node("nested-main", "3c3d"), isMain: true, sortOrder: 2 };
+    const nestedVariation = { ...node("nested-var", "8c8d"), isMain: false, sortOrder: 0 };
+    const rootVariation = { ...node("root-var", "2g2f"), isMain: false, sortOrder: 0 };
+    const rootMain = { ...node("root-main", "7g7f", [nestedVariation, nestedMain]), isMain: true, sortOrder: 1 };
+    const semanticFixture = { ...fixture, moves: [rootVariation, rootMain] };
+
+    expect(openingMainPathAt(semanticFixture, [])).toEqual([1]);
+    expect(openingMainPathAt(semanticFixture, [1])).toEqual([1, 1]);
+    expect(openingMainPathAt(semanticFixture, [1, 0])).toEqual([1, 0]);
+  });
+
+  it("enumerates a 500-node deep tree without losing paths", () => {
+    let next: OpeningMoveNode[] = [];
+    for (let index = 499; index >= 0; index -= 1) next = [node(`deep-${index}`, "7g7f", next)];
+    const deep = { ...fixture, moves: next };
+    const entries = enumerateOpeningTree(deep);
+    expect(entries).toHaveLength(500);
+    expect(entries.at(-1)?.path).toHaveLength(500);
+  });
+
+  it("uses structural paths when display-identical nodes and branch points would otherwise collide", () => {
+    const sharedMove = (id: string) => ({ ...node(id, "3c3d"), branchLabel: "本線", isMain: true });
+    const branchA = { ...node("accessible-a", "7g7f", [sharedMove("accessible-a-main"), node("accessible-a-var", "8c8d")]), branchLabel: "同じ表示名", isMain: true };
+    const branchB = { ...node("accessible-b", "2g2f", [sharedMove("accessible-b-main"), node("accessible-b-var", "8c8d")]), branchLabel: "同じ表示名", isMain: false };
+    const accessibleFixture = { ...fixture, moves: [branchA, branchB] };
+
+    expect(openingStructuralPathLabel([0, 0])).toBe("経路 1-1");
+    expect(openingStructuralPathLabel([1, 0])).toBe("経路 2-1");
+    const jumpA = openingNodeJumpAccessibleName(accessibleFixture, [0, 0]);
+    const jumpB = openingNodeJumpAccessibleName(accessibleFixture, [1, 0]);
+    expect(jumpA).toBe("2手目 3c3d、USI 3c3d、同じ表示名 → 本線、経路 1-1、ここへ移動");
+    expect(jumpB).toBe("2手目 3c3d、USI 3c3d、同じ表示名 → 本線、経路 2-1、ここへ移動");
+    expect(jumpA).not.toBe(jumpB);
+
+    const switchA = openingMainSwitchAccessibleName(accessibleFixture, [0], false);
+    const switchB = openingMainSwitchAccessibleName(accessibleFixture, [1], false);
+    const selectedSwitch = openingMainSwitchAccessibleName(accessibleFixture, [0], true);
+    expect(switchA).toBe("この分岐点の本線へ切り替える、第2手の分岐点 同じ表示名、経路 1");
+    expect(switchB).toBe("この分岐点の本線へ切り替える、第2手の分岐点 同じ表示名、経路 2");
+    expect(switchA).toContain("この分岐点の本線へ切り替える");
+    expect(selectedSwitch).toBe("本線を選択中、第2手の分岐点 同じ表示名、経路 1");
+    expect(selectedSwitch).toContain("本線を選択中");
+    expect(switchA).not.toBe(switchB);
   });
 });
 

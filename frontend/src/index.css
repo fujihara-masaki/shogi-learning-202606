@@ -515,6 +515,121 @@ select {
   white-space: nowrap;
 }
 
+.opening-variation-section {
+  max-width: 100%;
+  min-width: 0;
+}
+
+.opening-variation-section details {
+  border: 1px solid #c9c1b2;
+  border-radius: 10px;
+  background: #fff;
+  overflow-wrap: anywhere;
+}
+
+.opening-variation-section summary {
+  cursor: pointer;
+  min-height: 44px;
+  padding: 10px 12px;
+}
+
+.opening-variation-section summary span {
+  display: block;
+  margin-top: 3px;
+  color: var(--text-muted-strong);
+  font-size: 0.86rem;
+}
+
+.opening-variation-content {
+  padding: 0 12px 12px;
+  min-width: 0;
+}
+
+.opening-variation-tree {
+  list-style: none;
+  margin: 6px 0;
+  padding: 0;
+}
+
+.opening-variation-tree .opening-variation-tree {
+  margin-left: min(12px, 2vw);
+  border-left: 2px solid #ddd5c7;
+  padding-left: min(10px, 2vw);
+}
+
+.opening-variation-node {
+  min-width: 0;
+  padding: 3px 0;
+}
+
+.opening-variation-level {
+  display: block;
+  color: var(--text-muted-strong);
+  font-size: 0.75rem;
+}
+
+.opening-variation-jump {
+  min-height: 44px;
+  max-width: 100%;
+  text-align: left;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.opening-variation-node.ancestor > .opening-variation-jump {
+  border-color: #9baec5;
+  background: #edf2f7;
+}
+
+.opening-variation-node.current > .opening-variation-jump {
+  border: 2px solid #805d16;
+  background: #fff0bd;
+  font-weight: 700;
+}
+
+.variation-state-label,
+.coverage-badge {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: #e3e9f2;
+  font-size: 0.75rem;
+}
+
+.opening-variation-source {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 3px 0;
+  font-size: 0.78rem;
+  overflow-wrap: anywhere;
+}
+
+.opening-variation-branch-action {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 6px 0;
+  padding: 6px;
+  border-left: 3px solid #af8a3d;
+  background: #faf7ef;
+}
+
+.opening-variation-branch-action button {
+  min-height: 44px;
+  white-space: normal;
+}
+
+@media (max-width: 420px) {
+  .opening-variation-tree .opening-variation-tree {
+    margin-left: 3px;
+    padding-left: 5px;
+  }
+}
+
 .banner {
   padding: 8px 14px;
   border-radius: 8px;

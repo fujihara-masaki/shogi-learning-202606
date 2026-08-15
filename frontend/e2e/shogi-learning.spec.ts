@@ -739,6 +739,38 @@ test("three-way opening branches behave the same from board and accessible cards
   await expect(page.getByRole("button", { name: "変化 5g5f、この変化を見る" })).toBeVisible();
   await expect(page.getByTestId("opening-feedback")).toHaveAttribute("aria-live", "polite");
 
+  const variationDisclosure = page.getByTestId("opening-variation-disclosure");
+  await expect(variationDisclosure).not.toHaveAttribute("open", "");
+  const variationSummary = variationDisclosure.locator("summary");
+  await variationSummary.focus();
+  await page.keyboard.press("Enter");
+  await expect(variationDisclosure).toHaveAttribute("open", "");
+  await expect(variationSummary).toContainText("1分岐・現在0手・本線");
+  const variationNodes = variationDisclosure.locator(".opening-variation-jump");
+  await expect(variationNodes).toHaveCount(6);
+
+  const siblingJump = page.getByRole("button", { name: "1手目 5g5f、USI 5g5f、中央、経路 3、ここへ移動", exact: true });
+  await siblingJump.focus();
+  await page.keyboard.press("Enter");
+  await expect(page.locator(".move-history .move-usi")).toHaveText(["(5g5f)"]);
+  await expect(siblingJump).toHaveAttribute("aria-current", "step");
+  await expect(variationDisclosure.locator('[aria-current="step"]')).toHaveCount(1);
+  await expect(page.getByTestId("opening-source")).toContainText("Fixture source");
+
+  const rootMainSwitch = page.getByRole("button", { name: "この分岐点の本線へ切り替える、第1手の分岐点 ルート、経路 ルート", exact: true });
+  await expect(rootMainSwitch).toHaveCount(1);
+  await rootMainSwitch.click();
+  await expect(page.locator(".move-history .move-usi")).toHaveText(["(7g7f)"]);
+  await expect(page.getByTestId("opening-feedback")).toContainText("後の手順を破棄し、本線へ移動");
+  await expect(page.getByRole("button", { name: "本線を選択中、第1手の分岐点 ルート、経路 ルート", exact: true })).toBeDisabled();
+
+  await siblingJump.focus();
+  await variationSummary.click();
+  await expect(variationDisclosure).not.toHaveAttribute("open", "");
+  await expect(variationSummary).toBeFocused();
+  await variationSummary.click();
+  await page.getByRole("button", { name: "最初に戻る" }).click();
+
   const board = page.getByTestId("shogi-board");
   const historyUsis = page.locator(".move-history .move-usi");
   for (const [usi, , , , from, to] of branches) {
@@ -765,7 +797,10 @@ test("three-way opening branches behave the same from board and accessible cards
   const selectedBranch = page.getByRole("button", { name: "中央（選択中）" });
   await expect(selectedBranch).toBeDisabled();
   await expect(selectedBranch).toHaveAttribute("aria-current", "step");
-  await page.getByRole("button", { name: "本線へ切り替える" }).click();
+  await page
+    .getByTestId("opening-branches")
+    .getByRole("button", { name: "本線へ切り替える", exact: true })
+    .click();
   await expect(historyUsis).toHaveText(["(7g7f)"]);
   await page.getByRole("button", { name: "一手戻る" }).click();
   await page.getByRole("button", { name: "本線を一手進む" }).click();

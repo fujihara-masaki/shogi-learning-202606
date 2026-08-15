@@ -235,11 +235,100 @@ export function mainOpeningChoiceIndex(choices: OpeningMoveNode[]): number {
   return main ? choices.indexOf(main) : -1;
 }
 
+export interface OpeningTreeEntry {
+  node: OpeningMoveNode;
+  path: number[];
+  choices: OpeningMoveNode[];
+  level: number;
+}
+
+/** Enumerate every tree node with its unique root-relative index path. */
+export function enumerateOpeningTree(opening: OpeningLine): OpeningTreeEntry[] {
+  const entries: OpeningTreeEntry[] = [];
+  const visit = (choices: OpeningMoveNode[], parentPath: number[]) => {
+    choices.forEach((node, index) => {
+      const path = [...parentPath, index];
+      entries.push({ node, path, choices, level: path.length });
+      visit(node.next ?? [], path);
+    });
+  };
+  visit(opening.moves, []);
+  return entries;
+}
+
+export function countOpeningBranchPoints(opening: OpeningLine): number {
+  let count = opening.moves.length > 1 ? 1 : 0;
+  for (const { node } of enumerateOpeningTree(opening)) {
+    if ((node.next?.length ?? 0) > 1) count += 1;
+  }
+  return count;
+}
+
+/** Classify a tree path relative to the currently applied path. */
+export function openingPathState(nodePath: number[], currentPath: number[]): "current" | "ancestor" | "other" {
+  if (nodePath.length > currentPath.length || nodePath.some((index, depth) => currentPath[depth] !== index)) return "other";
+  return nodePath.length === currentPath.length ? "current" : "ancestor";
+}
+
+/** Discard everything after a branch point and select its semantic main choice. */
+export function openingMainPathAt(opening: OpeningLine, branchPointPath: number[]): number[] {
+  let choices = opening.moves;
+  const validParentPath: number[] = [];
+  for (const index of branchPointPath) {
+    const node = choices[index];
+    if (!node) return validParentPath;
+    validParentPath.push(index);
+    choices = node.next ?? [];
+  }
+  const mainIndex = mainOpeningChoiceIndex(choices);
+  return mainIndex < 0 ? validParentPath : [...validParentPath, mainIndex];
+}
+
 /** Return the user-facing label for a choice at a branch point. */
 export function openingBranchChoiceLabel(choices: OpeningMoveNode[], index: number): string {
   const choice = choices[index];
   if (!choice) return `分岐${index + 1}`;
   return choice.branchLabel ?? (choice === mainOpeningChoice(choices) ? "本線" : `分岐${index + 1}`);
+}
+
+/** Describe the branch choices traversed from root to a node or branch point. */
+export function openingBranchBreadcrumb(opening: OpeningLine, path: number[]): string {
+  const labels: string[] = [];
+  let choices = opening.moves;
+  for (const index of path) {
+    const node = choices[index];
+    if (!node) break;
+    if (choices.length > 1) labels.push(openingBranchChoiceLabel(choices, index));
+    choices = node.next ?? [];
+  }
+  return labels.join(" → ") || "ルート";
+}
+
+/** Return a compact, 1-based structural identity for a root-relative tree path. */
+export function openingStructuralPathLabel(path: number[]): string {
+  return `経路 ${path.length > 0 ? path.map((index) => index + 1).join("-") : "ルート"}`;
+}
+
+/** Centralized, branch-qualified accessible name for a variation node jump. */
+export function openingNodeJumpAccessibleName(opening: OpeningLine, path: number[]): string {
+  let choices = opening.moves;
+  let node: OpeningMoveNode | undefined;
+  for (const index of path) {
+    node = choices[index];
+    if (!node) break;
+    choices = node.next ?? [];
+  }
+  const identity = `${openingBranchBreadcrumb(opening, path)}、${openingStructuralPathLabel(path)}`;
+  if (!node) return `${path.length}手目、不明な手、${identity}、ここへ移動`;
+  return `${path.length}手目 ${node.notation}、USI ${node.usi}、${identity}、ここへ移動`;
+}
+
+/** Centralized, branch-qualified accessible name for a semantic-main switch. */
+export function openingMainSwitchAccessibleName(opening: OpeningLine, branchPointPath: number[], selected: boolean): string {
+  const location = openingBranchBreadcrumb(opening, branchPointPath);
+  const identity = openingStructuralPathLabel(branchPointPath);
+  const visibleLabel = selected ? "本線を選択中" : "この分岐点の本線へ切り替える";
+  return `${visibleLabel}、第${branchPointPath.length + 1}手の分岐点 ${location}、${identity}`;
 }
 
 /** Return the user-facing labels of the branch points traversed by an applied path. */
