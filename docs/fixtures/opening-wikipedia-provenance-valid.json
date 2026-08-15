@@ -1,0 +1,11 @@
+{
+  "fixture_version": "1.0.0",
+  "provenance_class": "explicit_sequence",
+  "coverage": "partial_explicit_sequence",
+  "moves": ["7g7f", "3c3d", "7f7e"],
+  "covered_through_ply": 3,
+  "covered_through_move": "7f7e",
+  "source_note": "引用した連続手順の3手目までを収録。後続は未収録。",
+  "omitted_after": "引用 section の4手目以降",
+  "expected_errors": []
+}

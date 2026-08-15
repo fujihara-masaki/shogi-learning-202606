@@ -1,0 +1,1658 @@
+{
+  "schema_version": "1.0.0",
+  "artifact_type": "wikipedia_opening_provenance_audit",
+  "generated_at": "2026-08-15T00:00:00Z",
+  "seed_snapshot": {
+    "commit": "3d4b48fe7464b7e36145a51dfdee1d2d2bfe8d51",
+    "source_file": "backend/app/seed.py",
+    "line_count": 34
+  },
+  "records": [
+    {
+      "record_id": "seed:棒銀",
+      "subject_kind": "move_line",
+      "line_name": "棒銀",
+      "seed_locator": "backend/app/seed.py:SAMPLE_OPENING_LINES",
+      "move_count": 11,
+      "moves": [
+        "7g7f",
+        "3c3d",
+        "2g2f",
+        "8c8d",
+        "2f2e",
+        "8d8e",
+        "3i3h",
+        "7a6b",
+        "3h2g",
+        "4a3b",
+        "2g2f"
+      ],
+      "provenance_class": "diagram_reconstruction",
+      "coverage": "diagram_reconstruction",
+      "legacy_coverage_status": "局面図参考の短い手順",
+      "source": {
+        "source_type": "wikipedia",
+        "source_title": "Wikipedia 棒銀",
+        "requested_url": "https://ja.wikipedia.org/wiki/棒銀",
+        "canonical_url": null,
+        "source_section": null,
+        "revision_id": null,
+        "revision_timestamp": null,
+        "retrieved_at": "2026-08-15",
+        "source_license": "CC BY-SA 4.0"
+      },
+      "coverage_boundary": {
+        "covered_through_ply": 11,
+        "covered_through_move": "2g2f",
+        "omitted_after": null
+      },
+      "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+      "segments": [],
+      "verification": {
+        "status": "unavailable",
+        "method": "MediaWiki API and article HTTP retrieval",
+        "checked_at": "2026-08-15T00:00:00Z",
+        "note": "Network access was denied (shell CONNECT tunnel HTTP 403; web retrieval HTTP 401). Revision, redirect, canonical URL, and current section presence were not verified and are not inferred."
+      },
+      "audit_issues": [
+        "source_section_missing_in_seed"
+      ]
+    },
+    {
+      "record_id": "seed:中飛車",
+      "subject_kind": "move_line",
+      "line_name": "中飛車",
+      "seed_locator": "backend/app/seed.py:SAMPLE_OPENING_LINES",
+      "move_count": 8,
+      "moves": [
+        "7g7f",
+        "3c3d",
+        "2h5h",
+        "8c8d",
+        "5g5f",
+        "8d8e",
+        "5h5g",
+        "6a5b"
+      ],
+      "provenance_class": "diagram_reconstruction",
+      "coverage": "diagram_reconstruction",
+      "legacy_coverage_status": "短い手順のみ",
+      "source": {
+        "source_type": "wikipedia",
+        "source_title": "Wikipedia 将棋の戦法",
+        "requested_url": "https://ja.wikipedia.org/wiki/将棋の戦法",
+        "canonical_url": null,
+        "source_section": null,
+        "revision_id": null,
+        "revision_timestamp": null,
+        "retrieved_at": "2026-08-15",
+        "source_license": "CC BY-SA 4.0"
+      },
+      "coverage_boundary": {
+        "covered_through_ply": 8,
+        "covered_through_move": "6a5b",
+        "omitted_after": null
+      },
+      "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+      "segments": [],
+      "verification": {
+        "status": "unavailable",
+        "method": "MediaWiki API and article HTTP retrieval",
+        "checked_at": "2026-08-15T00:00:00Z",
+        "note": "Network access was denied (shell CONNECT tunnel HTTP 403; web retrieval HTTP 401). Revision, redirect, canonical URL, and current section presence were not verified and are not inferred."
+      },
+      "audit_issues": [
+        "source_section_missing_in_seed"
+      ]
+    },
+    {
+      "record_id": "seed:四間飛車",
+      "subject_kind": "move_line",
+      "line_name": "四間飛車",
+      "seed_locator": "backend/app/seed.py:SAMPLE_OPENING_LINES",
+      "move_count": 8,
+      "moves": [
+        "7g7f",
+        "3c3d",
+        "6g6f",
+        "8c8d",
+        "2h6h",
+        "8d8e",
+        "7i7h",
+        "6a5b"
+      ],
+      "provenance_class": "diagram_reconstruction",
+      "coverage": "diagram_reconstruction",
+      "legacy_coverage_status": "短い手順のみ",
+      "source": {
+        "source_type": "wikipedia",
+        "source_title": "Wikipedia 将棋の戦法",
+        "requested_url": "https://ja.wikipedia.org/wiki/将棋の戦法",
+        "canonical_url": null,
+        "source_section": null,
+        "revision_id": null,
+        "revision_timestamp": null,
+        "retrieved_at": "2026-08-15",
+        "source_license": "CC BY-SA 4.0"
+      },
+      "coverage_boundary": {
+        "covered_through_ply": 8,
+        "covered_through_move": "6a5b",
+        "omitted_after": null
+      },
+      "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+      "segments": [],
+      "verification": {
+        "status": "unavailable",
+        "method": "MediaWiki API and article HTTP retrieval",
+        "checked_at": "2026-08-15T00:00:00Z",
+        "note": "Network access was denied (shell CONNECT tunnel HTTP 403; web retrieval HTTP 401). Revision, redirect, canonical URL, and current section presence were not verified and are not inferred."
+      },
+      "audit_issues": [
+        "source_section_missing_in_seed"
+      ]
+    },
+    {
+      "record_id": "seed:矢倉",
+      "subject_kind": "move_line",
+      "line_name": "矢倉",
+      "seed_locator": "backend/app/seed.py:SAMPLE_OPENING_LINES",
+      "move_count": 9,
+      "moves": [
+        "7g7f",
+        "8c8d",
+        "6i7h",
+        "3c3d",
+        "6g6f",
+        "7a6b",
+        "7i6h",
+        "5a4b",
+        "5i6i"
+      ],
+      "provenance_class": "diagram_reconstruction",
+      "coverage": "diagram_reconstruction",
+      "legacy_coverage_status": "短い手順のみ",
+      "source": {
+        "source_type": "wikipedia",
+        "source_title": "Wikipedia 将棋の戦法",
+        "requested_url": "https://ja.wikipedia.org/wiki/将棋の戦法",
+        "canonical_url": null,
+        "source_section": null,
+        "revision_id": null,
+        "revision_timestamp": null,
+        "retrieved_at": "2026-08-15",
+        "source_license": "CC BY-SA 4.0"
+      },
+      "coverage_boundary": {
+        "covered_through_ply": 9,
+        "covered_through_move": "5i6i",
+        "omitted_after": null
+      },
+      "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+      "segments": [],
+      "verification": {
+        "status": "unavailable",
+        "method": "MediaWiki API and article HTTP retrieval",
+        "checked_at": "2026-08-15T00:00:00Z",
+        "note": "Network access was denied (shell CONNECT tunnel HTTP 403; web retrieval HTTP 401). Revision, redirect, canonical URL, and current section presence were not verified and are not inferred."
+      },
+      "audit_issues": [
+        "source_section_missing_in_seed"
+      ]
+    },
+    {
+      "record_id": "seed:角換わり",
+      "subject_kind": "move_line",
+      "line_name": "角換わり",
+      "seed_locator": "backend/app/seed.py:SAMPLE_OPENING_LINES",
+      "move_count": 8,
+      "moves": [
+        "7g7f",
+        "8c8d",
+        "2g2f",
+        "3c3d",
+        "8h2b+",
+        "3a2b",
+        "7i8h",
+        "7a7b"
+      ],
+      "provenance_class": "diagram_reconstruction",
+      "coverage": "diagram_reconstruction",
+      "legacy_coverage_status": "短い手順のみ",
+      "source": {
+        "source_type": "wikipedia",
+        "source_title": "Wikipedia 角換わり",
+        "requested_url": "https://ja.wikipedia.org/wiki/角換わり",
+        "canonical_url": null,
+        "source_section": null,
+        "revision_id": null,
+        "revision_timestamp": null,
+        "retrieved_at": "2026-08-15",
+        "source_license": "CC BY-SA 4.0"
+      },
+      "coverage_boundary": {
+        "covered_through_ply": 8,
+        "covered_through_move": "7a7b",
+        "omitted_after": null
+      },
+      "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+      "segments": [],
+      "verification": {
+        "status": "unavailable",
+        "method": "MediaWiki API and article HTTP retrieval",
+        "checked_at": "2026-08-15T00:00:00Z",
+        "note": "Network access was denied (shell CONNECT tunnel HTTP 403; web retrieval HTTP 401). Revision, redirect, canonical URL, and current section presence were not verified and are not inferred."
+      },
+      "audit_issues": [
+        "source_section_missing_in_seed"
+      ]
+    },
+    {
+      "record_id": "seed:相掛かり",
+      "subject_kind": "move_line",
+      "line_name": "相掛かり",
+      "seed_locator": "backend/app/seed.py:SAMPLE_OPENING_LINES",
+      "move_count": 8,
+      "moves": [
+        "2g2f",
+        "8c8d",
+        "2f2e",
+        "8d8e",
+        "7g7f",
+        "3c3d",
+        "2h7h",
+        "8b3b"
+      ],
+      "provenance_class": "diagram_reconstruction",
+      "coverage": "diagram_reconstruction",
+      "legacy_coverage_status": "短い手順のみ",
+      "source": {
+        "source_type": "wikipedia",
+        "source_title": "Wikipedia 将棋の戦法",
+        "requested_url": "https://ja.wikipedia.org/wiki/将棋の戦法",
+        "canonical_url": null,
+        "source_section": null,
+        "revision_id": null,
+        "revision_timestamp": null,
+        "retrieved_at": "2026-08-15",
+        "source_license": "CC BY-SA 4.0"
+      },
+      "coverage_boundary": {
+        "covered_through_ply": 8,
+        "covered_through_move": "8b3b",
+        "omitted_after": null
+      },
+      "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+      "segments": [],
+      "verification": {
+        "status": "unavailable",
+        "method": "MediaWiki API and article HTTP retrieval",
+        "checked_at": "2026-08-15T00:00:00Z",
+        "note": "Network access was denied (shell CONNECT tunnel HTTP 403; web retrieval HTTP 401). Revision, redirect, canonical URL, and current section presence were not verified and are not inferred."
+      },
+      "audit_issues": [
+        "source_section_missing_in_seed"
+      ]
+    },
+    {
+      "record_id": "seed:横歩取り",
+      "subject_kind": "move_line",
+      "line_name": "横歩取り",
+      "seed_locator": "backend/app/seed.py:SAMPLE_OPENING_LINES",
+      "move_count": 13,
+      "moves": [
+        "7g7f",
+        "3c3d",
+        "2g2f",
+        "8c8d",
+        "2f2e",
+        "8d8e",
+        "2e2d",
+        "2c2d",
+        "2h2d",
+        "8e8f",
+        "8g8f",
+        "8b8f",
+        "2d3d"
+      ],
+      "provenance_class": "diagram_reconstruction",
+      "coverage": "diagram_reconstruction",
+      "legacy_coverage_status": "基本局面まで",
+      "source": {
+        "source_type": "wikipedia",
+        "source_title": "Wikipedia 横歩取り",
+        "requested_url": "https://ja.wikipedia.org/wiki/横歩取り",
+        "canonical_url": null,
+        "source_section": null,
+        "revision_id": null,
+        "revision_timestamp": null,
+        "retrieved_at": "2026-08-15",
+        "source_license": "CC BY-SA 4.0"
+      },
+      "coverage_boundary": {
+        "covered_through_ply": 13,
+        "covered_through_move": "2d3d",
+        "omitted_after": null
+      },
+      "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+      "segments": [],
+      "verification": {
+        "status": "unavailable",
+        "method": "MediaWiki API and article HTTP retrieval",
+        "checked_at": "2026-08-15T00:00:00Z",
+        "note": "Network access was denied (shell CONNECT tunnel HTTP 403; web retrieval HTTP 401). Revision, redirect, canonical URL, and current section presence were not verified and are not inferred."
+      },
+      "audit_issues": [
+        "source_section_missing_in_seed"
+      ]
+    },
+    {
+      "record_id": "seed:石田流",
+      "subject_kind": "move_line",
+      "line_name": "石田流",
+      "seed_locator": "backend/app/seed.py:SAMPLE_OPENING_LINES",
+      "move_count": 8,
+      "moves": [
+        "7g7f",
+        "3c3d",
+        "7f7e",
+        "8c8d",
+        "2h7h",
+        "8d8e",
+        "7h7f",
+        "6a5b"
+      ],
+      "provenance_class": "diagram_reconstruction",
+      "coverage": "diagram_reconstruction",
+      "legacy_coverage_status": "短い手順のみ",
+      "source": {
+        "source_type": "wikipedia",
+        "source_title": "Wikipedia 石田流",
+        "requested_url": "https://ja.wikipedia.org/wiki/石田流",
+        "canonical_url": null,
+        "source_section": null,
+        "revision_id": null,
+        "revision_timestamp": null,
+        "retrieved_at": "2026-08-15",
+        "source_license": "CC BY-SA 4.0"
+      },
+      "coverage_boundary": {
+        "covered_through_ply": 8,
+        "covered_through_move": "6a5b",
+        "omitted_after": null
+      },
+      "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+      "segments": [],
+      "verification": {
+        "status": "unavailable",
+        "method": "MediaWiki API and article HTTP retrieval",
+        "checked_at": "2026-08-15T00:00:00Z",
+        "note": "Network access was denied (shell CONNECT tunnel HTTP 403; web retrieval HTTP 401). Revision, redirect, canonical URL, and current section presence were not verified and are not inferred."
+      },
+      "audit_issues": [
+        "source_section_missing_in_seed"
+      ]
+    },
+    {
+      "record_id": "seed:ゴキゲン中飛車",
+      "subject_kind": "move_line",
+      "line_name": "ゴキゲン中飛車",
+      "seed_locator": "backend/app/seed.py:SAMPLE_OPENING_LINES",
+      "move_count": 8,
+      "moves": [
+        "7g7f",
+        "3c3d",
+        "2g2f",
+        "5c5d",
+        "2f2e",
+        "5a5b",
+        "2h5h",
+        "8c8d"
+      ],
+      "provenance_class": "diagram_reconstruction",
+      "coverage": "diagram_reconstruction",
+      "legacy_coverage_status": "短い手順のみ",
+      "source": {
+        "source_type": "wikipedia",
+        "source_title": "Wikipedia ゴキゲン中飛車",
+        "requested_url": "https://ja.wikipedia.org/wiki/ゴキゲン中飛車",
+        "canonical_url": null,
+        "source_section": null,
+        "revision_id": null,
+        "revision_timestamp": null,
+        "retrieved_at": "2026-08-15",
+        "source_license": "CC BY-SA 4.0"
+      },
+      "coverage_boundary": {
+        "covered_through_ply": 8,
+        "covered_through_move": "8c8d",
+        "omitted_after": null
+      },
+      "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+      "segments": [],
+      "verification": {
+        "status": "unavailable",
+        "method": "MediaWiki API and article HTTP retrieval",
+        "checked_at": "2026-08-15T00:00:00Z",
+        "note": "Network access was denied (shell CONNECT tunnel HTTP 403; web retrieval HTTP 401). Revision, redirect, canonical URL, and current section presence were not verified and are not inferred."
+      },
+      "audit_issues": [
+        "source_section_missing_in_seed"
+      ]
+    },
+    {
+      "record_id": "seed:角交換四間飛車",
+      "subject_kind": "move_line",
+      "line_name": "角交換四間飛車",
+      "seed_locator": "backend/app/seed.py:SAMPLE_OPENING_LINES",
+      "move_count": 8,
+      "moves": [
+        "7g7f",
+        "3c3d",
+        "8h2b+",
+        "3a2b",
+        "2g2f",
+        "4c4d",
+        "2h4h",
+        "5a4b"
+      ],
+      "provenance_class": "diagram_reconstruction",
+      "coverage": "diagram_reconstruction",
+      "legacy_coverage_status": "短い手順のみ",
+      "source": {
+        "source_type": "wikipedia",
+        "source_title": "Wikipedia 将棋の戦法",
+        "requested_url": "https://ja.wikipedia.org/wiki/将棋の戦法",
+        "canonical_url": null,
+        "source_section": null,
+        "revision_id": null,
+        "revision_timestamp": null,
+        "retrieved_at": "2026-08-15",
+        "source_license": "CC BY-SA 4.0"
+      },
+      "coverage_boundary": {
+        "covered_through_ply": 8,
+        "covered_through_move": "5a4b",
+        "omitted_after": null
+      },
+      "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+      "segments": [],
+      "verification": {
+        "status": "unavailable",
+        "method": "MediaWiki API and article HTTP retrieval",
+        "checked_at": "2026-08-15T00:00:00Z",
+        "note": "Network access was denied (shell CONNECT tunnel HTTP 403; web retrieval HTTP 401). Revision, redirect, canonical URL, and current section presence were not verified and are not inferred."
+      },
+      "audit_issues": [
+        "source_section_missing_in_seed"
+      ]
+    },
+    {
+      "record_id": "seed:右四間飛車",
+      "subject_kind": "move_line",
+      "line_name": "右四間飛車",
+      "seed_locator": "backend/app/seed.py:SAMPLE_OPENING_LINES",
+      "move_count": 8,
+      "moves": [
+        "7g7f",
+        "3c3d",
+        "2g2f",
+        "4c4d",
+        "2f2e",
+        "3a3b",
+        "2h4h",
+        "6a5b"
+      ],
+      "provenance_class": "diagram_reconstruction",
+      "coverage": "diagram_reconstruction",
+      "legacy_coverage_status": "短い手順のみ",
+      "source": {
+        "source_type": "wikipedia",
+        "source_title": "Wikipedia 将棋の戦法",
+        "requested_url": "https://ja.wikipedia.org/wiki/将棋の戦法",
+        "canonical_url": null,
+        "source_section": null,
+        "revision_id": null,
+        "revision_timestamp": null,
+        "retrieved_at": "2026-08-15",
+        "source_license": "CC BY-SA 4.0"
+      },
+      "coverage_boundary": {
+        "covered_through_ply": 8,
+        "covered_through_move": "6a5b",
+        "omitted_after": null
+      },
+      "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+      "segments": [],
+      "verification": {
+        "status": "unavailable",
+        "method": "MediaWiki API and article HTTP retrieval",
+        "checked_at": "2026-08-15T00:00:00Z",
+        "note": "Network access was denied (shell CONNECT tunnel HTTP 403; web retrieval HTTP 401). Revision, redirect, canonical URL, and current section presence were not verified and are not inferred."
+      },
+      "audit_issues": [
+        "source_section_missing_in_seed"
+      ]
+    },
+    {
+      "record_id": "seed:居飛車穴熊",
+      "subject_kind": "move_line",
+      "line_name": "居飛車穴熊",
+      "seed_locator": "backend/app/seed.py:SAMPLE_OPENING_LINES",
+      "move_count": 13,
+      "moves": [
+        "7g7f",
+        "3c3d",
+        "2g2f",
+        "4c4d",
+        "8h7g",
+        "3a3b",
+        "4i5h",
+        "4a4b",
+        "5i6h",
+        "5a4a",
+        "6h7h",
+        "4a3a",
+        "7h8h"
+      ],
+      "provenance_class": "diagram_reconstruction",
+      "coverage": "diagram_reconstruction",
+      "legacy_coverage_status": "短い手順のみ",
+      "source": {
+        "source_type": "wikipedia",
+        "source_title": "Wikipedia 穴熊囲い",
+        "requested_url": "https://ja.wikipedia.org/wiki/穴熊囲い",
+        "canonical_url": null,
+        "source_section": null,
+        "revision_id": null,
+        "revision_timestamp": null,
+        "retrieved_at": "2026-08-15",
+        "source_license": "CC BY-SA 4.0"
+      },
+      "coverage_boundary": {
+        "covered_through_ply": 13,
+        "covered_through_move": "7h8h",
+        "omitted_after": null
+      },
+      "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+      "segments": [],
+      "verification": {
+        "status": "unavailable",
+        "method": "MediaWiki API and article HTTP retrieval",
+        "checked_at": "2026-08-15T00:00:00Z",
+        "note": "Network access was denied (shell CONNECT tunnel HTTP 403; web retrieval HTTP 401). Revision, redirect, canonical URL, and current section presence were not verified and are not inferred."
+      },
+      "audit_issues": [
+        "source_section_missing_in_seed"
+      ]
+    },
+    {
+      "record_id": "seed:対振り飛車急戦",
+      "subject_kind": "move_line",
+      "line_name": "対振り飛車急戦",
+      "seed_locator": "backend/app/seed.py:SAMPLE_OPENING_LINES",
+      "move_count": 13,
+      "moves": [
+        "7g7f",
+        "3c3d",
+        "2g2f",
+        "4c4d",
+        "2f2e",
+        "3a3b",
+        "4i5h",
+        "4a4b",
+        "5g5f",
+        "5a4a",
+        "3i4h",
+        "6a5b",
+        "4h5g"
+      ],
+      "provenance_class": "diagram_reconstruction",
+      "coverage": "diagram_reconstruction",
+      "legacy_coverage_status": "短い手順のみ",
+      "source": {
+        "source_type": "wikipedia",
+        "source_title": "Wikipedia 将棋の戦法",
+        "requested_url": "https://ja.wikipedia.org/wiki/将棋の戦法",
+        "canonical_url": null,
+        "source_section": null,
+        "revision_id": null,
+        "revision_timestamp": null,
+        "retrieved_at": "2026-08-15",
+        "source_license": "CC BY-SA 4.0"
+      },
+      "coverage_boundary": {
+        "covered_through_ply": 13,
+        "covered_through_move": "4h5g",
+        "omitted_after": null
+      },
+      "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+      "segments": [],
+      "verification": {
+        "status": "unavailable",
+        "method": "MediaWiki API and article HTTP retrieval",
+        "checked_at": "2026-08-15T00:00:00Z",
+        "note": "Network access was denied (shell CONNECT tunnel HTTP 403; web retrieval HTTP 401). Revision, redirect, canonical URL, and current section presence were not verified and are not inferred."
+      },
+      "audit_issues": [
+        "source_section_missing_in_seed"
+      ]
+    },
+    {
+      "record_id": "seed:三間飛車",
+      "subject_kind": "move_line",
+      "line_name": "三間飛車",
+      "seed_locator": "backend/app/seed.py:SAMPLE_OPENING_LINES",
+      "move_count": 8,
+      "moves": [
+        "7g7f",
+        "3c3d",
+        "6g6f",
+        "8c8d",
+        "2h7h",
+        "8d8e",
+        "7i6h",
+        "6a5b"
+      ],
+      "provenance_class": "diagram_reconstruction",
+      "coverage": "diagram_reconstruction",
+      "legacy_coverage_status": "短い手順のみ",
+      "source": {
+        "source_type": "wikipedia",
+        "source_title": "Wikipedia 将棋の戦法",
+        "requested_url": "https://ja.wikipedia.org/wiki/将棋の戦法",
+        "canonical_url": null,
+        "source_section": null,
+        "revision_id": null,
+        "revision_timestamp": null,
+        "retrieved_at": "2026-08-15",
+        "source_license": "CC BY-SA 4.0"
+      },
+      "coverage_boundary": {
+        "covered_through_ply": 8,
+        "covered_through_move": "6a5b",
+        "omitted_after": null
+      },
+      "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+      "segments": [],
+      "verification": {
+        "status": "unavailable",
+        "method": "MediaWiki API and article HTTP retrieval",
+        "checked_at": "2026-08-15T00:00:00Z",
+        "note": "Network access was denied (shell CONNECT tunnel HTTP 403; web retrieval HTTP 401). Revision, redirect, canonical URL, and current section presence were not verified and are not inferred."
+      },
+      "audit_issues": [
+        "source_section_missing_in_seed"
+      ]
+    },
+    {
+      "record_id": "seed:角交換振り飛車",
+      "subject_kind": "move_line",
+      "line_name": "角交換振り飛車",
+      "seed_locator": "backend/app/seed.py:SAMPLE_OPENING_LINES",
+      "move_count": 8,
+      "moves": [
+        "7g7f",
+        "3c3d",
+        "8h2b+",
+        "3a2b",
+        "2h6h",
+        "8c8d",
+        "6g6f",
+        "6a5b"
+      ],
+      "provenance_class": "diagram_reconstruction",
+      "coverage": "diagram_reconstruction",
+      "legacy_coverage_status": "短い手順のみ",
+      "source": {
+        "source_type": "wikipedia",
+        "source_title": "Wikipedia 将棋の戦法",
+        "requested_url": "https://ja.wikipedia.org/wiki/将棋の戦法",
+        "canonical_url": null,
+        "source_section": null,
+        "revision_id": null,
+        "revision_timestamp": null,
+        "retrieved_at": "2026-08-15",
+        "source_license": "CC BY-SA 4.0"
+      },
+      "coverage_boundary": {
+        "covered_through_ply": 8,
+        "covered_through_move": "6a5b",
+        "omitted_after": null
+      },
+      "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+      "segments": [],
+      "verification": {
+        "status": "unavailable",
+        "method": "MediaWiki API and article HTTP retrieval",
+        "checked_at": "2026-08-15T00:00:00Z",
+        "note": "Network access was denied (shell CONNECT tunnel HTTP 403; web retrieval HTTP 401). Revision, redirect, canonical URL, and current section presence were not verified and are not inferred."
+      },
+      "audit_issues": [
+        "source_section_missing_in_seed"
+      ]
+    },
+    {
+      "record_id": "seed:相振り飛車",
+      "subject_kind": "move_line",
+      "line_name": "相振り飛車",
+      "seed_locator": "backend/app/seed.py:SAMPLE_OPENING_LINES",
+      "move_count": 8,
+      "moves": [
+        "7g7f",
+        "3c3d",
+        "6g6f",
+        "5c5d",
+        "2h7h",
+        "8b5b",
+        "7i6h",
+        "5b3b"
+      ],
+      "provenance_class": "diagram_reconstruction",
+      "coverage": "diagram_reconstruction",
+      "legacy_coverage_status": "短い手順のみ",
+      "source": {
+        "source_type": "wikipedia",
+        "source_title": "Wikipedia 将棋の戦法",
+        "requested_url": "https://ja.wikipedia.org/wiki/将棋の戦法",
+        "canonical_url": null,
+        "source_section": null,
+        "revision_id": null,
+        "revision_timestamp": null,
+        "retrieved_at": "2026-08-15",
+        "source_license": "CC BY-SA 4.0"
+      },
+      "coverage_boundary": {
+        "covered_through_ply": 8,
+        "covered_through_move": "5b3b",
+        "omitted_after": null
+      },
+      "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+      "segments": [],
+      "verification": {
+        "status": "unavailable",
+        "method": "MediaWiki API and article HTTP retrieval",
+        "checked_at": "2026-08-15T00:00:00Z",
+        "note": "Network access was denied (shell CONNECT tunnel HTTP 403; web retrieval HTTP 401). Revision, redirect, canonical URL, and current section presence were not verified and are not inferred."
+      },
+      "audit_issues": [
+        "source_section_missing_in_seed"
+      ]
+    },
+    {
+      "record_id": "seed:嬉野流",
+      "subject_kind": "move_line",
+      "line_name": "嬉野流",
+      "seed_locator": "backend/app/seed.py:SAMPLE_OPENING_LINES",
+      "move_count": 8,
+      "moves": [
+        "6i7h",
+        "3c3d",
+        "7i6h",
+        "8c8d",
+        "5g5f",
+        "8d8e",
+        "6h5g",
+        "4a3b"
+      ],
+      "provenance_class": "diagram_reconstruction",
+      "coverage": "diagram_reconstruction",
+      "legacy_coverage_status": "短い手順のみ",
+      "source": {
+        "source_type": "wikipedia",
+        "source_title": "Wikipedia 将棋の戦法",
+        "requested_url": "https://ja.wikipedia.org/wiki/将棋の戦法",
+        "canonical_url": null,
+        "source_section": null,
+        "revision_id": null,
+        "revision_timestamp": null,
+        "retrieved_at": "2026-08-15",
+        "source_license": "CC BY-SA 4.0"
+      },
+      "coverage_boundary": {
+        "covered_through_ply": 8,
+        "covered_through_move": "4a3b",
+        "omitted_after": null
+      },
+      "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+      "segments": [],
+      "verification": {
+        "status": "unavailable",
+        "method": "MediaWiki API and article HTTP retrieval",
+        "checked_at": "2026-08-15T00:00:00Z",
+        "note": "Network access was denied (shell CONNECT tunnel HTTP 403; web retrieval HTTP 401). Revision, redirect, canonical URL, and current section presence were not verified and are not inferred."
+      },
+      "audit_issues": [
+        "source_section_missing_in_seed"
+      ]
+    },
+    {
+      "record_id": "seed:鬼殺し",
+      "subject_kind": "move_line",
+      "line_name": "鬼殺し",
+      "seed_locator": "backend/app/seed.py:SAMPLE_OPENING_LINES",
+      "move_count": 9,
+      "moves": [
+        "7g7f",
+        "3c3d",
+        "7i7h",
+        "8c8d",
+        "6g6f",
+        "8d8e",
+        "7h6g",
+        "6a5b",
+        "6g5f"
+      ],
+      "provenance_class": "diagram_reconstruction",
+      "coverage": "diagram_reconstruction",
+      "legacy_coverage_status": "短い手順のみ",
+      "source": {
+        "source_type": "wikipedia",
+        "source_title": "Wikipedia 将棋の戦法",
+        "requested_url": "https://ja.wikipedia.org/wiki/将棋の戦法",
+        "canonical_url": null,
+        "source_section": null,
+        "revision_id": null,
+        "revision_timestamp": null,
+        "retrieved_at": "2026-08-15",
+        "source_license": "CC BY-SA 4.0"
+      },
+      "coverage_boundary": {
+        "covered_through_ply": 9,
+        "covered_through_move": "6g5f",
+        "omitted_after": null
+      },
+      "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+      "segments": [],
+      "verification": {
+        "status": "unavailable",
+        "method": "MediaWiki API and article HTTP retrieval",
+        "checked_at": "2026-08-15T00:00:00Z",
+        "note": "Network access was denied (shell CONNECT tunnel HTTP 403; web retrieval HTTP 401). Revision, redirect, canonical URL, and current section presence were not verified and are not inferred."
+      },
+      "audit_issues": [
+        "source_section_missing_in_seed"
+      ]
+    },
+    {
+      "record_id": "seed:原始鬼殺し（Wikipedia明示手順）",
+      "subject_kind": "move_line",
+      "line_name": "原始鬼殺し（Wikipedia明示手順）",
+      "seed_locator": "backend/app/seed.py:SAMPLE_OPENING_LINES",
+      "move_count": 19,
+      "moves": [
+        "7g7f",
+        "3c3d",
+        "8i7g",
+        "8c8d",
+        "7g6e",
+        "7a6b",
+        "7f7e",
+        "6c6d",
+        "8h2b+",
+        "3a2b",
+        "B*5e",
+        "2b3c",
+        "5e6d",
+        "6a5b",
+        "7e7d",
+        "6b6c",
+        "2h7h",
+        "6c6d",
+        "7d7c+"
+      ],
+      "provenance_class": "explicit_sequence",
+      "coverage": "partial_explicit_sequence",
+      "legacy_coverage_status": "Wikipedia本文明示の長手順・対策分岐",
+      "source": {
+        "source_type": "wikipedia",
+        "source_title": "Wikipedia 鬼殺し (将棋)",
+        "requested_url": "https://ja.wikipedia.org/wiki/鬼殺し_(将棋)",
+        "canonical_url": null,
+        "source_section": "原始鬼殺し",
+        "revision_id": null,
+        "revision_timestamp": null,
+        "retrieved_at": "2026-08-15",
+        "source_license": "CC BY-SA 4.0"
+      },
+      "coverage_boundary": {
+        "covered_through_ply": 19,
+        "covered_through_move": "7d7c+",
+        "omitted_after": null
+      },
+      "evidence_note": "原始鬼殺し節の▲7六歩△3四歩▲7七桂から▲7三歩成までの本文記述と、△6二金/△6二銀の対応を短く手順化。",
+      "segments": [],
+      "verification": {
+        "status": "unavailable",
+        "method": "MediaWiki API and article HTTP retrieval",
+        "checked_at": "2026-08-15T00:00:00Z",
+        "note": "Network access was denied (shell CONNECT tunnel HTTP 403; web retrieval HTTP 401). Revision, redirect, canonical URL, and current section presence were not verified and are not inferred."
+      },
+      "audit_issues": []
+    },
+    {
+      "record_id": "seed:新・早石田（鈴木流急戦・Wikipedia明示手順）",
+      "subject_kind": "move_line",
+      "line_name": "新・早石田（鈴木流急戦・Wikipedia明示手順）",
+      "seed_locator": "backend/app/seed.py:SAMPLE_OPENING_LINES",
+      "move_count": 7,
+      "moves": [
+        "7g7f",
+        "3c3d",
+        "7f7e",
+        "8c8d",
+        "2h7h",
+        "8d8e",
+        "7e7d"
+      ],
+      "provenance_class": "explicit_sequence",
+      "coverage": "partial_explicit_sequence",
+      "legacy_coverage_status": "Wikipedia本文明示の初手からの手順",
+      "source": {
+        "source_type": "wikipedia",
+        "source_title": "Wikipedia 石田流",
+        "requested_url": "https://ja.wikipedia.org/wiki/石田流",
+        "canonical_url": null,
+        "source_section": "新・早石田",
+        "revision_id": null,
+        "revision_timestamp": null,
+        "retrieved_at": "2026-08-15",
+        "source_license": "CC BY-SA 4.0"
+      },
+      "coverage_boundary": {
+        "covered_through_ply": 7,
+        "covered_through_move": "7e7d",
+        "omitted_after": null
+      },
+      "evidence_note": "新・早石田節の第7手▲7四歩までの本文・図示手順を対象化。以降は本文にある範囲のみ。",
+      "segments": [],
+      "verification": {
+        "status": "unavailable",
+        "method": "MediaWiki API and article HTTP retrieval",
+        "checked_at": "2026-08-15T00:00:00Z",
+        "note": "Network access was denied (shell CONNECT tunnel HTTP 403; web retrieval HTTP 401). Revision, redirect, canonical URL, and current section presence were not verified and are not inferred."
+      },
+      "audit_issues": []
+    },
+    {
+      "record_id": "seed:升田式石田流（Wikipedia明示手順）",
+      "subject_kind": "move_line",
+      "line_name": "升田式石田流（Wikipedia明示手順）",
+      "seed_locator": "backend/app/seed.py:SAMPLE_OPENING_LINES",
+      "move_count": 7,
+      "moves": [
+        "7g7f",
+        "3c3d",
+        "7f7e",
+        "8c8d",
+        "2h7h",
+        "8d8e",
+        "5i4h"
+      ],
+      "provenance_class": "explicit_sequence",
+      "coverage": "partial_explicit_sequence",
+      "legacy_coverage_status": "Wikipedia本文明示の初手からの手順",
+      "source": {
+        "source_type": "wikipedia",
+        "source_title": "Wikipedia 石田流",
+        "requested_url": "https://ja.wikipedia.org/wiki/石田流",
+        "canonical_url": null,
+        "source_section": "升田式石田流",
+        "revision_id": null,
+        "revision_timestamp": null,
+        "retrieved_at": "2026-08-15",
+        "source_license": "CC BY-SA 4.0"
+      },
+      "coverage_boundary": {
+        "covered_through_ply": 7,
+        "covered_through_move": "5i4h",
+        "omitted_after": null
+      },
+      "evidence_note": "升田式石田流節の▲7六歩△3四歩▲7五歩△8四歩▲7八飛△8五歩▲4八玉、および実戦以下▲7六飛を手順化。",
+      "segments": [],
+      "verification": {
+        "status": "unavailable",
+        "method": "MediaWiki API and article HTTP retrieval",
+        "checked_at": "2026-08-15T00:00:00Z",
+        "note": "Network access was denied (shell CONNECT tunnel HTTP 403; web retrieval HTTP 401). Revision, redirect, canonical URL, and current section presence were not verified and are not inferred."
+      },
+      "audit_issues": [
+        "source_note_claims_unrecorded_move_7h7f"
+      ]
+    },
+    {
+      "record_id": "seed:早石田",
+      "subject_kind": "move_line",
+      "line_name": "早石田",
+      "seed_locator": "backend/app/seed.py:SAMPLE_OPENING_LINES",
+      "move_count": 7,
+      "moves": [
+        "7g7f",
+        "3c3d",
+        "7f7e",
+        "8c8d",
+        "2h7h",
+        "8d8e",
+        "7h7f"
+      ],
+      "provenance_class": "diagram_reconstruction",
+      "coverage": "diagram_reconstruction",
+      "legacy_coverage_status": "短い手順のみ",
+      "source": {
+        "source_type": "wikipedia",
+        "source_title": "Wikipedia 将棋の戦法",
+        "requested_url": "https://ja.wikipedia.org/wiki/将棋の戦法",
+        "canonical_url": null,
+        "source_section": null,
+        "revision_id": null,
+        "revision_timestamp": null,
+        "retrieved_at": "2026-08-15",
+        "source_license": "CC BY-SA 4.0"
+      },
+      "coverage_boundary": {
+        "covered_through_ply": 7,
+        "covered_through_move": "7h7f",
+        "omitted_after": null
+      },
+      "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+      "segments": [],
+      "verification": {
+        "status": "unavailable",
+        "method": "MediaWiki API and article HTTP retrieval",
+        "checked_at": "2026-08-15T00:00:00Z",
+        "note": "Network access was denied (shell CONNECT tunnel HTTP 403; web retrieval HTTP 401). Revision, redirect, canonical URL, and current section presence were not verified and are not inferred."
+      },
+      "audit_issues": [
+        "source_section_missing_in_seed"
+      ]
+    },
+    {
+      "record_id": "seed:筋違い角",
+      "subject_kind": "move_line",
+      "line_name": "筋違い角",
+      "seed_locator": "backend/app/seed.py:SAMPLE_OPENING_LINES",
+      "move_count": 6,
+      "moves": [
+        "7g7f",
+        "3c3d",
+        "8h2b+",
+        "3a2b",
+        "B*4e",
+        "6a5b"
+      ],
+      "provenance_class": "diagram_reconstruction",
+      "coverage": "diagram_reconstruction",
+      "legacy_coverage_status": "短い手順のみ",
+      "source": {
+        "source_type": "wikipedia",
+        "source_title": "Wikipedia 将棋の戦法",
+        "requested_url": "https://ja.wikipedia.org/wiki/将棋の戦法",
+        "canonical_url": null,
+        "source_section": null,
+        "revision_id": null,
+        "revision_timestamp": null,
+        "retrieved_at": "2026-08-15",
+        "source_license": "CC BY-SA 4.0"
+      },
+      "coverage_boundary": {
+        "covered_through_ply": 6,
+        "covered_through_move": "6a5b",
+        "omitted_after": null
+      },
+      "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+      "segments": [],
+      "verification": {
+        "status": "unavailable",
+        "method": "MediaWiki API and article HTTP retrieval",
+        "checked_at": "2026-08-15T00:00:00Z",
+        "note": "Network access was denied (shell CONNECT tunnel HTTP 403; web retrieval HTTP 401). Revision, redirect, canonical URL, and current section presence were not verified and are not inferred."
+      },
+      "audit_issues": [
+        "source_section_missing_in_seed"
+      ]
+    },
+    {
+      "record_id": "seed:雁木",
+      "subject_kind": "move_line",
+      "line_name": "雁木",
+      "seed_locator": "backend/app/seed.py:SAMPLE_OPENING_LINES",
+      "move_count": 9,
+      "moves": [
+        "7g7f",
+        "8c8d",
+        "6g6f",
+        "3c3d",
+        "7i6h",
+        "7a6b",
+        "6h6g",
+        "5c5d",
+        "5g5f"
+      ],
+      "provenance_class": "diagram_reconstruction",
+      "coverage": "diagram_reconstruction",
+      "legacy_coverage_status": "短い手順のみ",
+      "source": {
+        "source_type": "wikipedia",
+        "source_title": "Wikipedia 将棋の戦法",
+        "requested_url": "https://ja.wikipedia.org/wiki/将棋の戦法",
+        "canonical_url": null,
+        "source_section": null,
+        "revision_id": null,
+        "revision_timestamp": null,
+        "retrieved_at": "2026-08-15",
+        "source_license": "CC BY-SA 4.0"
+      },
+      "coverage_boundary": {
+        "covered_through_ply": 9,
+        "covered_through_move": "5g5f",
+        "omitted_after": null
+      },
+      "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+      "segments": [],
+      "verification": {
+        "status": "unavailable",
+        "method": "MediaWiki API and article HTTP retrieval",
+        "checked_at": "2026-08-15T00:00:00Z",
+        "note": "Network access was denied (shell CONNECT tunnel HTTP 403; web retrieval HTTP 401). Revision, redirect, canonical URL, and current section presence were not verified and are not inferred."
+      },
+      "audit_issues": [
+        "source_section_missing_in_seed"
+      ]
+    },
+    {
+      "record_id": "seed:矢倉棒銀",
+      "subject_kind": "move_line",
+      "line_name": "矢倉棒銀",
+      "seed_locator": "backend/app/seed.py:SAMPLE_OPENING_LINES",
+      "move_count": 11,
+      "moves": [
+        "7g7f",
+        "8c8d",
+        "6i7h",
+        "3c3d",
+        "6g6f",
+        "7a6b",
+        "2g2f",
+        "5c5d",
+        "3i3h",
+        "5a4b",
+        "3h2g"
+      ],
+      "provenance_class": "diagram_reconstruction",
+      "coverage": "diagram_reconstruction",
+      "legacy_coverage_status": "短い手順のみ",
+      "source": {
+        "source_type": "wikipedia",
+        "source_title": "Wikipedia 将棋の戦法",
+        "requested_url": "https://ja.wikipedia.org/wiki/将棋の戦法",
+        "canonical_url": null,
+        "source_section": null,
+        "revision_id": null,
+        "revision_timestamp": null,
+        "retrieved_at": "2026-08-15",
+        "source_license": "CC BY-SA 4.0"
+      },
+      "coverage_boundary": {
+        "covered_through_ply": 11,
+        "covered_through_move": "3h2g",
+        "omitted_after": null
+      },
+      "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+      "segments": [],
+      "verification": {
+        "status": "unavailable",
+        "method": "MediaWiki API and article HTTP retrieval",
+        "checked_at": "2026-08-15T00:00:00Z",
+        "note": "Network access was denied (shell CONNECT tunnel HTTP 403; web retrieval HTTP 401). Revision, redirect, canonical URL, and current section presence were not verified and are not inferred."
+      },
+      "audit_issues": [
+        "source_section_missing_in_seed"
+      ]
+    },
+    {
+      "record_id": "seed:角換わり棒銀",
+      "subject_kind": "move_line",
+      "line_name": "角換わり棒銀",
+      "seed_locator": "backend/app/seed.py:SAMPLE_OPENING_LINES",
+      "move_count": 9,
+      "moves": [
+        "7g7f",
+        "8c8d",
+        "2g2f",
+        "3c3d",
+        "8h2b+",
+        "3a2b",
+        "3i3h",
+        "7a7b",
+        "3h2g"
+      ],
+      "provenance_class": "diagram_reconstruction",
+      "coverage": "diagram_reconstruction",
+      "legacy_coverage_status": "短い手順のみ",
+      "source": {
+        "source_type": "wikipedia",
+        "source_title": "Wikipedia 角換わり",
+        "requested_url": "https://ja.wikipedia.org/wiki/角換わり",
+        "canonical_url": null,
+        "source_section": null,
+        "revision_id": null,
+        "revision_timestamp": null,
+        "retrieved_at": "2026-08-15",
+        "source_license": "CC BY-SA 4.0"
+      },
+      "coverage_boundary": {
+        "covered_through_ply": 9,
+        "covered_through_move": "3h2g",
+        "omitted_after": null
+      },
+      "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+      "segments": [],
+      "verification": {
+        "status": "unavailable",
+        "method": "MediaWiki API and article HTTP retrieval",
+        "checked_at": "2026-08-15T00:00:00Z",
+        "note": "Network access was denied (shell CONNECT tunnel HTTP 403; web retrieval HTTP 401). Revision, redirect, canonical URL, and current section presence were not verified and are not inferred."
+      },
+      "audit_issues": [
+        "source_section_missing_in_seed"
+      ]
+    },
+    {
+      "record_id": "seed:角換わり早繰り銀",
+      "subject_kind": "move_line",
+      "line_name": "角換わり早繰り銀",
+      "seed_locator": "backend/app/seed.py:SAMPLE_OPENING_LINES",
+      "move_count": 11,
+      "moves": [
+        "7g7f",
+        "8c8d",
+        "2g2f",
+        "3c3d",
+        "8h2b+",
+        "3a2b",
+        "3i4h",
+        "7a7b",
+        "3g3f",
+        "6a5b",
+        "4h3g"
+      ],
+      "provenance_class": "diagram_reconstruction",
+      "coverage": "diagram_reconstruction",
+      "legacy_coverage_status": "短い手順のみ",
+      "source": {
+        "source_type": "wikipedia",
+        "source_title": "Wikipedia 角換わり",
+        "requested_url": "https://ja.wikipedia.org/wiki/角換わり",
+        "canonical_url": null,
+        "source_section": null,
+        "revision_id": null,
+        "revision_timestamp": null,
+        "retrieved_at": "2026-08-15",
+        "source_license": "CC BY-SA 4.0"
+      },
+      "coverage_boundary": {
+        "covered_through_ply": 11,
+        "covered_through_move": "4h3g",
+        "omitted_after": null
+      },
+      "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+      "segments": [],
+      "verification": {
+        "status": "unavailable",
+        "method": "MediaWiki API and article HTTP retrieval",
+        "checked_at": "2026-08-15T00:00:00Z",
+        "note": "Network access was denied (shell CONNECT tunnel HTTP 403; web retrieval HTTP 401). Revision, redirect, canonical URL, and current section presence were not verified and are not inferred."
+      },
+      "audit_issues": [
+        "source_section_missing_in_seed"
+      ]
+    },
+    {
+      "record_id": "seed:角換わり腰掛け銀",
+      "subject_kind": "move_line",
+      "line_name": "角換わり腰掛け銀",
+      "seed_locator": "backend/app/seed.py:SAMPLE_OPENING_LINES",
+      "move_count": 13,
+      "moves": [
+        "7g7f",
+        "8c8d",
+        "2g2f",
+        "3c3d",
+        "8h2b+",
+        "3a2b",
+        "7i8h",
+        "7a7b",
+        "5g5f",
+        "6a5b",
+        "3i4h",
+        "5c5d",
+        "4h5g"
+      ],
+      "provenance_class": "diagram_reconstruction",
+      "coverage": "diagram_reconstruction",
+      "legacy_coverage_status": "短い手順のみ",
+      "source": {
+        "source_type": "wikipedia",
+        "source_title": "Wikipedia 腰掛け銀",
+        "requested_url": "https://ja.wikipedia.org/wiki/腰掛け銀",
+        "canonical_url": null,
+        "source_section": null,
+        "revision_id": null,
+        "revision_timestamp": null,
+        "retrieved_at": "2026-08-15",
+        "source_license": "CC BY-SA 4.0"
+      },
+      "coverage_boundary": {
+        "covered_through_ply": 13,
+        "covered_through_move": "4h5g",
+        "omitted_after": null
+      },
+      "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+      "segments": [],
+      "verification": {
+        "status": "unavailable",
+        "method": "MediaWiki API and article HTTP retrieval",
+        "checked_at": "2026-08-15T00:00:00Z",
+        "note": "Network access was denied (shell CONNECT tunnel HTTP 403; web retrieval HTTP 401). Revision, redirect, canonical URL, and current section presence were not verified and are not inferred."
+      },
+      "audit_issues": [
+        "source_section_missing_in_seed"
+      ]
+    },
+    {
+      "record_id": "seed:原始棒銀",
+      "subject_kind": "move_line",
+      "line_name": "原始棒銀",
+      "seed_locator": "backend/app/seed.py:SAMPLE_OPENING_LINES",
+      "move_count": 9,
+      "moves": [
+        "2g2f",
+        "8c8d",
+        "2f2e",
+        "8d8e",
+        "3i3h",
+        "7a6b",
+        "3h2g",
+        "4a3b",
+        "2g2f"
+      ],
+      "provenance_class": "diagram_reconstruction",
+      "coverage": "diagram_reconstruction",
+      "legacy_coverage_status": "局面図参考の短い手順",
+      "source": {
+        "source_type": "wikipedia",
+        "source_title": "Wikipedia 棒銀",
+        "requested_url": "https://ja.wikipedia.org/wiki/棒銀",
+        "canonical_url": null,
+        "source_section": null,
+        "revision_id": null,
+        "revision_timestamp": null,
+        "retrieved_at": "2026-08-15",
+        "source_license": "CC BY-SA 4.0"
+      },
+      "coverage_boundary": {
+        "covered_through_ply": 9,
+        "covered_through_move": "2g2f",
+        "omitted_after": null
+      },
+      "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+      "segments": [],
+      "verification": {
+        "status": "unavailable",
+        "method": "MediaWiki API and article HTTP retrieval",
+        "checked_at": "2026-08-15T00:00:00Z",
+        "note": "Network access was denied (shell CONNECT tunnel HTTP 403; web retrieval HTTP 401). Revision, redirect, canonical URL, and current section presence were not verified and are not inferred."
+      },
+      "audit_issues": [
+        "source_section_missing_in_seed"
+      ]
+    },
+    {
+      "record_id": "seed:美濃囲い",
+      "subject_kind": "move_line",
+      "line_name": "美濃囲い",
+      "seed_locator": "backend/app/seed.py:SAMPLE_OPENING_LINES",
+      "move_count": 13,
+      "moves": [
+        "7g7f",
+        "3c3d",
+        "6g6f",
+        "8c8d",
+        "2h6h",
+        "8d8e",
+        "5i4h",
+        "6a5b",
+        "4h3h",
+        "5b4b",
+        "3h2h",
+        "7a6b",
+        "3i3h"
+      ],
+      "provenance_class": "diagram_reconstruction",
+      "coverage": "diagram_reconstruction",
+      "legacy_coverage_status": "短い手順のみ",
+      "source": {
+        "source_type": "wikipedia",
+        "source_title": "Wikipedia 将棋の戦法",
+        "requested_url": "https://ja.wikipedia.org/wiki/将棋の戦法",
+        "canonical_url": null,
+        "source_section": null,
+        "revision_id": null,
+        "revision_timestamp": null,
+        "retrieved_at": "2026-08-15",
+        "source_license": "CC BY-SA 4.0"
+      },
+      "coverage_boundary": {
+        "covered_through_ply": 13,
+        "covered_through_move": "3i3h",
+        "omitted_after": null
+      },
+      "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+      "segments": [],
+      "verification": {
+        "status": "unavailable",
+        "method": "MediaWiki API and article HTTP retrieval",
+        "checked_at": "2026-08-15T00:00:00Z",
+        "note": "Network access was denied (shell CONNECT tunnel HTTP 403; web retrieval HTTP 401). Revision, redirect, canonical URL, and current section presence were not verified and are not inferred."
+      },
+      "audit_issues": [
+        "source_section_missing_in_seed"
+      ]
+    },
+    {
+      "record_id": "seed:穴熊",
+      "subject_kind": "move_line",
+      "line_name": "穴熊",
+      "seed_locator": "backend/app/seed.py:SAMPLE_OPENING_LINES",
+      "move_count": 11,
+      "moves": [
+        "7g7f",
+        "3c3d",
+        "2g2f",
+        "4c4d",
+        "8h7g",
+        "3a3b",
+        "5i6h",
+        "5a4b",
+        "6h7h",
+        "6a5b",
+        "7h8h"
+      ],
+      "provenance_class": "diagram_reconstruction",
+      "coverage": "diagram_reconstruction",
+      "legacy_coverage_status": "短い手順のみ",
+      "source": {
+        "source_type": "wikipedia",
+        "source_title": "Wikipedia 将棋の戦法",
+        "requested_url": "https://ja.wikipedia.org/wiki/将棋の戦法",
+        "canonical_url": null,
+        "source_section": null,
+        "revision_id": null,
+        "revision_timestamp": null,
+        "retrieved_at": "2026-08-15",
+        "source_license": "CC BY-SA 4.0"
+      },
+      "coverage_boundary": {
+        "covered_through_ply": 11,
+        "covered_through_move": "7h8h",
+        "omitted_after": null
+      },
+      "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+      "segments": [],
+      "verification": {
+        "status": "unavailable",
+        "method": "MediaWiki API and article HTTP retrieval",
+        "checked_at": "2026-08-15T00:00:00Z",
+        "note": "Network access was denied (shell CONNECT tunnel HTTP 403; web retrieval HTTP 401). Revision, redirect, canonical URL, and current section presence were not verified and are not inferred."
+      },
+      "audit_issues": [
+        "source_section_missing_in_seed"
+      ]
+    },
+    {
+      "record_id": "seed:舟囲い",
+      "subject_kind": "move_line",
+      "line_name": "舟囲い",
+      "seed_locator": "backend/app/seed.py:SAMPLE_OPENING_LINES",
+      "move_count": 9,
+      "moves": [
+        "7g7f",
+        "3c3d",
+        "2g2f",
+        "4c4d",
+        "4i5h",
+        "3a3b",
+        "5i6h",
+        "4a4b",
+        "6h7h"
+      ],
+      "provenance_class": "diagram_reconstruction",
+      "coverage": "diagram_reconstruction",
+      "legacy_coverage_status": "短い手順のみ",
+      "source": {
+        "source_type": "wikipedia",
+        "source_title": "Wikipedia 将棋の戦法",
+        "requested_url": "https://ja.wikipedia.org/wiki/将棋の戦法",
+        "canonical_url": null,
+        "source_section": null,
+        "revision_id": null,
+        "revision_timestamp": null,
+        "retrieved_at": "2026-08-15",
+        "source_license": "CC BY-SA 4.0"
+      },
+      "coverage_boundary": {
+        "covered_through_ply": 9,
+        "covered_through_move": "6h7h",
+        "omitted_after": null
+      },
+      "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+      "segments": [],
+      "verification": {
+        "status": "unavailable",
+        "method": "MediaWiki API and article HTTP retrieval",
+        "checked_at": "2026-08-15T00:00:00Z",
+        "note": "Network access was denied (shell CONNECT tunnel HTTP 403; web retrieval HTTP 401). Revision, redirect, canonical URL, and current section presence were not verified and are not inferred."
+      },
+      "audit_issues": [
+        "source_section_missing_in_seed"
+      ]
+    },
+    {
+      "record_id": "seed:左美濃",
+      "subject_kind": "move_line",
+      "line_name": "左美濃",
+      "seed_locator": "backend/app/seed.py:SAMPLE_OPENING_LINES",
+      "move_count": 11,
+      "moves": [
+        "7g7f",
+        "3c3d",
+        "2g2f",
+        "8c8d",
+        "7i6h",
+        "7a6b",
+        "6h7g",
+        "4a3b",
+        "5i6h",
+        "6a5b",
+        "4i5h"
+      ],
+      "provenance_class": "diagram_reconstruction",
+      "coverage": "diagram_reconstruction",
+      "legacy_coverage_status": "短い手順のみ",
+      "source": {
+        "source_type": "wikipedia",
+        "source_title": "Wikipedia 将棋の戦法",
+        "requested_url": "https://ja.wikipedia.org/wiki/将棋の戦法",
+        "canonical_url": null,
+        "source_section": null,
+        "revision_id": null,
+        "revision_timestamp": null,
+        "retrieved_at": "2026-08-15",
+        "source_license": "CC BY-SA 4.0"
+      },
+      "coverage_boundary": {
+        "covered_through_ply": 11,
+        "covered_through_move": "4i5h",
+        "omitted_after": null
+      },
+      "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+      "segments": [],
+      "verification": {
+        "status": "unavailable",
+        "method": "MediaWiki API and article HTTP retrieval",
+        "checked_at": "2026-08-15T00:00:00Z",
+        "note": "Network access was denied (shell CONNECT tunnel HTTP 403; web retrieval HTTP 401). Revision, redirect, canonical URL, and current section presence were not verified and are not inferred."
+      },
+      "audit_issues": [
+        "source_section_missing_in_seed"
+      ]
+    },
+    {
+      "record_id": "seed:向かい飛車",
+      "subject_kind": "move_line",
+      "line_name": "向かい飛車",
+      "seed_locator": "backend/app/seed.py:SAMPLE_OPENING_LINES",
+      "move_count": 8,
+      "moves": [
+        "7g7f",
+        "3c3d",
+        "8h7g",
+        "8c8d",
+        "2h8h",
+        "8d8e",
+        "4i5h",
+        "4a3b"
+      ],
+      "provenance_class": "diagram_reconstruction",
+      "coverage": "diagram_reconstruction",
+      "legacy_coverage_status": "短い手順のみ",
+      "source": {
+        "source_type": "wikipedia",
+        "source_title": "Wikipedia 将棋の戦法",
+        "requested_url": "https://ja.wikipedia.org/wiki/将棋の戦法",
+        "canonical_url": null,
+        "source_section": null,
+        "revision_id": null,
+        "revision_timestamp": null,
+        "retrieved_at": "2026-08-15",
+        "source_license": "CC BY-SA 4.0"
+      },
+      "coverage_boundary": {
+        "covered_through_ply": 8,
+        "covered_through_move": "4a3b",
+        "omitted_after": null
+      },
+      "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+      "segments": [],
+      "verification": {
+        "status": "unavailable",
+        "method": "MediaWiki API and article HTTP retrieval",
+        "checked_at": "2026-08-15T00:00:00Z",
+        "note": "Network access was denied (shell CONNECT tunnel HTTP 403; web retrieval HTTP 401). Revision, redirect, canonical URL, and current section presence were not verified and are not inferred."
+      },
+      "audit_issues": [
+        "source_section_missing_in_seed"
+      ]
+    }
+  ]
+}
