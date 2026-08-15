@@ -250,6 +250,10 @@
                   "explicit_sequence",
                   "diagram_reconstruction"
                 ]
+              },
+              "source_section": {
+                "type": "string",
+                "minLength": 1
               }
             }
           }
