@@ -7,7 +7,9 @@ load JSON Schema (or the audit documents).  Error codes are stable API for CI.
 from __future__ import annotations
 
 import argparse
+import ast
 import json
+import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -247,6 +249,72 @@ def _seed_errors(artifact: dict[str, Any], seed_lines: list[dict[str, Any]]) -> 
     return errors
 
 
+def _literal_assignment(tree: ast.Module, name: str) -> Any:
+    for statement in tree.body:
+        if isinstance(statement, ast.Assign) and any(isinstance(target, ast.Name) and target.id == name for target in statement.targets):
+            return ast.literal_eval(statement.value)
+    raise ValueError(f"missing literal assignment: {name}")
+
+
+def _extract_snapshot_seed_lines(source: str) -> list[dict[str, Any]]:
+    """Safely extract the audited seed and its literal metadata defaults."""
+    try:
+        tree = ast.parse(source)
+        lines = _literal_assignment(tree, "SAMPLE_OPENING_LINES")
+        defaults = _literal_assignment(tree, "WIKIPEDIA_OPENING_SOURCE_DEFAULTS")
+        by_name = _literal_assignment(tree, "WIKIPEDIA_OPENING_SOURCE_BY_NAME")
+    except (SyntaxError, ValueError, TypeError) as exc:
+        raise ValueError("snapshot source is not a supported literal seed") from exc
+    if not isinstance(lines, list) or not isinstance(defaults, dict) or not isinstance(by_name, dict):
+        raise ValueError("snapshot seed literals have invalid types")
+
+    # Freeze the historical defaults into each line.  _seed_errors may then
+    # reuse today's canonical normalizer without silently substituting today's
+    # defaults for values declared by the historical source.
+    result = []
+    metadata_keys = {
+        "source_url", "source_title", "license", "source_type", "source_section",
+        "source_license", "source_retrieved_at", "source_note", "coverage_status",
+    }
+    for raw_line in lines:
+        if not isinstance(raw_line, dict) or not isinstance(raw_line.get("name"), str):
+            raise ValueError("snapshot opening line is invalid")
+        line = dict(raw_line)
+        metadata = dict(defaults)
+        override = by_name.get(line["name"], {})
+        if not isinstance(override, dict):
+            raise ValueError("snapshot metadata override is invalid")
+        metadata.update(override)
+        metadata.update({key: line[key] for key in metadata_keys if key in line})
+        line.update({key: value for key, value in metadata.items() if key in metadata_keys})
+        result.append(line)
+    return result
+
+
+def _declared_snapshot_errors(artifact: dict[str, Any], repo_root: Path | None = None) -> list[ValidationError]:
+    snapshot = artifact.get("seed_snapshot", {})
+    commit, source_file = snapshot.get("commit"), snapshot.get("source_file")
+    root = repo_root or Path(__file__).resolve().parents[3]
+    try:
+        completed = subprocess.run(
+            ["git", "-C", str(root), "show", f"{commit}:{source_file}"],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+    except OSError:
+        return [ValidationError("seed_snapshot_commit_unavailable")]
+    if completed.returncode != 0:
+        return [ValidationError("seed_snapshot_commit_unavailable")]
+    try:
+        snapshot_lines = _extract_snapshot_seed_lines(completed.stdout)
+    except ValueError:
+        return [ValidationError("seed_snapshot_source_invalid")]
+    if _seed_errors(artifact, snapshot_lines):
+        return [ValidationError("seed_snapshot_content_mismatch")]
+    return []
+
+
 def validate_artifact(data: dict[str, Any], schema: dict[str, Any] | None = None, seed_lines: list[dict[str, Any]] | None = None) -> list[ValidationError]:
     errors: list[ValidationError] = []
     if schema is not None:
@@ -287,7 +355,11 @@ def validate_production_artifact(data: dict[str, Any], schema: dict[str, Any] | 
 
     from app.seed import SAMPLE_OPENING_LINES
 
-    return validate_artifact(data, schema, SAMPLE_OPENING_LINES)
+    errors = validate_artifact(data, schema, SAMPLE_OPENING_LINES)
+    if any(error.code == "schema_validation_error" for error in errors):
+        return errors
+    errors.extend(_declared_snapshot_errors(data))
+    return errors
 
 
 def main() -> int:

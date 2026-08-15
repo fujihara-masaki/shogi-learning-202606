@@ -1,10 +1,16 @@
 import json
 from copy import deepcopy
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
-from app.scripts.validate_opening_wikipedia_provenance import validate_artifact, validate_production_artifact
+from app.scripts.validate_opening_wikipedia_provenance import (
+    _declared_snapshot_errors,
+    _extract_snapshot_seed_lines,
+    validate_artifact,
+    validate_production_artifact,
+)
 from app.seed import SAMPLE_OPENING_LINES
 
 
@@ -73,6 +79,49 @@ def test_canonical_seed_snapshot_references_audited_revision():
         "line_count": 34,
         "node_count": 328,
     }
+
+
+def test_missing_declared_snapshot_commit_is_rejected():
+    artifact = json.loads((DOCS / "opening-wikipedia-provenance-audit.json").read_text())
+    artifact["seed_snapshot"]["commit"] = "0" * 40
+    assert [error.code for error in _declared_snapshot_errors(artifact)] == [
+        "seed_snapshot_commit_unavailable"
+    ]
+
+
+def test_declared_snapshot_content_mismatch_is_rejected(monkeypatch):
+    artifact = json.loads((DOCS / "opening-wikipedia-provenance-audit.json").read_text())
+    source = (DOCS.parent / "backend/app/seed.py").read_text()
+    drifted_source = source.replace('"7g7f"', '"1a1b"', 1)
+    monkeypatch.setattr(
+        "app.scripts.validate_opening_wikipedia_provenance.subprocess.run",
+        lambda *args, **kwargs: SimpleNamespace(returncode=0, stdout=drifted_source),
+    )
+    assert [error.code for error in _declared_snapshot_errors(artifact)] == [
+        "seed_snapshot_content_mismatch"
+    ]
+
+
+def test_declared_snapshot_matching_content_is_valid(monkeypatch):
+    artifact = json.loads((DOCS / "opening-wikipedia-provenance-audit.json").read_text())
+    source = (DOCS.parent / "backend/app/seed.py").read_text()
+    monkeypatch.setattr(
+        "app.scripts.validate_opening_wikipedia_provenance.subprocess.run",
+        lambda *args, **kwargs: SimpleNamespace(returncode=0, stdout=source),
+    )
+    assert validate_production_artifact(artifact, SCHEMA) == []
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        "WIKIPEDIA_OPENING_SOURCE_DEFAULTS = {}\nWIKIPEDIA_OPENING_SOURCE_BY_NAME = {}",
+        "SAMPLE_OPENING_LINES = make_lines()\nWIKIPEDIA_OPENING_SOURCE_DEFAULTS = {}\nWIKIPEDIA_OPENING_SOURCE_BY_NAME = {}",
+    ],
+)
+def test_snapshot_source_parser_rejects_missing_or_nonliteral_seed(source):
+    with pytest.raises(ValueError):
+        _extract_snapshot_seed_lines(source)
 
 
 @pytest.mark.parametrize(

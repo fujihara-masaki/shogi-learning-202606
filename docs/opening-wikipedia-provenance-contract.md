@@ -84,6 +84,13 @@ offline/CI で検査し、app 起動時には読み込まない。revision と n
 branch ごとの根拠を正確に表現できないため、新規 DB 列は追加しない。将来 API/UI で
 公開する場合は、別 PR で保存モデルを設計する。
 
+production validationは`seed_snapshot.commit`と`seed_snapshot.source_file`をlocal
+git object databaseから読み、宣言revisionの`SAMPLE_OPENING_LINES`とcurrent working
+treeのseedをそれぞれartifactへ照合する。履歴sourceは実行せずASTのliteralとして読む。
+validatorはnetwork fetchへfallbackしないため、CI checkoutは宣言commitを含む完全な
+履歴（例: `fetch-depth: 0`）を用意しなければならない。shallow checkout等でobjectを
+取得できない場合はproduction validation失敗であり、working treeで代用しない。
+
 PR-D1 の production validator は最低限、次を失敗にする。
 
 1. Wikipedia move-line の必須 metadata 欠落、または source section/revision/retrieved date/license の欠落。
