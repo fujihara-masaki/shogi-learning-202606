@@ -68,6 +68,20 @@ def _valid_record_artifact():
     return json.loads((DOCS / "fixtures/opening-wikipedia-provenance-valid.json").read_text())
 
 
+def test_duplicate_record_id_is_rejected_without_seed_check():
+    artifact = _valid_record_artifact()
+    artifact["records"].append(deepcopy(artifact["records"][0]))
+    assert "duplicate_record_id" in {error.code for error in validate_artifact(artifact)}
+
+
+def test_duplicate_move_line_name_is_rejected_without_seed_check():
+    artifact = _valid_record_artifact()
+    duplicate = deepcopy(artifact["records"][0])
+    duplicate["record_id"] = "fixture:duplicate-line-name"
+    artifact["records"].append(duplicate)
+    assert "duplicate_move_line_name" in {error.code for error in validate_artifact(artifact)}
+
+
 @pytest.mark.parametrize(
     ("mutate", "expected_code"),
     [
@@ -100,6 +114,23 @@ def test_multiple_virtual_root_children_are_valid_with_one_semantic_main():
     errors = {error.code for error in validate_artifact(artifact)}
     assert "sibling_main_count_invalid" not in errors
     assert "node_not_connected_to_virtual_root" not in errors
+
+
+@pytest.mark.parametrize(
+    ("branch_overrides", "expected_code"),
+    [
+        ({"usi": "7g7f", "sort_order": 1}, "duplicate_sibling_usi"),
+        ({"usi": "2g2f", "sort_order": 0}, "duplicate_sibling_sort_order"),
+    ],
+)
+def test_virtual_root_sibling_values_are_unique(branch_overrides, expected_code):
+    artifact = _valid_record_artifact()
+    record = artifact["records"][0]
+    branch = deepcopy(record["nodes"][0])
+    branch.update(move_key="root-branch", is_main=False, **branch_overrides)
+    record["nodes"].append(branch)
+    record["node_count"] += 1
+    assert expected_code in {error.code for error in validate_artifact(artifact)}
 
 
 def test_verified_move_line_rejects_unverified_node():
@@ -165,6 +196,13 @@ def test_malformed_mixed_main_cycle_terminates_with_stable_errors():
     codes = {error.code for error in validate_artifact(artifact)}
     assert "parent_cycle" in codes
     assert "semantic_main_chain_mismatch" in codes
+
+
+def test_mixed_unresolved_marker_cannot_coexist_with_segments():
+    artifact = json.loads((DOCS / "fixtures/opening-wikipedia-provenance-valid-mixed-verified.json").read_text())
+    artifact["records"][0]["audit_issues"].append("mixed_segment_boundary_unresolved")
+    codes = {error.code for error in validate_artifact(artifact)}
+    assert "mixed_unresolved_with_segments" in codes
 
 
 def test_masuda_boundary_and_metadata_only_change_are_fixed():

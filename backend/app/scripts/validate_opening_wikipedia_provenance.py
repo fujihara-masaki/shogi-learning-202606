@@ -110,6 +110,10 @@ def _semantic_errors(record: dict[str, Any]) -> list[ValidationError]:
     for parent_key, children in siblings.items():
         if sum(child.get("is_main") is True for child in children) != 1:
             errors.append(_error("sibling_main_count_invalid", record, f"parent[{parent_key}]"))
+        if len({child.get("usi") for child in children}) != len(children):
+            errors.append(_error("duplicate_sibling_usi", record, f"parent[{parent_key}]"))
+        if len({child.get("sort_order") for child in children}) != len(children):
+            errors.append(_error("duplicate_sibling_sort_order", record, f"parent[{parent_key}]"))
 
     # A duplicate key makes parent lookup ambiguous, so report it above and do
     # not pretend that a cycle/root result from an arbitrary duplicate is valid.
@@ -159,6 +163,8 @@ def _semantic_errors(record: dict[str, Any]) -> list[ValidationError]:
     segments = record.get("segments", [])
     if provenance == "mixed":
         unresolved = "mixed_segment_boundary_unresolved" in record.get("audit_issues", [])
+        if unresolved and segments:
+            errors.append(_error("mixed_unresolved_with_segments", record))
         if status == "verified" and unresolved:
             errors.append(_error("mixed_segment_boundary_unresolved", record))
         if segments:
@@ -243,6 +249,15 @@ def validate_artifact(data: dict[str, Any], schema: dict[str, Any] | None = None
         if errors:
             return errors
     records = data.get("records", [data])
+    record_ids = [record.get("record_id") for record in records if record.get("record_id") is not None]
+    if len(record_ids) != len(set(record_ids)):
+        errors.append(ValidationError("duplicate_record_id"))
+    line_names = [
+        record.get("line_name") for record in records
+        if record.get("subject_kind") == "move_line" and record.get("line_name") is not None
+    ]
+    if len(line_names) != len(set(line_names)):
+        errors.append(ValidationError("duplicate_move_line_name"))
     for record in records:
         errors.extend(_semantic_errors(record))
     if seed_lines is not None:
