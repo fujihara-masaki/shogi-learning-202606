@@ -87,7 +87,8 @@ def _semantic_errors(record: dict[str, Any]) -> list[ValidationError]:
         errors.append(_error("unavailable_source_metadata_inferred", record))
 
     keys = {node.get("move_key") for node in nodes}
-    if len(keys) != len(nodes):
+    duplicate_keys = len(keys) != len(nodes)
+    if duplicate_keys:
         errors.append(_error("duplicate_move_key", record))
     for index, node in enumerate(nodes):
         parent = node.get("parent_key")
@@ -100,6 +101,37 @@ def _semantic_errors(record: dict[str, Any]) -> list[ValidationError]:
             "explicit_sequence", "diagram_reconstruction"
         }:
             errors.append(_error("verified_node_provenance_invalid", record, f"nodes[{index}]"))
+
+    siblings: dict[str | None, list[dict[str, Any]]] = {}
+    for node in nodes:
+        siblings.setdefault(node.get("parent_key"), []).append(node)
+    for parent_key, children in siblings.items():
+        if sum(child.get("is_main") is True for child in children) != 1:
+            errors.append(_error("sibling_main_count_invalid", record, f"parent[{parent_key}]"))
+
+    # A duplicate key makes parent lookup ambiguous, so report it above and do
+    # not pretend that a cycle/root result from an arbitrary duplicate is valid.
+    if not duplicate_keys:
+        by_key = {node.get("move_key"): node for node in nodes}
+        reported_cycles: set[frozenset[str]] = set()
+        for start_key in by_key:
+            path: list[str] = []
+            positions: dict[str, int] = {}
+            key: str | None = start_key
+            while key is not None and key in by_key and key not in positions:
+                positions[key] = len(path)
+                path.append(key)
+                key = by_key[key].get("parent_key")
+            if key in positions:
+                cycle = frozenset(path[positions[key]:])
+                if cycle not in reported_cycles:
+                    reported_cycles.add(cycle)
+                    code = "self_parent_cycle" if len(cycle) == 1 else "parent_cycle"
+                    errors.append(_error(code, record, f"nodes[{start_key}]"))
+            elif key is not None:
+                # Missing parents have their own precise error, while this code
+                # states the resulting invariant failure explicitly.
+                errors.append(_error("node_not_connected_to_virtual_root", record, f"nodes[{start_key}]"))
 
     segments = record.get("segments", [])
     if provenance == "mixed":
@@ -120,14 +152,20 @@ def _semantic_errors(record: dict[str, Any]) -> list[ValidationError]:
                 children.setdefault(node.get("parent_key"), []).append(node)
             main_chain = []
             parent_key = None
+            visited_main: set[str] = set()
             while parent_key in children:
                 main_children = [node for node in children[parent_key] if node.get("is_main") is True]
                 if len(main_children) != 1:
                     errors.append(_error("semantic_main_chain_invalid", record))
                     break
                 node = main_children[0]
+                move_key = node.get("move_key")
+                if move_key in visited_main:
+                    errors.append(_error("semantic_main_chain_cycle", record))
+                    break
+                visited_main.add(move_key)
                 main_chain.append(node)
-                parent_key = node.get("move_key")
+                parent_key = move_key
             if len(main_chain) != len(moves) or [node.get("usi") for node in main_chain] != moves:
                 errors.append(_error("semantic_main_chain_mismatch", record))
             for ply, node in enumerate(main_chain, start=1):
@@ -151,8 +189,15 @@ def _seed_errors(artifact: dict[str, Any], seed_lines: list[dict[str, Any]]) -> 
     # Membership comes from the canonical audit, rather than mutable source
     # metadata, so changing source_type/source_url cannot make a line disappear
     # from the comparison it is meant to fail.
-    wikipedia = [line for line in seed_lines if line.get("name") in records]
+    wikipedia = [
+        line for line in seed_lines
+        if line.get("name") in records
+        or _opening_source_metadata(line).get("source_type") in {"wikipedia", "wikibooks"}
+    ]
     errors: list[ValidationError] = []
+    snapshot_line_count = artifact.get("seed_snapshot", {}).get("line_count")
+    if snapshot_line_count != len(records) or snapshot_line_count != len(wikipedia):
+        errors.append(_error("seed_snapshot_line_count_mismatch"))
     if len(records) != len(wikipedia):
         errors.append(_error("seed_line_count_mismatch"))
     for line in wikipedia:

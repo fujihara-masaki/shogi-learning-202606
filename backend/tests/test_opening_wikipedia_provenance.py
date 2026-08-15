@@ -64,6 +64,61 @@ def test_seed_retrieved_date_is_not_compared_with_audit_attempt_date():
     assert validate_artifact(artifact, None, seed_lines) == []
 
 
+def _valid_record_artifact():
+    return json.loads((DOCS / "fixtures/opening-wikipedia-provenance-valid.json").read_text())
+
+
+@pytest.mark.parametrize(
+    ("mutate", "expected_code"),
+    [
+        (lambda nodes: nodes[1].update(move_key=nodes[0]["move_key"]), "duplicate_move_key"),
+        (lambda nodes: nodes[1].update(parent_key="missing-parent"), "parent_key_missing"),
+        (lambda nodes: nodes[0].update(parent_key=nodes[0]["move_key"]), "self_parent_cycle"),
+        (
+            lambda nodes: (
+                nodes[0].update(parent_key=nodes[1]["move_key"]),
+                nodes[1].update(parent_key=nodes[0]["move_key"]),
+            ),
+            "parent_cycle",
+        ),
+        (lambda nodes: nodes[1].update(is_main=False), "sibling_main_count_invalid"),
+    ],
+)
+def test_canonical_node_structure_errors_are_stable(mutate, expected_code):
+    artifact = _valid_record_artifact()
+    mutate(artifact["records"][0]["nodes"])
+    assert expected_code in {error.code for error in validate_artifact(artifact)}
+
+
+def test_multiple_virtual_root_children_are_valid_with_one_semantic_main():
+    artifact = _valid_record_artifact()
+    record = artifact["records"][0]
+    branch = deepcopy(record["nodes"][0])
+    branch.update(move_key="root-branch", usi="2g2f", is_main=False, sort_order=1)
+    record["nodes"].append(branch)
+    record["node_count"] += 1
+    errors = {error.code for error in validate_artifact(artifact)}
+    assert "sibling_main_count_invalid" not in errors
+    assert "node_not_connected_to_virtual_root" not in errors
+
+
+def test_seed_snapshot_line_count_drift_is_rejected():
+    artifact = json.loads((DOCS / "opening-wikipedia-provenance-audit.json").read_text())
+    artifact["seed_snapshot"]["line_count"] += 1
+    errors = validate_artifact(artifact, None, SAMPLE_OPENING_LINES)
+    assert "seed_snapshot_line_count_mismatch" in {error.code for error in errors}
+
+
+def test_new_wikipedia_seed_without_audit_record_is_rejected():
+    artifact = json.loads((DOCS / "opening-wikipedia-provenance-audit.json").read_text())
+    seed_lines = deepcopy(SAMPLE_OPENING_LINES)
+    new_line = deepcopy(seed_lines[0])
+    new_line.update(name="監査未登録Wikipedia line", source_type="wikipedia")
+    seed_lines.append(new_line)
+    codes = {error.code for error in validate_artifact(artifact, None, seed_lines)}
+    assert {"seed_snapshot_line_count_mismatch", "seed_line_count_mismatch", "seed_line_missing"} <= codes
+
+
 def test_verified_mixed_segments_follow_semantic_main_chain_not_node_order():
     artifact = json.loads((DOCS / "fixtures/opening-wikipedia-provenance-valid-mixed-verified.json").read_text())
     record = artifact["records"][0]
@@ -86,6 +141,16 @@ def test_verified_mixed_segments_follow_semantic_main_chain_not_node_order():
     record["node_count"] += 1
     artifact["seed_snapshot"]["node_count"] += 1
     assert validate_artifact(artifact, SCHEMA) == []
+
+
+def test_malformed_mixed_main_cycle_terminates_with_stable_errors():
+    artifact = json.loads((DOCS / "fixtures/opening-wikipedia-provenance-valid-mixed-verified.json").read_text())
+    nodes = artifact["records"][0]["nodes"]
+    nodes[0]["parent_key"] = nodes[1]["move_key"]
+    nodes[1]["parent_key"] = nodes[0]["move_key"]
+    codes = {error.code for error in validate_artifact(artifact)}
+    assert "parent_cycle" in codes
+    assert "semantic_main_chain_mismatch" in codes
 
 
 def test_masuda_boundary_and_metadata_only_change_are_fixed():
