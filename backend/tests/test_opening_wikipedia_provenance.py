@@ -112,6 +112,40 @@ def test_declared_snapshot_matching_content_is_valid(monkeypatch):
     assert validate_production_artifact(artifact, SCHEMA) == []
 
 
+def test_declared_snapshot_git_show_uses_utf8_and_parses_japanese(monkeypatch):
+    artifact = json.loads((DOCS / "opening-wikipedia-provenance-audit.json").read_text())
+    source = (DOCS.parent / "backend/app/seed.py").read_text(encoding="utf-8")
+    assert "升田式石田流" in source
+    captured = {}
+
+    def fake_run(*args, **kwargs):
+        captured.update(kwargs)
+        return SimpleNamespace(returncode=0, stdout=source)
+
+    monkeypatch.setattr(
+        "app.scripts.validate_opening_wikipedia_provenance.subprocess.run",
+        fake_run,
+    )
+    assert _declared_snapshot_errors(artifact) == []
+    assert captured["text"] is True
+    assert captured["encoding"] == "utf-8"
+
+
+def test_declared_snapshot_decode_failure_is_stable_error(monkeypatch):
+    artifact = json.loads((DOCS / "opening-wikipedia-provenance-audit.json").read_text())
+
+    def fail_decode(*args, **kwargs):
+        raise UnicodeDecodeError("utf-8", b"\xff", 0, 1, "invalid start byte")
+
+    monkeypatch.setattr(
+        "app.scripts.validate_opening_wikipedia_provenance.subprocess.run",
+        fail_decode,
+    )
+    assert [error.code for error in _declared_snapshot_errors(artifact)] == [
+        "seed_snapshot_source_invalid"
+    ]
+
+
 @pytest.mark.parametrize(
     "source",
     [

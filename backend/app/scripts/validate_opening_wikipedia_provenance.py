@@ -301,7 +301,10 @@ def _declared_snapshot_errors(artifact: dict[str, Any], repo_root: Path | None =
             check=False,
             capture_output=True,
             text=True,
+            encoding="utf-8",
         )
+    except UnicodeDecodeError:
+        return [ValidationError("seed_snapshot_source_invalid")]
     except OSError:
         return [ValidationError("seed_snapshot_commit_unavailable")]
     if completed.returncode != 0:
