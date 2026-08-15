@@ -1,11 +1,11 @@
 {
   "schema_version": "1.0.0",
   "artifact_type": "wikipedia_opening_provenance_audit",
-  "generated_at": "2026-08-15T00:00:00Z",
   "seed_snapshot": {
     "commit": "3d4b48fe7464b7e36145a51dfdee1d2d2bfe8d51",
     "source_file": "backend/app/seed.py",
-    "line_count": 34
+    "line_count": 34,
+    "node_count": 328
   },
   "records": [
     {
@@ -51,11 +51,168 @@
       "verification": {
         "status": "unavailable",
         "method": "MediaWiki API and article HTTP retrieval",
-        "checked_at": "2026-08-15T00:00:00Z",
-        "note": "Network access was denied (shell CONNECT tunnel HTTP 403; web retrieval HTTP 401). Revision, redirect, canonical URL, and current section presence were not verified and are not inferred."
+        "note": "Network access was denied (shell CONNECT tunnel HTTP 403; web retrieval HTTP 401). Revision, redirect, canonical URL, and current section presence were not verified and are not inferred.",
+        "checked_on": "2026-08-15"
       },
       "audit_issues": [
         "source_section_missing_in_seed"
+      ],
+      "node_count": 11,
+      "nodes": [
+        {
+          "move_key": "main-1",
+          "parent_key": null,
+          "usi": "7g7f",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "角道を開けて攻めの準備をします。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-2",
+          "parent_key": "main-1",
+          "usi": "3c3d",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "後手も角道を開けます。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-3",
+          "parent_key": "main-2",
+          "usi": "2g2f",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "飛車先の歩を伸ばします。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-4",
+          "parent_key": "main-3",
+          "usi": "8c8d",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "後手も飛車先を伸ばします。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-5",
+          "parent_key": "main-4",
+          "usi": "2f2e",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "2筋の圧力を高めます。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-6",
+          "parent_key": "main-5",
+          "usi": "8d8e",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "後手も8筋を伸ばして対抗します。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-7",
+          "parent_key": "main-6",
+          "usi": "3i3h",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "右銀を攻めに使う第一歩です。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-8",
+          "parent_key": "main-7",
+          "usi": "7a6b",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "後手は銀を上がって受けの形を整えます。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-9",
+          "parent_key": "main-8",
+          "usi": "3h2g",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "銀を2筋へ進め、棒銀の形を明確にします。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-10",
+          "parent_key": "main-9",
+          "usi": "4a3b",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "後手は玉側の金を締めます。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-11",
+          "parent_key": "main-10",
+          "usi": "2g2f",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "銀をさらに前へ出て飛車先突破を狙います。",
+            "review_status": "unavailable"
+          }
+        }
       ]
     },
     {
@@ -98,11 +255,126 @@
       "verification": {
         "status": "unavailable",
         "method": "MediaWiki API and article HTTP retrieval",
-        "checked_at": "2026-08-15T00:00:00Z",
-        "note": "Network access was denied (shell CONNECT tunnel HTTP 403; web retrieval HTTP 401). Revision, redirect, canonical URL, and current section presence were not verified and are not inferred."
+        "note": "Network access was denied (shell CONNECT tunnel HTTP 403; web retrieval HTTP 401). Revision, redirect, canonical URL, and current section presence were not verified and are not inferred.",
+        "checked_on": "2026-08-15"
       },
       "audit_issues": [
         "source_section_missing_in_seed"
+      ],
+      "node_count": 8,
+      "nodes": [
+        {
+          "move_key": "main-1",
+          "parent_key": null,
+          "usi": "7g7f",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "角道を開けます。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-2",
+          "parent_key": "main-1",
+          "usi": "3c3d",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "後手も角道を開けます。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-3",
+          "parent_key": "main-2",
+          "usi": "2h5h",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "飛車を中央の5筋へ振ります。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-4",
+          "parent_key": "main-3",
+          "usi": "8c8d",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "後手は飛車先を伸ばします。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-5",
+          "parent_key": "main-4",
+          "usi": "5g5f",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "5筋の歩を突き、中央の争点を作ります。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-6",
+          "parent_key": "main-5",
+          "usi": "8d8e",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "後手は8筋の圧力を高めます。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-7",
+          "parent_key": "main-6",
+          "usi": "5h5g",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "飛車を5七へ浮き、中央を支えます。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-8",
+          "parent_key": "main-7",
+          "usi": "6a5b",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "後手は金を寄せて中央を厚くします。",
+            "review_status": "unavailable"
+          }
+        }
       ]
     },
     {
@@ -145,11 +417,126 @@
       "verification": {
         "status": "unavailable",
         "method": "MediaWiki API and article HTTP retrieval",
-        "checked_at": "2026-08-15T00:00:00Z",
-        "note": "Network access was denied (shell CONNECT tunnel HTTP 403; web retrieval HTTP 401). Revision, redirect, canonical URL, and current section presence were not verified and are not inferred."
+        "note": "Network access was denied (shell CONNECT tunnel HTTP 403; web retrieval HTTP 401). Revision, redirect, canonical URL, and current section presence were not verified and are not inferred.",
+        "checked_on": "2026-08-15"
       },
       "audit_issues": [
         "source_section_missing_in_seed"
+      ],
+      "node_count": 8,
+      "nodes": [
+        {
+          "move_key": "main-1",
+          "parent_key": null,
+          "usi": "7g7f",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "角道を開けて駒組みを始めます。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-2",
+          "parent_key": "main-1",
+          "usi": "3c3d",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "後手も角道を開けます。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-3",
+          "parent_key": "main-2",
+          "usi": "6g6f",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "角道を止め、振り飛車らしい持久戦に備えます。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-4",
+          "parent_key": "main-3",
+          "usi": "8c8d",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "後手は飛車先を伸ばします。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-5",
+          "parent_key": "main-4",
+          "usi": "2h6h",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "飛車を4筋へ振って四間飛車に構えます。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-6",
+          "parent_key": "main-5",
+          "usi": "8d8e",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "後手は飛車先を伸ばして圧力をかけます。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-7",
+          "parent_key": "main-6",
+          "usi": "7i7h",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "左銀を上がり、美濃囲いと中央の厚みを準備します。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-8",
+          "parent_key": "main-7",
+          "usi": "6a5b",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "後手は金を寄せて玉周りを整えます。",
+            "review_status": "unavailable"
+          }
+        }
       ]
     },
     {
@@ -193,11 +580,140 @@
       "verification": {
         "status": "unavailable",
         "method": "MediaWiki API and article HTTP retrieval",
-        "checked_at": "2026-08-15T00:00:00Z",
-        "note": "Network access was denied (shell CONNECT tunnel HTTP 403; web retrieval HTTP 401). Revision, redirect, canonical URL, and current section presence were not verified and are not inferred."
+        "note": "Network access was denied (shell CONNECT tunnel HTTP 403; web retrieval HTTP 401). Revision, redirect, canonical URL, and current section presence were not verified and are not inferred.",
+        "checked_on": "2026-08-15"
       },
       "audit_issues": [
         "source_section_missing_in_seed"
+      ],
+      "node_count": 9,
+      "nodes": [
+        {
+          "move_key": "main-1",
+          "parent_key": null,
+          "usi": "7g7f",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "角道を開けます。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-2",
+          "parent_key": "main-1",
+          "usi": "8c8d",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "後手は飛車先を伸ばして相居飛車を示します。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-3",
+          "parent_key": "main-2",
+          "usi": "6i7h",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "金を上がって矢倉の土台を作ります。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-4",
+          "parent_key": "main-3",
+          "usi": "3c3d",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "後手も角道を開けます。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-5",
+          "parent_key": "main-4",
+          "usi": "6g6f",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "角道を止めて矢倉の骨格を固めます。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-6",
+          "parent_key": "main-5",
+          "usi": "7a6b",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "後手は銀を上がって受けの形を作ります。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-7",
+          "parent_key": "main-6",
+          "usi": "7i6h",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "左銀を中央へ使い、矢倉囲いを目指します。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-8",
+          "parent_key": "main-7",
+          "usi": "5a4b",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "後手は玉を囲う準備をします。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-9",
+          "parent_key": "main-8",
+          "usi": "5i6i",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "玉を左へ寄せ、矢倉囲いへ進みます。",
+            "review_status": "unavailable"
+          }
+        }
       ]
     },
     {
@@ -240,11 +756,126 @@
       "verification": {
         "status": "unavailable",
         "method": "MediaWiki API and article HTTP retrieval",
-        "checked_at": "2026-08-15T00:00:00Z",
-        "note": "Network access was denied (shell CONNECT tunnel HTTP 403; web retrieval HTTP 401). Revision, redirect, canonical URL, and current section presence were not verified and are not inferred."
+        "note": "Network access was denied (shell CONNECT tunnel HTTP 403; web retrieval HTTP 401). Revision, redirect, canonical URL, and current section presence were not verified and are not inferred.",
+        "checked_on": "2026-08-15"
       },
       "audit_issues": [
         "source_section_missing_in_seed"
+      ],
+      "node_count": 8,
+      "nodes": [
+        {
+          "move_key": "main-1",
+          "parent_key": null,
+          "usi": "7g7f",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "角道を開けます。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-2",
+          "parent_key": "main-1",
+          "usi": "8c8d",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "後手は飛車先を伸ばします。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-3",
+          "parent_key": "main-2",
+          "usi": "2g2f",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "先手も飛車先を伸ばします。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-4",
+          "parent_key": "main-3",
+          "usi": "3c3d",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "後手も角道を開けます。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-5",
+          "parent_key": "main-4",
+          "usi": "8h2b+",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "角を交換して角換わりの入口に入ります。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-6",
+          "parent_key": "main-5",
+          "usi": "3a2b",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "後手は銀で角を取り返します。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-7",
+          "parent_key": "main-6",
+          "usi": "7i8h",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "銀を上がり、打ち込みに強い形を作ります。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-8",
+          "parent_key": "main-7",
+          "usi": "7a7b",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "後手も銀を上がって角換わりの駒組みに進みます。",
+            "review_status": "unavailable"
+          }
+        }
       ]
     },
     {
@@ -287,11 +918,126 @@
       "verification": {
         "status": "unavailable",
         "method": "MediaWiki API and article HTTP retrieval",
-        "checked_at": "2026-08-15T00:00:00Z",
-        "note": "Network access was denied (shell CONNECT tunnel HTTP 403; web retrieval HTTP 401). Revision, redirect, canonical URL, and current section presence were not verified and are not inferred."
+        "note": "Network access was denied (shell CONNECT tunnel HTTP 403; web retrieval HTTP 401). Revision, redirect, canonical URL, and current section presence were not verified and are not inferred.",
+        "checked_on": "2026-08-15"
       },
       "audit_issues": [
         "source_section_missing_in_seed"
+      ],
+      "node_count": 8,
+      "nodes": [
+        {
+          "move_key": "main-1",
+          "parent_key": null,
+          "usi": "2g2f",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "飛車先を伸ばして相掛かりを目指します。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-2",
+          "parent_key": "main-1",
+          "usi": "8c8d",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "後手も飛車先を伸ばします。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-3",
+          "parent_key": "main-2",
+          "usi": "2f2e",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "2筋の歩をさらに進めます。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-4",
+          "parent_key": "main-3",
+          "usi": "8d8e",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "後手も8筋の歩を伸ばします。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-5",
+          "parent_key": "main-4",
+          "usi": "7g7f",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "角道を開けて駒の働きを広げます。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-6",
+          "parent_key": "main-5",
+          "usi": "3c3d",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "後手も角道を開けます。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-7",
+          "parent_key": "main-6",
+          "usi": "2h7h",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "飛車を横に使い、ひねり飛車含みの含みを残します。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-8",
+          "parent_key": "main-7",
+          "usi": "8b3b",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "後手も飛車を横に使ってバランスを取ります。",
+            "review_status": "unavailable"
+          }
+        }
       ]
     },
     {
@@ -339,11 +1085,196 @@
       "verification": {
         "status": "unavailable",
         "method": "MediaWiki API and article HTTP retrieval",
-        "checked_at": "2026-08-15T00:00:00Z",
-        "note": "Network access was denied (shell CONNECT tunnel HTTP 403; web retrieval HTTP 401). Revision, redirect, canonical URL, and current section presence were not verified and are not inferred."
+        "note": "Network access was denied (shell CONNECT tunnel HTTP 403; web retrieval HTTP 401). Revision, redirect, canonical URL, and current section presence were not verified and are not inferred.",
+        "checked_on": "2026-08-15"
       },
       "audit_issues": [
         "source_section_missing_in_seed"
+      ],
+      "node_count": 13,
+      "nodes": [
+        {
+          "move_key": "main-1",
+          "parent_key": null,
+          "usi": "7g7f",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "角道を開けます。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-2",
+          "parent_key": "main-1",
+          "usi": "3c3d",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "後手も角道を開けます。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-3",
+          "parent_key": "main-2",
+          "usi": "2g2f",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "飛車先を伸ばします。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-4",
+          "parent_key": "main-3",
+          "usi": "8c8d",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "後手も飛車先を伸ばします。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-5",
+          "parent_key": "main-4",
+          "usi": "2f2e",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "2筋の歩を伸ばして交換を狙います。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-6",
+          "parent_key": "main-5",
+          "usi": "8d8e",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "後手も8筋で歩交換を狙います。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-7",
+          "parent_key": "main-6",
+          "usi": "2e2d",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "先手から歩を突き捨てます。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-8",
+          "parent_key": "main-7",
+          "usi": "2c2d",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "後手は同歩と取ります。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-9",
+          "parent_key": "main-8",
+          "usi": "2h2d",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "飛車で歩を取り、飛車先交換に成功します。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-10",
+          "parent_key": "main-9",
+          "usi": "8e8f",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "後手も8筋を突き捨てます。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-11",
+          "parent_key": "main-10",
+          "usi": "8g8f",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "先手は同歩と応じます。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-12",
+          "parent_key": "main-11",
+          "usi": "8b8f",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "後手も飛車で歩を取ります。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-13",
+          "parent_key": "main-12",
+          "usi": "2d3d",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "3四の横歩を取り、横歩取りの基本局面に進みます。",
+            "review_status": "unavailable"
+          }
+        }
       ]
     },
     {
@@ -386,11 +1317,126 @@
       "verification": {
         "status": "unavailable",
         "method": "MediaWiki API and article HTTP retrieval",
-        "checked_at": "2026-08-15T00:00:00Z",
-        "note": "Network access was denied (shell CONNECT tunnel HTTP 403; web retrieval HTTP 401). Revision, redirect, canonical URL, and current section presence were not verified and are not inferred."
+        "note": "Network access was denied (shell CONNECT tunnel HTTP 403; web retrieval HTTP 401). Revision, redirect, canonical URL, and current section presence were not verified and are not inferred.",
+        "checked_on": "2026-08-15"
       },
       "audit_issues": [
         "source_section_missing_in_seed"
+      ],
+      "node_count": 8,
+      "nodes": [
+        {
+          "move_key": "main-1",
+          "parent_key": null,
+          "usi": "7g7f",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "角道を開けます。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-2",
+          "parent_key": "main-1",
+          "usi": "3c3d",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "後手も角道を開けます。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-3",
+          "parent_key": "main-2",
+          "usi": "7f7e",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "7筋の歩を伸ばし、石田流の位を取ります。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-4",
+          "parent_key": "main-3",
+          "usi": "8c8d",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "後手は飛車先を伸ばします。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-5",
+          "parent_key": "main-4",
+          "usi": "2h7h",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "飛車を7筋へ振ります。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-6",
+          "parent_key": "main-5",
+          "usi": "8d8e",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "後手は8筋を伸ばします。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-7",
+          "parent_key": "main-6",
+          "usi": "7h7f",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "飛車を7六へ浮き、石田流の形を作ります。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-8",
+          "parent_key": "main-7",
+          "usi": "6a5b",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "後手は金を寄せて受けに備えます。",
+            "review_status": "unavailable"
+          }
+        }
       ]
     },
     {
@@ -433,11 +1479,126 @@
       "verification": {
         "status": "unavailable",
         "method": "MediaWiki API and article HTTP retrieval",
-        "checked_at": "2026-08-15T00:00:00Z",
-        "note": "Network access was denied (shell CONNECT tunnel HTTP 403; web retrieval HTTP 401). Revision, redirect, canonical URL, and current section presence were not verified and are not inferred."
+        "note": "Network access was denied (shell CONNECT tunnel HTTP 403; web retrieval HTTP 401). Revision, redirect, canonical URL, and current section presence were not verified and are not inferred.",
+        "checked_on": "2026-08-15"
       },
       "audit_issues": [
         "source_section_missing_in_seed"
+      ],
+      "node_count": 8,
+      "nodes": [
+        {
+          "move_key": "main-1",
+          "parent_key": null,
+          "usi": "7g7f",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "角道を開けます。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-2",
+          "parent_key": "main-1",
+          "usi": "3c3d",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "後手も角道を開けます。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-3",
+          "parent_key": "main-2",
+          "usi": "2g2f",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "先手は飛車先を伸ばします。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-4",
+          "parent_key": "main-3",
+          "usi": "5c5d",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "後手は角道を止めずに5筋の歩を突きます。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-5",
+          "parent_key": "main-4",
+          "usi": "2f2e",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "先手は2筋の圧力を高めます。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-6",
+          "parent_key": "main-5",
+          "usi": "5a5b",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "後手は玉を中央へ寄せて中飛車を支えます。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-7",
+          "parent_key": "main-6",
+          "usi": "2h5h",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "先手も飛車を5筋へ振って中央で対抗します。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-8",
+          "parent_key": "main-7",
+          "usi": "8c8d",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "後手は飛車先を伸ばしてバランスを取ります。",
+            "review_status": "unavailable"
+          }
+        }
       ]
     },
     {
@@ -480,11 +1641,126 @@
       "verification": {
         "status": "unavailable",
         "method": "MediaWiki API and article HTTP retrieval",
-        "checked_at": "2026-08-15T00:00:00Z",
-        "note": "Network access was denied (shell CONNECT tunnel HTTP 403; web retrieval HTTP 401). Revision, redirect, canonical URL, and current section presence were not verified and are not inferred."
+        "note": "Network access was denied (shell CONNECT tunnel HTTP 403; web retrieval HTTP 401). Revision, redirect, canonical URL, and current section presence were not verified and are not inferred.",
+        "checked_on": "2026-08-15"
       },
       "audit_issues": [
         "source_section_missing_in_seed"
+      ],
+      "node_count": 8,
+      "nodes": [
+        {
+          "move_key": "main-1",
+          "parent_key": null,
+          "usi": "7g7f",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "角道を開けます。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-2",
+          "parent_key": "main-1",
+          "usi": "3c3d",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "後手も角道を開けます。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-3",
+          "parent_key": "main-2",
+          "usi": "8h2b+",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "角交換を行い、角交換振り飛車の含みを作ります。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-4",
+          "parent_key": "main-3",
+          "usi": "3a2b",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "後手は銀で取り返します。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-5",
+          "parent_key": "main-4",
+          "usi": "2g2f",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "飛車先を伸ばして居飛車の含みも見せます。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-6",
+          "parent_key": "main-5",
+          "usi": "4c4d",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "後手は4筋を突いて四間飛車の形を目指します。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-7",
+          "parent_key": "main-6",
+          "usi": "2h4h",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "飛車を4筋へ振り、角交換四間飛車に構えます。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-8",
+          "parent_key": "main-7",
+          "usi": "5a4b",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "後手は玉を囲う準備をします。",
+            "review_status": "unavailable"
+          }
+        }
       ]
     },
     {
@@ -527,11 +1803,126 @@
       "verification": {
         "status": "unavailable",
         "method": "MediaWiki API and article HTTP retrieval",
-        "checked_at": "2026-08-15T00:00:00Z",
-        "note": "Network access was denied (shell CONNECT tunnel HTTP 403; web retrieval HTTP 401). Revision, redirect, canonical URL, and current section presence were not verified and are not inferred."
+        "note": "Network access was denied (shell CONNECT tunnel HTTP 403; web retrieval HTTP 401). Revision, redirect, canonical URL, and current section presence were not verified and are not inferred.",
+        "checked_on": "2026-08-15"
       },
       "audit_issues": [
         "source_section_missing_in_seed"
+      ],
+      "node_count": 8,
+      "nodes": [
+        {
+          "move_key": "main-1",
+          "parent_key": null,
+          "usi": "7g7f",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "角道を開けます。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-2",
+          "parent_key": "main-1",
+          "usi": "3c3d",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "後手も角道を開けます。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-3",
+          "parent_key": "main-2",
+          "usi": "2g2f",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "飛車先を伸ばします。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-4",
+          "parent_key": "main-3",
+          "usi": "4c4d",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "後手は4筋の歩を突いて争点を作ります。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-5",
+          "parent_key": "main-4",
+          "usi": "2f2e",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "2筋を伸ばして居飛車の形を保ちます。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-6",
+          "parent_key": "main-5",
+          "usi": "3a3b",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "後手は銀を上がって角頭を守ります。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-7",
+          "parent_key": "main-6",
+          "usi": "2h4h",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "飛車を4筋へ寄せ、右四間飛車に構えます。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-8",
+          "parent_key": "main-7",
+          "usi": "6a5b",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "後手は金を寄せて中央を厚くします。",
+            "review_status": "unavailable"
+          }
+        }
       ]
     },
     {
@@ -579,11 +1970,196 @@
       "verification": {
         "status": "unavailable",
         "method": "MediaWiki API and article HTTP retrieval",
-        "checked_at": "2026-08-15T00:00:00Z",
-        "note": "Network access was denied (shell CONNECT tunnel HTTP 403; web retrieval HTTP 401). Revision, redirect, canonical URL, and current section presence were not verified and are not inferred."
+        "note": "Network access was denied (shell CONNECT tunnel HTTP 403; web retrieval HTTP 401). Revision, redirect, canonical URL, and current section presence were not verified and are not inferred.",
+        "checked_on": "2026-08-15"
       },
       "audit_issues": [
         "source_section_missing_in_seed"
+      ],
+      "node_count": 13,
+      "nodes": [
+        {
+          "move_key": "main-1",
+          "parent_key": null,
+          "usi": "7g7f",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "角道を開けます。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-2",
+          "parent_key": "main-1",
+          "usi": "3c3d",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "後手も角道を開けます。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-3",
+          "parent_key": "main-2",
+          "usi": "2g2f",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "居飛車らしく飛車先を伸ばします。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-4",
+          "parent_key": "main-3",
+          "usi": "4c4d",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "後手は振り飛車を含みに4筋を突きます。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-5",
+          "parent_key": "main-4",
+          "usi": "8h7g",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "角を上がって玉の通り道を作ります。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-6",
+          "parent_key": "main-5",
+          "usi": "3a3b",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "後手は銀を上がって角頭を守ります。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-7",
+          "parent_key": "main-6",
+          "usi": "4i5h",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "金を寄せて囲いの準備をします。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-8",
+          "parent_key": "main-7",
+          "usi": "4a4b",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "後手も金を寄せます。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-9",
+          "parent_key": "main-8",
+          "usi": "5i6h",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "玉を左へ移動します。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-10",
+          "parent_key": "main-9",
+          "usi": "5a4a",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "後手玉も囲いへ向かいます。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-11",
+          "parent_key": "main-10",
+          "usi": "6h7h",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "玉をさらに左へ寄せます。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-12",
+          "parent_key": "main-11",
+          "usi": "4a3a",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "後手は玉を深く囲います。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-13",
+          "parent_key": "main-12",
+          "usi": "7h8h",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "玉を8八へ潜り、居飛車穴熊の入口を作ります。",
+            "review_status": "unavailable"
+          }
+        }
       ]
     },
     {
@@ -631,11 +2207,196 @@
       "verification": {
         "status": "unavailable",
         "method": "MediaWiki API and article HTTP retrieval",
-        "checked_at": "2026-08-15T00:00:00Z",
-        "note": "Network access was denied (shell CONNECT tunnel HTTP 403; web retrieval HTTP 401). Revision, redirect, canonical URL, and current section presence were not verified and are not inferred."
+        "note": "Network access was denied (shell CONNECT tunnel HTTP 403; web retrieval HTTP 401). Revision, redirect, canonical URL, and current section presence were not verified and are not inferred.",
+        "checked_on": "2026-08-15"
       },
       "audit_issues": [
         "source_section_missing_in_seed"
+      ],
+      "node_count": 13,
+      "nodes": [
+        {
+          "move_key": "main-1",
+          "parent_key": null,
+          "usi": "7g7f",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "角道を開けます。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-2",
+          "parent_key": "main-1",
+          "usi": "3c3d",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "後手も角道を開けます。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-3",
+          "parent_key": "main-2",
+          "usi": "2g2f",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "飛車先を伸ばして居飛車を明示します。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-4",
+          "parent_key": "main-3",
+          "usi": "4c4d",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "後手は4筋を突いて振り飛車模様にします。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-5",
+          "parent_key": "main-4",
+          "usi": "2f2e",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "飛車先の圧力を高めます。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-6",
+          "parent_key": "main-5",
+          "usi": "3a3b",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "後手は銀を上がって角頭を守ります。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-7",
+          "parent_key": "main-6",
+          "usi": "4i5h",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "金を中央へ寄せて急戦に備えます。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-8",
+          "parent_key": "main-7",
+          "usi": "4a4b",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "後手も金を寄せます。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-9",
+          "parent_key": "main-8",
+          "usi": "5g5f",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "5筋の歩を突き、右銀の進出路を作ります。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-10",
+          "parent_key": "main-9",
+          "usi": "5a4a",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "後手玉は囲いへ向かいます。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-11",
+          "parent_key": "main-10",
+          "usi": "3i4h",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "右銀を上がって攻めに使います。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-12",
+          "parent_key": "main-11",
+          "usi": "6a5b",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "後手は中央を厚くします。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-13",
+          "parent_key": "main-12",
+          "usi": "4h5g",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "銀を5七へ進め、急戦の仕掛けを狙います。",
+            "review_status": "unavailable"
+          }
+        }
       ]
     },
     {
@@ -678,11 +2439,126 @@
       "verification": {
         "status": "unavailable",
         "method": "MediaWiki API and article HTTP retrieval",
-        "checked_at": "2026-08-15T00:00:00Z",
-        "note": "Network access was denied (shell CONNECT tunnel HTTP 403; web retrieval HTTP 401). Revision, redirect, canonical URL, and current section presence were not verified and are not inferred."
+        "note": "Network access was denied (shell CONNECT tunnel HTTP 403; web retrieval HTTP 401). Revision, redirect, canonical URL, and current section presence were not verified and are not inferred.",
+        "checked_on": "2026-08-15"
       },
       "audit_issues": [
         "source_section_missing_in_seed"
+      ],
+      "node_count": 8,
+      "nodes": [
+        {
+          "move_key": "main-1",
+          "parent_key": null,
+          "usi": "7g7f",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-2",
+          "parent_key": "main-1",
+          "usi": "3c3d",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-3",
+          "parent_key": "main-2",
+          "usi": "6g6f",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-4",
+          "parent_key": "main-3",
+          "usi": "8c8d",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-5",
+          "parent_key": "main-4",
+          "usi": "2h7h",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-6",
+          "parent_key": "main-5",
+          "usi": "8d8e",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-7",
+          "parent_key": "main-6",
+          "usi": "7i6h",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-8",
+          "parent_key": "main-7",
+          "usi": "6a5b",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+            "review_status": "unavailable"
+          }
+        }
       ]
     },
     {
@@ -725,11 +2601,126 @@
       "verification": {
         "status": "unavailable",
         "method": "MediaWiki API and article HTTP retrieval",
-        "checked_at": "2026-08-15T00:00:00Z",
-        "note": "Network access was denied (shell CONNECT tunnel HTTP 403; web retrieval HTTP 401). Revision, redirect, canonical URL, and current section presence were not verified and are not inferred."
+        "note": "Network access was denied (shell CONNECT tunnel HTTP 403; web retrieval HTTP 401). Revision, redirect, canonical URL, and current section presence were not verified and are not inferred.",
+        "checked_on": "2026-08-15"
       },
       "audit_issues": [
         "source_section_missing_in_seed"
+      ],
+      "node_count": 8,
+      "nodes": [
+        {
+          "move_key": "main-1",
+          "parent_key": null,
+          "usi": "7g7f",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-2",
+          "parent_key": "main-1",
+          "usi": "3c3d",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-3",
+          "parent_key": "main-2",
+          "usi": "8h2b+",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-4",
+          "parent_key": "main-3",
+          "usi": "3a2b",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-5",
+          "parent_key": "main-4",
+          "usi": "2h6h",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-6",
+          "parent_key": "main-5",
+          "usi": "8c8d",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-7",
+          "parent_key": "main-6",
+          "usi": "6g6f",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-8",
+          "parent_key": "main-7",
+          "usi": "6a5b",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+            "review_status": "unavailable"
+          }
+        }
       ]
     },
     {
@@ -772,11 +2763,126 @@
       "verification": {
         "status": "unavailable",
         "method": "MediaWiki API and article HTTP retrieval",
-        "checked_at": "2026-08-15T00:00:00Z",
-        "note": "Network access was denied (shell CONNECT tunnel HTTP 403; web retrieval HTTP 401). Revision, redirect, canonical URL, and current section presence were not verified and are not inferred."
+        "note": "Network access was denied (shell CONNECT tunnel HTTP 403; web retrieval HTTP 401). Revision, redirect, canonical URL, and current section presence were not verified and are not inferred.",
+        "checked_on": "2026-08-15"
       },
       "audit_issues": [
         "source_section_missing_in_seed"
+      ],
+      "node_count": 8,
+      "nodes": [
+        {
+          "move_key": "main-1",
+          "parent_key": null,
+          "usi": "7g7f",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-2",
+          "parent_key": "main-1",
+          "usi": "3c3d",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-3",
+          "parent_key": "main-2",
+          "usi": "6g6f",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-4",
+          "parent_key": "main-3",
+          "usi": "5c5d",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-5",
+          "parent_key": "main-4",
+          "usi": "2h7h",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-6",
+          "parent_key": "main-5",
+          "usi": "8b5b",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-7",
+          "parent_key": "main-6",
+          "usi": "7i6h",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-8",
+          "parent_key": "main-7",
+          "usi": "5b3b",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+            "review_status": "unavailable"
+          }
+        }
       ]
     },
     {
@@ -819,11 +2925,126 @@
       "verification": {
         "status": "unavailable",
         "method": "MediaWiki API and article HTTP retrieval",
-        "checked_at": "2026-08-15T00:00:00Z",
-        "note": "Network access was denied (shell CONNECT tunnel HTTP 403; web retrieval HTTP 401). Revision, redirect, canonical URL, and current section presence were not verified and are not inferred."
+        "note": "Network access was denied (shell CONNECT tunnel HTTP 403; web retrieval HTTP 401). Revision, redirect, canonical URL, and current section presence were not verified and are not inferred.",
+        "checked_on": "2026-08-15"
       },
       "audit_issues": [
         "source_section_missing_in_seed"
+      ],
+      "node_count": 8,
+      "nodes": [
+        {
+          "move_key": "main-1",
+          "parent_key": null,
+          "usi": "6i7h",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-2",
+          "parent_key": "main-1",
+          "usi": "3c3d",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-3",
+          "parent_key": "main-2",
+          "usi": "7i6h",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-4",
+          "parent_key": "main-3",
+          "usi": "8c8d",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-5",
+          "parent_key": "main-4",
+          "usi": "5g5f",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-6",
+          "parent_key": "main-5",
+          "usi": "8d8e",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-7",
+          "parent_key": "main-6",
+          "usi": "6h5g",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-8",
+          "parent_key": "main-7",
+          "usi": "4a3b",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+            "review_status": "unavailable"
+          }
+        }
       ]
     },
     {
@@ -867,11 +3088,140 @@
       "verification": {
         "status": "unavailable",
         "method": "MediaWiki API and article HTTP retrieval",
-        "checked_at": "2026-08-15T00:00:00Z",
-        "note": "Network access was denied (shell CONNECT tunnel HTTP 403; web retrieval HTTP 401). Revision, redirect, canonical URL, and current section presence were not verified and are not inferred."
+        "note": "Network access was denied (shell CONNECT tunnel HTTP 403; web retrieval HTTP 401). Revision, redirect, canonical URL, and current section presence were not verified and are not inferred.",
+        "checked_on": "2026-08-15"
       },
       "audit_issues": [
         "source_section_missing_in_seed"
+      ],
+      "node_count": 9,
+      "nodes": [
+        {
+          "move_key": "main-1",
+          "parent_key": null,
+          "usi": "7g7f",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-2",
+          "parent_key": "main-1",
+          "usi": "3c3d",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-3",
+          "parent_key": "main-2",
+          "usi": "7i7h",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-4",
+          "parent_key": "main-3",
+          "usi": "8c8d",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-5",
+          "parent_key": "main-4",
+          "usi": "6g6f",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-6",
+          "parent_key": "main-5",
+          "usi": "8d8e",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-7",
+          "parent_key": "main-6",
+          "usi": "7h6g",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-8",
+          "parent_key": "main-7",
+          "usi": "6a5b",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-9",
+          "parent_key": "main-8",
+          "usi": "6g5f",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+            "review_status": "unavailable"
+          }
+        }
       ]
     },
     {
@@ -925,10 +3275,335 @@
       "verification": {
         "status": "unavailable",
         "method": "MediaWiki API and article HTTP retrieval",
-        "checked_at": "2026-08-15T00:00:00Z",
-        "note": "Network access was denied (shell CONNECT tunnel HTTP 403; web retrieval HTTP 401). Revision, redirect, canonical URL, and current section presence were not verified and are not inferred."
+        "note": "Network access was denied (shell CONNECT tunnel HTTP 403; web retrieval HTTP 401). Revision, redirect, canonical URL, and current section presence were not verified and are not inferred.",
+        "checked_on": "2026-08-15"
       },
-      "audit_issues": []
+      "audit_issues": [],
+      "node_count": 23,
+      "nodes": [
+        {
+          "move_key": "main-1",
+          "parent_key": null,
+          "usi": "7g7f",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "explicit_sequence",
+            "source_section": "原始鬼殺し",
+            "evidence_note": "▲7六歩。原始鬼殺しの初手です。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-2",
+          "parent_key": "main-1",
+          "usi": "3c3d",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "explicit_sequence",
+            "source_section": "原始鬼殺し",
+            "evidence_note": "△3四歩。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-3",
+          "parent_key": "main-2",
+          "usi": "8i7g",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "explicit_sequence",
+            "source_section": "原始鬼殺し",
+            "evidence_note": "▲7七桂。Wikipedia図1-1の局面です。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-4",
+          "parent_key": "main-3",
+          "usi": "8c8d",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "explicit_sequence",
+            "source_section": "原始鬼殺し",
+            "evidence_note": "△8四歩。本文で示された応手です。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-5",
+          "parent_key": "main-4",
+          "usi": "7g6e",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "explicit_sequence",
+            "source_section": "原始鬼殺し",
+            "evidence_note": "▲6五桂。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-6",
+          "parent_key": "main-5",
+          "usi": "7a6b",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "explicit_sequence",
+            "source_section": "原始鬼殺し",
+            "evidence_note": "△6二銀。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-7",
+          "parent_key": "main-6",
+          "usi": "7f7e",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "explicit_sequence",
+            "source_section": "原始鬼殺し",
+            "evidence_note": "▲7五歩。Wikipedia図1-2の局面です。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-8",
+          "parent_key": "main-7",
+          "usi": "6c6d",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "explicit_sequence",
+            "source_section": "原始鬼殺し",
+            "evidence_note": "△6四歩。両取り筋への対応です。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-9",
+          "parent_key": "main-8",
+          "usi": "8h2b+",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "explicit_sequence",
+            "source_section": "原始鬼殺し",
+            "evidence_note": "▲2二角成。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-10",
+          "parent_key": "main-9",
+          "usi": "3a2b",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "explicit_sequence",
+            "source_section": "原始鬼殺し",
+            "evidence_note": "△同銀。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-11",
+          "parent_key": "main-10",
+          "usi": "B*5e",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "explicit_sequence",
+            "source_section": "原始鬼殺し",
+            "evidence_note": "▲5五角。Wikipedia図1-3の局面です。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-12",
+          "parent_key": "main-11",
+          "usi": "2b3c",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "explicit_sequence",
+            "source_section": "原始鬼殺し",
+            "evidence_note": "△3三銀。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-13",
+          "parent_key": "main-12",
+          "usi": "5e6d",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "explicit_sequence",
+            "source_section": "原始鬼殺し",
+            "evidence_note": "▲6四角。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-14",
+          "parent_key": "main-13",
+          "usi": "6a5b",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "explicit_sequence",
+            "source_section": "原始鬼殺し",
+            "evidence_note": "△5二金右。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-15",
+          "parent_key": "main-14",
+          "usi": "7e7d",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "explicit_sequence",
+            "source_section": "原始鬼殺し",
+            "evidence_note": "▲7四歩。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-16",
+          "parent_key": "main-15",
+          "usi": "6b6c",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "explicit_sequence",
+            "source_section": "原始鬼殺し",
+            "evidence_note": "△6三金。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-17",
+          "parent_key": "main-16",
+          "usi": "2h7h",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "explicit_sequence",
+            "source_section": "原始鬼殺し",
+            "evidence_note": "▲7八飛。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-18",
+          "parent_key": "main-17",
+          "usi": "6c6d",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "explicit_sequence",
+            "source_section": "原始鬼殺し",
+            "evidence_note": "△6四金。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-19",
+          "parent_key": "main-18",
+          "usi": "7d7c+",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "explicit_sequence",
+            "source_section": "原始鬼殺し",
+            "evidence_note": "▲7三歩成。Wikipedia図1-4までの本文手順です。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "branch-1-1",
+          "parent_key": "main-3",
+          "usi": "7a6b",
+          "is_main": false,
+          "sort_order": 1,
+          "variation_group": "△6二銀の対応",
+          "provenance": {
+            "provenance_class": "explicit_sequence",
+            "source_section": "原始鬼殺し",
+            "evidence_note": "3手目▲7七桂に対する4手目△6二銀。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "branch-2-1",
+          "parent_key": "main-3",
+          "usi": "6a6b",
+          "is_main": false,
+          "sort_order": 2,
+          "variation_group": "△6二金の有効な受け",
+          "provenance": {
+            "provenance_class": "explicit_sequence",
+            "source_section": "原始鬼殺し",
+            "evidence_note": "△6二金、▲6五桂に△6四歩と受ける入口。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "branch-2-2",
+          "parent_key": "branch-2-1",
+          "usi": "7g6e",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "△6二金の有効な受け",
+          "provenance": {
+            "provenance_class": "explicit_sequence",
+            "source_section": "原始鬼殺し",
+            "evidence_note": "△6二金の有効な受け 2手目です。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "branch-2-3",
+          "parent_key": "branch-2-2",
+          "usi": "6c6d",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "△6二金の有効な受け",
+          "provenance": {
+            "provenance_class": "explicit_sequence",
+            "source_section": "原始鬼殺し",
+            "evidence_note": "△6二金の有効な受け 3手目です。",
+            "review_status": "unavailable"
+          }
+        }
+      ]
     },
     {
       "record_id": "seed:新・早石田（鈴木流急戦・Wikipedia明示手順）",
@@ -969,10 +3644,111 @@
       "verification": {
         "status": "unavailable",
         "method": "MediaWiki API and article HTTP retrieval",
-        "checked_at": "2026-08-15T00:00:00Z",
-        "note": "Network access was denied (shell CONNECT tunnel HTTP 403; web retrieval HTTP 401). Revision, redirect, canonical URL, and current section presence were not verified and are not inferred."
+        "note": "Network access was denied (shell CONNECT tunnel HTTP 403; web retrieval HTTP 401). Revision, redirect, canonical URL, and current section presence were not verified and are not inferred.",
+        "checked_on": "2026-08-15"
       },
-      "audit_issues": []
+      "audit_issues": [],
+      "node_count": 7,
+      "nodes": [
+        {
+          "move_key": "main-1",
+          "parent_key": null,
+          "usi": "7g7f",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "explicit_sequence",
+            "source_section": "新・早石田",
+            "evidence_note": "新・早石田節の第7手▲7四歩までの本文・図示手順を対象化。以降は本文にある範囲のみ。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-2",
+          "parent_key": "main-1",
+          "usi": "3c3d",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "explicit_sequence",
+            "source_section": "新・早石田",
+            "evidence_note": "新・早石田節の第7手▲7四歩までの本文・図示手順を対象化。以降は本文にある範囲のみ。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-3",
+          "parent_key": "main-2",
+          "usi": "7f7e",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "explicit_sequence",
+            "source_section": "新・早石田",
+            "evidence_note": "新・早石田節の第7手▲7四歩までの本文・図示手順を対象化。以降は本文にある範囲のみ。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-4",
+          "parent_key": "main-3",
+          "usi": "8c8d",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "explicit_sequence",
+            "source_section": "新・早石田",
+            "evidence_note": "新・早石田節の第7手▲7四歩までの本文・図示手順を対象化。以降は本文にある範囲のみ。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-5",
+          "parent_key": "main-4",
+          "usi": "2h7h",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "explicit_sequence",
+            "source_section": "新・早石田",
+            "evidence_note": "新・早石田節の第7手▲7四歩までの本文・図示手順を対象化。以降は本文にある範囲のみ。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-6",
+          "parent_key": "main-5",
+          "usi": "8d8e",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "explicit_sequence",
+            "source_section": "新・早石田",
+            "evidence_note": "新・早石田節の第7手▲7四歩までの本文・図示手順を対象化。以降は本文にある範囲のみ。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-7",
+          "parent_key": "main-6",
+          "usi": "7e7d",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "explicit_sequence",
+            "source_section": "新・早石田",
+            "evidence_note": "新・早石田節の第7手▲7四歩までの本文・図示手順を対象化。以降は本文にある範囲のみ。",
+            "review_status": "unavailable"
+          }
+        }
+      ]
     },
     {
       "record_id": "seed:升田式石田流（Wikipedia明示手順）",
@@ -1013,11 +3789,112 @@
       "verification": {
         "status": "unavailable",
         "method": "MediaWiki API and article HTTP retrieval",
-        "checked_at": "2026-08-15T00:00:00Z",
-        "note": "Network access was denied (shell CONNECT tunnel HTTP 403; web retrieval HTTP 401). Revision, redirect, canonical URL, and current section presence were not verified and are not inferred."
+        "note": "Network access was denied (shell CONNECT tunnel HTTP 403; web retrieval HTTP 401). Revision, redirect, canonical URL, and current section presence were not verified and are not inferred.",
+        "checked_on": "2026-08-15"
       },
       "audit_issues": [
         "source_note_claims_unrecorded_move_7h7f"
+      ],
+      "node_count": 7,
+      "nodes": [
+        {
+          "move_key": "main-1",
+          "parent_key": null,
+          "usi": "7g7f",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "explicit_sequence",
+            "source_section": "升田式石田流",
+            "evidence_note": "升田式石田流節の▲7六歩△3四歩▲7五歩△8四歩▲7八飛△8五歩▲4八玉、および実戦以下▲7六飛を手順化。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-2",
+          "parent_key": "main-1",
+          "usi": "3c3d",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "explicit_sequence",
+            "source_section": "升田式石田流",
+            "evidence_note": "升田式石田流節の▲7六歩△3四歩▲7五歩△8四歩▲7八飛△8五歩▲4八玉、および実戦以下▲7六飛を手順化。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-3",
+          "parent_key": "main-2",
+          "usi": "7f7e",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "explicit_sequence",
+            "source_section": "升田式石田流",
+            "evidence_note": "升田式石田流節の▲7六歩△3四歩▲7五歩△8四歩▲7八飛△8五歩▲4八玉、および実戦以下▲7六飛を手順化。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-4",
+          "parent_key": "main-3",
+          "usi": "8c8d",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "explicit_sequence",
+            "source_section": "升田式石田流",
+            "evidence_note": "升田式石田流節の▲7六歩△3四歩▲7五歩△8四歩▲7八飛△8五歩▲4八玉、および実戦以下▲7六飛を手順化。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-5",
+          "parent_key": "main-4",
+          "usi": "2h7h",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "explicit_sequence",
+            "source_section": "升田式石田流",
+            "evidence_note": "升田式石田流節の▲7六歩△3四歩▲7五歩△8四歩▲7八飛△8五歩▲4八玉、および実戦以下▲7六飛を手順化。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-6",
+          "parent_key": "main-5",
+          "usi": "8d8e",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "explicit_sequence",
+            "source_section": "升田式石田流",
+            "evidence_note": "升田式石田流節の▲7六歩△3四歩▲7五歩△8四歩▲7八飛△8五歩▲4八玉、および実戦以下▲7六飛を手順化。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-7",
+          "parent_key": "main-6",
+          "usi": "5i4h",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "explicit_sequence",
+            "source_section": "升田式石田流",
+            "evidence_note": "升田式石田流節の▲7六歩△3四歩▲7五歩△8四歩▲7八飛△8五歩▲4八玉、および実戦以下▲7六飛を手順化。",
+            "review_status": "unavailable"
+          }
+        }
       ]
     },
     {
@@ -1059,11 +3936,112 @@
       "verification": {
         "status": "unavailable",
         "method": "MediaWiki API and article HTTP retrieval",
-        "checked_at": "2026-08-15T00:00:00Z",
-        "note": "Network access was denied (shell CONNECT tunnel HTTP 403; web retrieval HTTP 401). Revision, redirect, canonical URL, and current section presence were not verified and are not inferred."
+        "note": "Network access was denied (shell CONNECT tunnel HTTP 403; web retrieval HTTP 401). Revision, redirect, canonical URL, and current section presence were not verified and are not inferred.",
+        "checked_on": "2026-08-15"
       },
       "audit_issues": [
         "source_section_missing_in_seed"
+      ],
+      "node_count": 7,
+      "nodes": [
+        {
+          "move_key": "main-1",
+          "parent_key": null,
+          "usi": "7g7f",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-2",
+          "parent_key": "main-1",
+          "usi": "3c3d",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-3",
+          "parent_key": "main-2",
+          "usi": "7f7e",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-4",
+          "parent_key": "main-3",
+          "usi": "8c8d",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-5",
+          "parent_key": "main-4",
+          "usi": "2h7h",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-6",
+          "parent_key": "main-5",
+          "usi": "8d8e",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-7",
+          "parent_key": "main-6",
+          "usi": "7h7f",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+            "review_status": "unavailable"
+          }
+        }
       ]
     },
     {
@@ -1104,11 +4082,98 @@
       "verification": {
         "status": "unavailable",
         "method": "MediaWiki API and article HTTP retrieval",
-        "checked_at": "2026-08-15T00:00:00Z",
-        "note": "Network access was denied (shell CONNECT tunnel HTTP 403; web retrieval HTTP 401). Revision, redirect, canonical URL, and current section presence were not verified and are not inferred."
+        "note": "Network access was denied (shell CONNECT tunnel HTTP 403; web retrieval HTTP 401). Revision, redirect, canonical URL, and current section presence were not verified and are not inferred.",
+        "checked_on": "2026-08-15"
       },
       "audit_issues": [
         "source_section_missing_in_seed"
+      ],
+      "node_count": 6,
+      "nodes": [
+        {
+          "move_key": "main-1",
+          "parent_key": null,
+          "usi": "7g7f",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-2",
+          "parent_key": "main-1",
+          "usi": "3c3d",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-3",
+          "parent_key": "main-2",
+          "usi": "8h2b+",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-4",
+          "parent_key": "main-3",
+          "usi": "3a2b",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-5",
+          "parent_key": "main-4",
+          "usi": "B*4e",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-6",
+          "parent_key": "main-5",
+          "usi": "6a5b",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+            "review_status": "unavailable"
+          }
+        }
       ]
     },
     {
@@ -1152,11 +4217,140 @@
       "verification": {
         "status": "unavailable",
         "method": "MediaWiki API and article HTTP retrieval",
-        "checked_at": "2026-08-15T00:00:00Z",
-        "note": "Network access was denied (shell CONNECT tunnel HTTP 403; web retrieval HTTP 401). Revision, redirect, canonical URL, and current section presence were not verified and are not inferred."
+        "note": "Network access was denied (shell CONNECT tunnel HTTP 403; web retrieval HTTP 401). Revision, redirect, canonical URL, and current section presence were not verified and are not inferred.",
+        "checked_on": "2026-08-15"
       },
       "audit_issues": [
         "source_section_missing_in_seed"
+      ],
+      "node_count": 9,
+      "nodes": [
+        {
+          "move_key": "main-1",
+          "parent_key": null,
+          "usi": "7g7f",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-2",
+          "parent_key": "main-1",
+          "usi": "8c8d",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-3",
+          "parent_key": "main-2",
+          "usi": "6g6f",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-4",
+          "parent_key": "main-3",
+          "usi": "3c3d",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-5",
+          "parent_key": "main-4",
+          "usi": "7i6h",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-6",
+          "parent_key": "main-5",
+          "usi": "7a6b",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-7",
+          "parent_key": "main-6",
+          "usi": "6h6g",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-8",
+          "parent_key": "main-7",
+          "usi": "5c5d",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-9",
+          "parent_key": "main-8",
+          "usi": "5g5f",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+            "review_status": "unavailable"
+          }
+        }
       ]
     },
     {
@@ -1202,11 +4396,168 @@
       "verification": {
         "status": "unavailable",
         "method": "MediaWiki API and article HTTP retrieval",
-        "checked_at": "2026-08-15T00:00:00Z",
-        "note": "Network access was denied (shell CONNECT tunnel HTTP 403; web retrieval HTTP 401). Revision, redirect, canonical URL, and current section presence were not verified and are not inferred."
+        "note": "Network access was denied (shell CONNECT tunnel HTTP 403; web retrieval HTTP 401). Revision, redirect, canonical URL, and current section presence were not verified and are not inferred.",
+        "checked_on": "2026-08-15"
       },
       "audit_issues": [
         "source_section_missing_in_seed"
+      ],
+      "node_count": 11,
+      "nodes": [
+        {
+          "move_key": "main-1",
+          "parent_key": null,
+          "usi": "7g7f",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-2",
+          "parent_key": "main-1",
+          "usi": "8c8d",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-3",
+          "parent_key": "main-2",
+          "usi": "6i7h",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-4",
+          "parent_key": "main-3",
+          "usi": "3c3d",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-5",
+          "parent_key": "main-4",
+          "usi": "6g6f",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-6",
+          "parent_key": "main-5",
+          "usi": "7a6b",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-7",
+          "parent_key": "main-6",
+          "usi": "2g2f",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-8",
+          "parent_key": "main-7",
+          "usi": "5c5d",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-9",
+          "parent_key": "main-8",
+          "usi": "3i3h",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-10",
+          "parent_key": "main-9",
+          "usi": "5a4b",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-11",
+          "parent_key": "main-10",
+          "usi": "3h2g",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+            "review_status": "unavailable"
+          }
+        }
       ]
     },
     {
@@ -1250,11 +4601,140 @@
       "verification": {
         "status": "unavailable",
         "method": "MediaWiki API and article HTTP retrieval",
-        "checked_at": "2026-08-15T00:00:00Z",
-        "note": "Network access was denied (shell CONNECT tunnel HTTP 403; web retrieval HTTP 401). Revision, redirect, canonical URL, and current section presence were not verified and are not inferred."
+        "note": "Network access was denied (shell CONNECT tunnel HTTP 403; web retrieval HTTP 401). Revision, redirect, canonical URL, and current section presence were not verified and are not inferred.",
+        "checked_on": "2026-08-15"
       },
       "audit_issues": [
         "source_section_missing_in_seed"
+      ],
+      "node_count": 9,
+      "nodes": [
+        {
+          "move_key": "main-1",
+          "parent_key": null,
+          "usi": "7g7f",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-2",
+          "parent_key": "main-1",
+          "usi": "8c8d",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-3",
+          "parent_key": "main-2",
+          "usi": "2g2f",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-4",
+          "parent_key": "main-3",
+          "usi": "3c3d",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-5",
+          "parent_key": "main-4",
+          "usi": "8h2b+",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-6",
+          "parent_key": "main-5",
+          "usi": "3a2b",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-7",
+          "parent_key": "main-6",
+          "usi": "3i3h",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-8",
+          "parent_key": "main-7",
+          "usi": "7a7b",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-9",
+          "parent_key": "main-8",
+          "usi": "3h2g",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+            "review_status": "unavailable"
+          }
+        }
       ]
     },
     {
@@ -1300,11 +4780,168 @@
       "verification": {
         "status": "unavailable",
         "method": "MediaWiki API and article HTTP retrieval",
-        "checked_at": "2026-08-15T00:00:00Z",
-        "note": "Network access was denied (shell CONNECT tunnel HTTP 403; web retrieval HTTP 401). Revision, redirect, canonical URL, and current section presence were not verified and are not inferred."
+        "note": "Network access was denied (shell CONNECT tunnel HTTP 403; web retrieval HTTP 401). Revision, redirect, canonical URL, and current section presence were not verified and are not inferred.",
+        "checked_on": "2026-08-15"
       },
       "audit_issues": [
         "source_section_missing_in_seed"
+      ],
+      "node_count": 11,
+      "nodes": [
+        {
+          "move_key": "main-1",
+          "parent_key": null,
+          "usi": "7g7f",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-2",
+          "parent_key": "main-1",
+          "usi": "8c8d",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-3",
+          "parent_key": "main-2",
+          "usi": "2g2f",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-4",
+          "parent_key": "main-3",
+          "usi": "3c3d",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-5",
+          "parent_key": "main-4",
+          "usi": "8h2b+",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-6",
+          "parent_key": "main-5",
+          "usi": "3a2b",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-7",
+          "parent_key": "main-6",
+          "usi": "3i4h",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-8",
+          "parent_key": "main-7",
+          "usi": "7a7b",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-9",
+          "parent_key": "main-8",
+          "usi": "3g3f",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-10",
+          "parent_key": "main-9",
+          "usi": "6a5b",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-11",
+          "parent_key": "main-10",
+          "usi": "4h3g",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+            "review_status": "unavailable"
+          }
+        }
       ]
     },
     {
@@ -1352,11 +4989,196 @@
       "verification": {
         "status": "unavailable",
         "method": "MediaWiki API and article HTTP retrieval",
-        "checked_at": "2026-08-15T00:00:00Z",
-        "note": "Network access was denied (shell CONNECT tunnel HTTP 403; web retrieval HTTP 401). Revision, redirect, canonical URL, and current section presence were not verified and are not inferred."
+        "note": "Network access was denied (shell CONNECT tunnel HTTP 403; web retrieval HTTP 401). Revision, redirect, canonical URL, and current section presence were not verified and are not inferred.",
+        "checked_on": "2026-08-15"
       },
       "audit_issues": [
         "source_section_missing_in_seed"
+      ],
+      "node_count": 13,
+      "nodes": [
+        {
+          "move_key": "main-1",
+          "parent_key": null,
+          "usi": "7g7f",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-2",
+          "parent_key": "main-1",
+          "usi": "8c8d",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-3",
+          "parent_key": "main-2",
+          "usi": "2g2f",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-4",
+          "parent_key": "main-3",
+          "usi": "3c3d",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-5",
+          "parent_key": "main-4",
+          "usi": "8h2b+",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-6",
+          "parent_key": "main-5",
+          "usi": "3a2b",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-7",
+          "parent_key": "main-6",
+          "usi": "7i8h",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-8",
+          "parent_key": "main-7",
+          "usi": "7a7b",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-9",
+          "parent_key": "main-8",
+          "usi": "5g5f",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-10",
+          "parent_key": "main-9",
+          "usi": "6a5b",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-11",
+          "parent_key": "main-10",
+          "usi": "3i4h",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-12",
+          "parent_key": "main-11",
+          "usi": "5c5d",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-13",
+          "parent_key": "main-12",
+          "usi": "4h5g",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+            "review_status": "unavailable"
+          }
+        }
       ]
     },
     {
@@ -1400,11 +5222,140 @@
       "verification": {
         "status": "unavailable",
         "method": "MediaWiki API and article HTTP retrieval",
-        "checked_at": "2026-08-15T00:00:00Z",
-        "note": "Network access was denied (shell CONNECT tunnel HTTP 403; web retrieval HTTP 401). Revision, redirect, canonical URL, and current section presence were not verified and are not inferred."
+        "note": "Network access was denied (shell CONNECT tunnel HTTP 403; web retrieval HTTP 401). Revision, redirect, canonical URL, and current section presence were not verified and are not inferred.",
+        "checked_on": "2026-08-15"
       },
       "audit_issues": [
         "source_section_missing_in_seed"
+      ],
+      "node_count": 9,
+      "nodes": [
+        {
+          "move_key": "main-1",
+          "parent_key": null,
+          "usi": "2g2f",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-2",
+          "parent_key": "main-1",
+          "usi": "8c8d",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-3",
+          "parent_key": "main-2",
+          "usi": "2f2e",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-4",
+          "parent_key": "main-3",
+          "usi": "8d8e",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-5",
+          "parent_key": "main-4",
+          "usi": "3i3h",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-6",
+          "parent_key": "main-5",
+          "usi": "7a6b",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-7",
+          "parent_key": "main-6",
+          "usi": "3h2g",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-8",
+          "parent_key": "main-7",
+          "usi": "4a3b",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-9",
+          "parent_key": "main-8",
+          "usi": "2g2f",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+            "review_status": "unavailable"
+          }
+        }
       ]
     },
     {
@@ -1452,11 +5403,196 @@
       "verification": {
         "status": "unavailable",
         "method": "MediaWiki API and article HTTP retrieval",
-        "checked_at": "2026-08-15T00:00:00Z",
-        "note": "Network access was denied (shell CONNECT tunnel HTTP 403; web retrieval HTTP 401). Revision, redirect, canonical URL, and current section presence were not verified and are not inferred."
+        "note": "Network access was denied (shell CONNECT tunnel HTTP 403; web retrieval HTTP 401). Revision, redirect, canonical URL, and current section presence were not verified and are not inferred.",
+        "checked_on": "2026-08-15"
       },
       "audit_issues": [
         "source_section_missing_in_seed"
+      ],
+      "node_count": 13,
+      "nodes": [
+        {
+          "move_key": "main-1",
+          "parent_key": null,
+          "usi": "7g7f",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-2",
+          "parent_key": "main-1",
+          "usi": "3c3d",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-3",
+          "parent_key": "main-2",
+          "usi": "6g6f",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-4",
+          "parent_key": "main-3",
+          "usi": "8c8d",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-5",
+          "parent_key": "main-4",
+          "usi": "2h6h",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-6",
+          "parent_key": "main-5",
+          "usi": "8d8e",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-7",
+          "parent_key": "main-6",
+          "usi": "5i4h",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-8",
+          "parent_key": "main-7",
+          "usi": "6a5b",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-9",
+          "parent_key": "main-8",
+          "usi": "4h3h",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-10",
+          "parent_key": "main-9",
+          "usi": "5b4b",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-11",
+          "parent_key": "main-10",
+          "usi": "3h2h",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-12",
+          "parent_key": "main-11",
+          "usi": "7a6b",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-13",
+          "parent_key": "main-12",
+          "usi": "3i3h",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+            "review_status": "unavailable"
+          }
+        }
       ]
     },
     {
@@ -1502,11 +5638,168 @@
       "verification": {
         "status": "unavailable",
         "method": "MediaWiki API and article HTTP retrieval",
-        "checked_at": "2026-08-15T00:00:00Z",
-        "note": "Network access was denied (shell CONNECT tunnel HTTP 403; web retrieval HTTP 401). Revision, redirect, canonical URL, and current section presence were not verified and are not inferred."
+        "note": "Network access was denied (shell CONNECT tunnel HTTP 403; web retrieval HTTP 401). Revision, redirect, canonical URL, and current section presence were not verified and are not inferred.",
+        "checked_on": "2026-08-15"
       },
       "audit_issues": [
         "source_section_missing_in_seed"
+      ],
+      "node_count": 11,
+      "nodes": [
+        {
+          "move_key": "main-1",
+          "parent_key": null,
+          "usi": "7g7f",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-2",
+          "parent_key": "main-1",
+          "usi": "3c3d",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-3",
+          "parent_key": "main-2",
+          "usi": "2g2f",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-4",
+          "parent_key": "main-3",
+          "usi": "4c4d",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-5",
+          "parent_key": "main-4",
+          "usi": "8h7g",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-6",
+          "parent_key": "main-5",
+          "usi": "3a3b",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-7",
+          "parent_key": "main-6",
+          "usi": "5i6h",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-8",
+          "parent_key": "main-7",
+          "usi": "5a4b",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-9",
+          "parent_key": "main-8",
+          "usi": "6h7h",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-10",
+          "parent_key": "main-9",
+          "usi": "6a5b",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-11",
+          "parent_key": "main-10",
+          "usi": "7h8h",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+            "review_status": "unavailable"
+          }
+        }
       ]
     },
     {
@@ -1550,11 +5843,140 @@
       "verification": {
         "status": "unavailable",
         "method": "MediaWiki API and article HTTP retrieval",
-        "checked_at": "2026-08-15T00:00:00Z",
-        "note": "Network access was denied (shell CONNECT tunnel HTTP 403; web retrieval HTTP 401). Revision, redirect, canonical URL, and current section presence were not verified and are not inferred."
+        "note": "Network access was denied (shell CONNECT tunnel HTTP 403; web retrieval HTTP 401). Revision, redirect, canonical URL, and current section presence were not verified and are not inferred.",
+        "checked_on": "2026-08-15"
       },
       "audit_issues": [
         "source_section_missing_in_seed"
+      ],
+      "node_count": 9,
+      "nodes": [
+        {
+          "move_key": "main-1",
+          "parent_key": null,
+          "usi": "7g7f",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-2",
+          "parent_key": "main-1",
+          "usi": "3c3d",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-3",
+          "parent_key": "main-2",
+          "usi": "2g2f",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-4",
+          "parent_key": "main-3",
+          "usi": "4c4d",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-5",
+          "parent_key": "main-4",
+          "usi": "4i5h",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-6",
+          "parent_key": "main-5",
+          "usi": "3a3b",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-7",
+          "parent_key": "main-6",
+          "usi": "5i6h",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-8",
+          "parent_key": "main-7",
+          "usi": "4a4b",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-9",
+          "parent_key": "main-8",
+          "usi": "6h7h",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+            "review_status": "unavailable"
+          }
+        }
       ]
     },
     {
@@ -1600,11 +6022,168 @@
       "verification": {
         "status": "unavailable",
         "method": "MediaWiki API and article HTTP retrieval",
-        "checked_at": "2026-08-15T00:00:00Z",
-        "note": "Network access was denied (shell CONNECT tunnel HTTP 403; web retrieval HTTP 401). Revision, redirect, canonical URL, and current section presence were not verified and are not inferred."
+        "note": "Network access was denied (shell CONNECT tunnel HTTP 403; web retrieval HTTP 401). Revision, redirect, canonical URL, and current section presence were not verified and are not inferred.",
+        "checked_on": "2026-08-15"
       },
       "audit_issues": [
         "source_section_missing_in_seed"
+      ],
+      "node_count": 11,
+      "nodes": [
+        {
+          "move_key": "main-1",
+          "parent_key": null,
+          "usi": "7g7f",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-2",
+          "parent_key": "main-1",
+          "usi": "3c3d",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-3",
+          "parent_key": "main-2",
+          "usi": "2g2f",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-4",
+          "parent_key": "main-3",
+          "usi": "8c8d",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-5",
+          "parent_key": "main-4",
+          "usi": "7i6h",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-6",
+          "parent_key": "main-5",
+          "usi": "7a6b",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-7",
+          "parent_key": "main-6",
+          "usi": "6h7g",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-8",
+          "parent_key": "main-7",
+          "usi": "4a3b",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-9",
+          "parent_key": "main-8",
+          "usi": "5i6h",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-10",
+          "parent_key": "main-9",
+          "usi": "6a5b",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-11",
+          "parent_key": "main-10",
+          "usi": "4i5h",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "Wikipediaの戦法説明・局面図を参考に、既存seedのUSI手順として再構成。明示情報が短い戦型は短い手順に留めています。",
+            "review_status": "unavailable"
+          }
+        }
       ]
     },
     {
@@ -1647,12 +6226,128 @@
       "verification": {
         "status": "unavailable",
         "method": "MediaWiki API and article HTTP retrieval",
-        "checked_at": "2026-08-15T00:00:00Z",
-        "note": "Network access was denied (shell CONNECT tunnel HTTP 403; web retrieval HTTP 401). Revision, redirect, canonical URL, and current section presence were not verified and are not inferred."
+        "note": "Network access was denied (shell CONNECT tunnel HTTP 403; web retrieval HTTP 401). Revision, redirect, canonical URL, and current section presence were not verified and are not inferred.",
+        "checked_on": "2026-08-15"
       },
       "audit_issues": [
         "source_section_missing_in_seed"
+      ],
+      "node_count": 8,
+      "nodes": [
+        {
+          "move_key": "main-1",
+          "parent_key": null,
+          "usi": "7g7f",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "角道を開けます。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-2",
+          "parent_key": "main-1",
+          "usi": "3c3d",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "後手も角道を開けます。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-3",
+          "parent_key": "main-2",
+          "usi": "8h7g",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "角を上がって飛車の横移動路を作ります。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-4",
+          "parent_key": "main-3",
+          "usi": "8c8d",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "後手は飛車先を伸ばします。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-5",
+          "parent_key": "main-4",
+          "usi": "2h8h",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "飛車を8筋へ振って向かい飛車に構えます。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-6",
+          "parent_key": "main-5",
+          "usi": "8d8e",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "後手は8筋を伸ばして接点を作ります。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-7",
+          "parent_key": "main-6",
+          "usi": "4i5h",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "金を中央へ寄せて陣形を整えます。",
+            "review_status": "unavailable"
+          }
+        },
+        {
+          "move_key": "main-8",
+          "parent_key": "main-7",
+          "usi": "4a3b",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": null,
+            "evidence_note": "後手も金を締めます。",
+            "review_status": "unavailable"
+          }
+        }
       ]
     }
-  ]
+  ],
+  "generated_on": "2026-08-15"
 }

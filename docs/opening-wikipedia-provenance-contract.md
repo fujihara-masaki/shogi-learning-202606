@@ -41,7 +41,7 @@
 
 ### 5.1 全監査 record
 
-`record_id`, `subject_kind`, `line_name`, `seed_locator`, `provenance_class`, `coverage`, `verification`, `audit_issues` を必須とする。move-line はさらに `move_count`, `moves`, `coverage_boundary`, `evidence_note`, `segments`, `source` を必須とする。`evidence_note` は短い paraphrase とし、本文を長く転載しない。
+record は `subject_kind` を discriminator とする `catalog_item` / `move_line` の `oneOf` である。catalog item は `catalog_name`, C/`name_only`, source/evidence を持ち、move関連fieldを持たないため、Cを空のmove-lineとして擬装しない。move-line は `line_name`, `move_count`, main列の`moves`, `node_count`, main/branch全体の`nodes`, `coverage_boundary`, `segments`, source/evidenceを必須とする。`evidence_note` は短い paraphrase とし、本文を長く転載しない。
 
 ### 5.2 source
 
@@ -57,7 +57,7 @@
 | `retrieved_at` | 必須。取得を試みた UTC calendar date (`YYYY-MM-DD`) |
 | `source_license` | 必須。取得時に確認した、または現行 seed が主張する license。後者は verification note で区別 |
 
-`verification.status` は `verified`, `needs_review`, `unavailable`。`verified` のとき canonical URL、section、revision ID/timestamp が揃わなければ schema 違反である。取得不能なら値を捏造せず `null` とし、方法、時刻、理由を note に残す。
+`verification.status` は `verified`, `needs_review`, `unavailable`。verified recordでは canonical URL、section、revision ID/timestamp が必須である。取得不能なら値を捏造せず `null` とし、方法、日付、理由を note に残す。擬似的な時刻精度を避けるため、artifact生成日は`generated_on`、確認日は`verification.checked_on`というdate-only fieldにする。revision timestampだけはsourceが提供する実時刻を保持する。
 
 ### 5.3 coverage boundary と M segment
 
@@ -65,9 +65,13 @@ move-line の `covered_through_ply` は収録済み終端の 1-origin ply、`cov
 
 M は `segments` を2件以上持ち、各要素に `provenance_class`（A/B のみ）、包含的 `start_ply` / `end_ply`、`source_section`, `evidence_note` を持つ。範囲は 1 から `move_count` までを隙間・重複なく覆い、昇順で、少なくとも A と B を各1件含む。同じ section でも根拠種別が変わる境界で分割する。A/B の単一 provenance line は `segments: []` とする。
 
+### 5.4 main / branch node snapshot
+
+`moves`はlegacy main列のcoverage boundary用であり、全着手監査の母集団ではない。`nodes`がPR-B adapter後のcanonical tree snapshotで、各nodeは`move_key`, `parent_key`, `usi`, `is_main`, `sort_order`, `variation_group`を持つ。さらに各node自身が`provenance`（A/B、section、evidence note、review status）を持ち、line/mainの根拠をbranchへ暗黙継承しない。`node_count == len(nodes)`、keyのline内一意性、parent存在、非rootの直接親接続、およびseedを`_opening_move_nodes`へ通した結果との完全一致をD1 validatorで検査する。
+
 ## 6. machine-readable artifact の読み方
 
-監査 artifact は seed snapshot にある `backend/app/seed.py` の `SAMPLE_OPENING_LINES` 全件を機械抽出した、一行一 record の棚卸しである。`audit_issues` は既存データまたは外部確認の未完了を隠さず記録するための field であり、配列が空であることを schema 適合条件にはしない。つまり **schema valid は production metadata verified/compliant と同義ではない**。
+監査 artifact は seed snapshot にある `backend/app/seed.py` の `SAMPLE_OPENING_LINES` 全件を機械抽出した、一line一 record、main/branchを合わせた全328 nodeの棚卸しである。`audit_issues` は既存データまたは外部確認の未完了を隠さず記録するための field であり、配列が空であることを schema 適合条件にはしない。つまり **schema valid は production metadata verified/compliant と同義ではない**。
 
 2026-08-15 の監査では shell の HTTPS proxy が 403、別の web retrieval が 401 を返したため、全 source の current revision、redirect、canonical URL、section の存在を確認できなかった。したがって全34件を `unavailable`、revision/canonical を `null` とした。requested URL、legacy note/license/section は seed から機械抽出した値であり「current Wikipedia で確認済み」ではない。section が seed にない31件は `source_section_missing_in_seed`、升田式石田流には既知の終端主張不一致を記録した。
 
@@ -84,9 +88,10 @@ PR-D1 の production validator は最低限、次を失敗にする。
 7. `source_note` / `evidence_note` が `moves` にない後続を「手順化」「収録済み」と主張する。未収録なら `omitted_after` と明記する。
 8. requested/canonical URL の混同、verified record の revision/timestamp 欠落、redirect/section 確認漏れ。
 9. branch/main の根拠を別 branch/segment に暗黙継承すること。
+10. `node_count`、stable `move_key` / `parent_key`、USI、semantic main、表示順、variation groupがseedのcanonical node treeと一致しないこと。
 
 特に升田式石田流の現行 moves は7手目 `5i4h` までだが、note は次の `7h7f` も「手順化」と主張する。D0 は seed を直さず artifact の issue と [`fixtures/opening-wikipedia-provenance-invalid-masuda.json`](fixtures/opening-wikipedia-provenance-invalid-masuda.json) に固定し、D1 validator が `note_claims_unrecorded_move` を返すことを要求する。
 
 ## 8. fixture の期待値
 
-[`fixtures/opening-wikipedia-provenance-valid.json`](fixtures/opening-wikipedia-provenance-valid.json) は終端境界が一致する A の最小例である。invalid fixture は JSON としては正しく、意図的に semantic contract に違反する。fixture の `expected_errors` は将来の validator の安定した error code 契約であり、production audit schema の対象外とする。
+[`fixtures/opening-wikipedia-provenance-valid.json`](fixtures/opening-wikipedia-provenance-valid.json) は終端境界が一致する A のsemantic最小例である。[`fixtures/opening-wikipedia-provenance-valid-name-only.json`](fixtures/opening-wikipedia-provenance-valid-name-only.json) はproduction schemaに適合するC/catalog artifactであり、move fieldを持たない。invalid fixture は JSON としては正しく、意図的にsemantic contractに違反する。fixtureの`expected_errors`は将来のvalidatorの安定したerror code契約であり、production audit schemaの対象外とする。
