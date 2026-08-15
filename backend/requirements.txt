@@ -3,4 +3,5 @@ uvicorn[standard]>=0.29
 pydantic>=2.9
 python-shogi>=1.1.1
 pytest>=8.0
+jsonschema>=4.23
 httpx2>=2.0

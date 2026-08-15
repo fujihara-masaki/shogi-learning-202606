@@ -897,11 +897,19 @@ def test_wikipedia_long_seed_branches_are_idempotent_and_replayable(client):
     conn = get_connection()
     try:
         before = conn.execute("SELECT COUNT(*) AS c FROM opening_lines").fetchone()["c"]
+        before_nodes = [tuple(row) for row in conn.execute(
+            """SELECT id, line_id, move_key, parent_move_id, usi, is_main, sort_order,
+                      variation_group FROM opening_line_moves ORDER BY id"""
+        ).fetchall()]
         seed_openings_if_empty(conn)
         seed_openings_if_empty(conn)
         conn.commit()
         after = conn.execute("SELECT COUNT(*) AS c FROM opening_lines").fetchone()["c"]
         assert after == before
+        assert [tuple(row) for row in conn.execute(
+            """SELECT id, line_id, move_key, parent_move_id, usi, is_main, sort_order,
+                      variation_group FROM opening_line_moves ORDER BY id"""
+        ).fetchall()] == before_nodes
         assert find_duplicate_opening_sibling_moves(conn) == []
     finally:
         conn.close()
@@ -927,6 +935,21 @@ def test_wikipedia_long_seed_branches_are_idempotent_and_replayable(client):
     onigoroshi = client.get(f"/api/openings/{ids['原始鬼殺し（Wikipedia明示手順）']}").json()
     branches = [m for m in onigoroshi["moves"] if m["variation_group"] != "main"]
     assert {m["variation_group"] for m in branches} == {"△6二銀の対応", "△6二金の有効な受け"}
+
+    masuda_list = next(line for line in client.get("/api/openings").json() if line["id"] == ids["升田式石田流（Wikipedia明示手順）"])
+    masuda = client.get(f"/api/openings/{masuda_list['id']}").json()
+    expected_source = {
+        "source_url": "https://ja.wikipedia.org/wiki/石田流",
+        "source_title": "Wikipedia 石田流",
+        "source_note": "升田式石田流節の▲7六歩△3四歩▲7五歩△8四歩▲7八飛△8五歩▲4八玉までを収録。続く▲7六飛（7h7f）は未収録。",
+        "coverage_status": "Wikipedia本文の▲4八玉まで収録（続く▲7六飛は未収録）",
+        "source_type": "wikipedia",
+        "source_section": "升田式石田流",
+        "source_license": "CC BY-SA 4.0",
+        "source_retrieved_at": "2026-07-03",
+    }
+    assert {key: masuda["source"][key] for key in expected_source} == expected_source
+    assert {key: masuda_list["source"][key] for key in expected_source} == expected_source
     main_sfen = {pos["ply"]: pos["sfen"] for pos in onigoroshi["positions"]}
     for group in {m["variation_group"] for m in branches}:
         branch_moves = sorted([m for m in branches if m["variation_group"] == group], key=lambda m: m["ply"])

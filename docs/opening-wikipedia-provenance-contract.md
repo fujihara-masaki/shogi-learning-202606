@@ -77,6 +77,13 @@ verified M は `segments` を2件以上持ち、各要素に `provenance_class`�
 
 ## 7. PR-D1 validator の規範要件
 
+実装は `backend/app/scripts/validate_opening_wikipedia_provenance.py` に置く。JSON
+Schema と semantic rule、ならびに seed の canonical direct-parent tree snapshot を
+offline/CI で検査し、app 起動時には読み込まない。revision と node/segment provenance
+は正規化監査 artifact が唯一の保存先である。現行 DB の line-level 列では segment や
+branch ごとの根拠を正確に表現できないため、新規 DB 列は追加しない。将来 API/UI で
+公開する場合は、別 PR で保存モデルを設計する。
+
 PR-D1 の production validator は最低限、次を失敗にする。
 
 1. Wikipedia move-line の必須 metadata 欠落、または source section/revision/retrieved date/license の欠落。

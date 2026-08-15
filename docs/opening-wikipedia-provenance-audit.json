@@ -3769,7 +3769,7 @@
       ],
       "provenance_class": "explicit_sequence",
       "coverage": "partial_explicit_sequence",
-      "legacy_coverage_status": "Wikipedia本文明示の初手からの手順",
+      "legacy_coverage_status": "Wikipedia本文の▲4八玉まで収録（続く▲7六飛は未収録）",
       "source": {
         "source_type": "wikipedia",
         "source_title": "Wikipedia 石田流",
@@ -3786,7 +3786,7 @@
         "covered_through_move": "5i4h",
         "omitted_after": "7h7f"
       },
-      "evidence_note": "升田式石田流節の▲7六歩△3四歩▲7五歩△8四歩▲7八飛△8五歩▲4八玉、および実戦以下▲7六飛を手順化。",
+      "evidence_note": "升田式石田流節の▲7六歩△3四歩▲7五歩△8四歩▲7八飛△8五歩▲4八玉までを収録。続く▲7六飛（7h7f）は未収録。",
       "segments": [],
       "verification": {
         "status": "unavailable",
@@ -3794,9 +3794,7 @@
         "note": "Network access was denied (shell CONNECT tunnel HTTP 403; web retrieval HTTP 401). Revision, redirect, canonical URL, and current section presence were not verified and are not inferred.",
         "checked_on": "2026-08-15"
       },
-      "audit_issues": [
-        "source_note_claims_unrecorded_move_7h7f"
-      ],
+      "audit_issues": [],
       "node_count": 7,
       "nodes": [
         {
@@ -3809,7 +3807,7 @@
           "provenance": {
             "provenance_class": "explicit_sequence",
             "source_section": "升田式石田流",
-            "evidence_note": "升田式石田流節の▲7六歩△3四歩▲7五歩△8四歩▲7八飛△8五歩▲4八玉、および実戦以下▲7六飛を手順化。",
+            "evidence_note": "升田式石田流節の▲7六歩△3四歩▲7五歩△8四歩▲7八飛△8五歩▲4八玉までを収録。続く▲7六飛（7h7f）は未収録。",
             "review_status": "unavailable"
           }
         },
@@ -3823,7 +3821,7 @@
           "provenance": {
             "provenance_class": "explicit_sequence",
             "source_section": "升田式石田流",
-            "evidence_note": "升田式石田流節の▲7六歩△3四歩▲7五歩△8四歩▲7八飛△8五歩▲4八玉、および実戦以下▲7六飛を手順化。",
+            "evidence_note": "升田式石田流節の▲7六歩△3四歩▲7五歩△8四歩▲7八飛△8五歩▲4八玉までを収録。続く▲7六飛（7h7f）は未収録。",
             "review_status": "unavailable"
           }
         },
@@ -3837,7 +3835,7 @@
           "provenance": {
             "provenance_class": "explicit_sequence",
             "source_section": "升田式石田流",
-            "evidence_note": "升田式石田流節の▲7六歩△3四歩▲7五歩△8四歩▲7八飛△8五歩▲4八玉、および実戦以下▲7六飛を手順化。",
+            "evidence_note": "升田式石田流節の▲7六歩△3四歩▲7五歩△8四歩▲7八飛△8五歩▲4八玉までを収録。続く▲7六飛（7h7f）は未収録。",
             "review_status": "unavailable"
           }
         },
@@ -3851,7 +3849,7 @@
           "provenance": {
             "provenance_class": "explicit_sequence",
             "source_section": "升田式石田流",
-            "evidence_note": "升田式石田流節の▲7六歩△3四歩▲7五歩△8四歩▲7八飛△8五歩▲4八玉、および実戦以下▲7六飛を手順化。",
+            "evidence_note": "升田式石田流節の▲7六歩△3四歩▲7五歩△8四歩▲7八飛△8五歩▲4八玉までを収録。続く▲7六飛（7h7f）は未収録。",
             "review_status": "unavailable"
           }
         },
@@ -3865,7 +3863,7 @@
           "provenance": {
             "provenance_class": "explicit_sequence",
             "source_section": "升田式石田流",
-            "evidence_note": "升田式石田流節の▲7六歩△3四歩▲7五歩△8四歩▲7八飛△8五歩▲4八玉、および実戦以下▲7六飛を手順化。",
+            "evidence_note": "升田式石田流節の▲7六歩△3四歩▲7五歩△8四歩▲7八飛△8五歩▲4八玉までを収録。続く▲7六飛（7h7f）は未収録。",
             "review_status": "unavailable"
           }
         },
@@ -3879,7 +3877,7 @@
           "provenance": {
             "provenance_class": "explicit_sequence",
             "source_section": "升田式石田流",
-            "evidence_note": "升田式石田流節の▲7六歩△3四歩▲7五歩△8四歩▲7八飛△8五歩▲4八玉、および実戦以下▲7六飛を手順化。",
+            "evidence_note": "升田式石田流節の▲7六歩△3四歩▲7五歩△8四歩▲7八飛△8五歩▲4八玉までを収録。続く▲7六飛（7h7f）は未収録。",
             "review_status": "unavailable"
           }
         },
@@ -3893,7 +3891,7 @@
           "provenance": {
             "provenance_class": "explicit_sequence",
             "source_section": "升田式石田流",
-            "evidence_note": "升田式石田流節の▲7六歩△3四歩▲7五歩△8四歩▲7八飛△8五歩▲4八玉、および実戦以下▲7六飛を手順化。",
+            "evidence_note": "升田式石田流節の▲7六歩△3四歩▲7五歩△8四歩▲7八飛△8五歩▲4八玉までを収録。続く▲7六飛（7h7f）は未収録。",
             "review_status": "unavailable"
           }
         }
