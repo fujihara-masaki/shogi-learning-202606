@@ -6,6 +6,7 @@ from types import SimpleNamespace
 import pytest
 
 from app.scripts.validate_opening_wikipedia_provenance import (
+    ValidationError,
     _declared_snapshot_errors,
     _extract_snapshot_seed_lines,
     validate_artifact,
@@ -182,6 +183,59 @@ def test_seed_retrieved_date_is_not_compared_with_audit_attempt_date():
     seed_lines = deepcopy(SAMPLE_OPENING_LINES)
     seed_lines[0]["source_retrieved_at"] = "2000-01-01"
     assert validate_artifact(artifact, None, seed_lines) == []
+
+
+def test_seed_entry_without_name_is_stable_validation_error():
+    artifact = json.loads((DOCS / "opening-wikipedia-provenance-audit.json").read_text())
+    seed_lines = deepcopy(SAMPLE_OPENING_LINES)
+    del seed_lines[0]["name"]
+    invalid = [
+        error for error in validate_artifact(artifact, None, seed_lines)
+        if error.code == "seed_entry_invalid"
+    ]
+    assert invalid == [ValidationError("seed_entry_invalid", path="seed_lines[0]")]
+
+
+def test_non_dict_seed_entry_is_stable_validation_error():
+    artifact = json.loads((DOCS / "opening-wikipedia-provenance-audit.json").read_text())
+    seed_lines = deepcopy(SAMPLE_OPENING_LINES)
+    seed_lines[0] = None
+    invalid = [
+        error for error in validate_artifact(artifact, None, seed_lines)
+        if error.code == "seed_entry_invalid"
+    ]
+    assert invalid == [ValidationError("seed_entry_invalid", path="seed_lines[0]")]
+
+
+def test_invalid_seed_entry_does_not_stop_later_metadata_validation():
+    artifact = json.loads((DOCS / "opening-wikipedia-provenance-audit.json").read_text())
+    seed_lines = deepcopy(SAMPLE_OPENING_LINES)
+    seed_lines[0] = None
+    seed_lines[1]["source_title"] = "later line metadata drift"
+    codes = {error.code for error in validate_artifact(artifact, None, seed_lines)}
+    assert {"seed_entry_invalid", "seed_metadata_source_title_mismatch"} <= codes
+
+
+def test_seed_metadata_normalization_failure_is_stable_error(monkeypatch):
+    artifact = json.loads((DOCS / "opening-wikipedia-provenance-audit.json").read_text())
+    seed_lines = deepcopy(SAMPLE_OPENING_LINES)
+    from app import seed as seed_module
+
+    original = seed_module._opening_source_metadata
+
+    def malformed_metadata(line):
+        if line["name"] == seed_lines[0]["name"]:
+            raise TypeError("malformed metadata")
+        return original(line)
+
+    monkeypatch.setattr(seed_module, "_opening_source_metadata", malformed_metadata)
+    invalid = [
+        error for error in validate_artifact(artifact, None, seed_lines)
+        if error.code == "seed_entry_invalid"
+    ]
+    assert len(invalid) == 1
+    assert invalid[0].record_id == artifact["records"][0]["record_id"]
+    assert invalid[0].path == "seed_lines[0]"
 
 
 @pytest.mark.parametrize("invalid_move", ["xxxx", "1a1b"])

@@ -196,21 +196,37 @@ def _seed_errors(artifact: dict[str, Any], seed_lines: list[dict[str, Any]]) -> 
     from app.seed import _opening_source_metadata
 
     records = {record.get("line_name"): record for record in artifact.get("records", []) if record.get("subject_kind") == "move_line"}
-    # Membership comes from the canonical audit, rather than mutable source
-    # metadata, so changing source_type/source_url cannot make a line disappear
-    # from the comparison it is meant to fail.
-    wikipedia = [
-        line for line in seed_lines
-        if line.get("name") in records
-        or _opening_source_metadata(line).get("source_type") in {"wikipedia", "wikibooks"}
-    ]
     errors: list[ValidationError] = []
+    normalized: list[tuple[dict[str, Any], dict[str, Any]]] = []
+    for index, raw_line in enumerate(seed_lines):
+        path = f"seed_lines[{index}]"
+        if not isinstance(raw_line, dict):
+            errors.append(ValidationError("seed_entry_invalid", path=path))
+            continue
+        name = raw_line.get("name")
+        if not isinstance(name, str) or not name:
+            errors.append(ValidationError("seed_entry_invalid", path=path))
+            continue
+        try:
+            metadata = _opening_source_metadata(raw_line)
+        except (ValueError, TypeError, AttributeError, KeyError):
+            errors.append(_error("seed_entry_invalid", records.get(name), path))
+            continue
+        normalized.append((raw_line, metadata))
+
+    # Membership is the union of audited names and normalized current source
+    # types.  Thus metadata drift cannot hide an existing line and a newly
+    # introduced Wikipedia/Wikibooks line cannot evade the audit.
+    wikipedia = [
+        (line, metadata) for line, metadata in normalized
+        if line["name"] in records or metadata.get("source_type") in {"wikipedia", "wikibooks"}
+    ]
     snapshot_line_count = artifact.get("seed_snapshot", {}).get("line_count")
     if snapshot_line_count != len(records) or snapshot_line_count != len(wikipedia):
         errors.append(_error("seed_snapshot_line_count_mismatch"))
     if len(records) != len(wikipedia):
         errors.append(_error("seed_line_count_mismatch"))
-    for line in wikipedia:
+    for line, metadata in wikipedia:
         record = records.get(line["name"])
         if not record:
             errors.append(ValidationError("seed_line_missing", line["name"]))
@@ -230,7 +246,6 @@ def _seed_errors(artifact: dict[str, Any], seed_lines: list[dict[str, Any]]) -> 
             errors.append(_error("seed_node_tree_mismatch", record))
         if record.get("moves") != line.get("moves"):
             errors.append(_error("seed_main_moves_mismatch", record))
-        metadata = _opening_source_metadata(line)
         source = record.get("source", {})
         comparisons = {
             "source_url": (metadata.get("source_url"), source.get("requested_url")),
