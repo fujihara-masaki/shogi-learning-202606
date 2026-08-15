@@ -1,0 +1,98 @@
+{
+  "schema_version": "1.0.0",
+  "artifact_type": "wikipedia_opening_provenance_audit",
+  "generated_on": "2026-08-15",
+  "seed_snapshot": {
+    "commit": "3d4b48fe7464b7e36145a51dfdee1d2d2bfe8d51",
+    "source_file": "backend/app/seed.py",
+    "line_count": 1,
+    "node_count": 2
+  },
+  "records": [
+    {
+      "record_id": "fixture:mixed-verified",
+      "subject_kind": "move_line",
+      "line_name": "境界・section検証済みのmixed例",
+      "seed_locator": "docs fixture",
+      "move_count": 2,
+      "moves": [
+        "7g7f",
+        "3c3d"
+      ],
+      "node_count": 2,
+      "nodes": [
+        {
+          "move_key": "main-1",
+          "parent_key": null,
+          "usi": "7g7f",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "explicit_sequence",
+            "source_section": "検証済みMixed",
+            "evidence_note": "分類とsectionを検証済み。",
+            "review_status": "verified"
+          }
+        },
+        {
+          "move_key": "main-2",
+          "parent_key": "main-1",
+          "usi": "3c3d",
+          "is_main": true,
+          "sort_order": 0,
+          "variation_group": "main",
+          "provenance": {
+            "provenance_class": "diagram_reconstruction",
+            "source_section": "検証済みMixed",
+            "evidence_note": "分類とsectionを検証済み。",
+            "review_status": "verified"
+          }
+        }
+      ],
+      "provenance_class": "mixed",
+      "coverage": "mixed",
+      "legacy_coverage_status": "fixture: unavailable mixed",
+      "source": {
+        "source_type": "wikipedia",
+        "source_title": "Wikipedia 検証済みMixed例",
+        "requested_url": "https://ja.wikipedia.org/wiki/検証済みMixed例",
+        "canonical_url": "https://ja.wikipedia.org/wiki/検証済みMixed例",
+        "source_section": "検証済みMixed",
+        "revision_id": 123456789,
+        "revision_timestamp": "2026-08-14T12:34:56Z",
+        "retrieved_at": "2026-08-15",
+        "source_license": "CC BY-SA 4.0"
+      },
+      "coverage_boundary": {
+        "covered_through_ply": 2,
+        "covered_through_move": "3c3d",
+        "omitted_after": null
+      },
+      "evidence_note": "A/B境界と全segmentのsectionを検証済みのfixture。",
+      "segments": [
+        {
+          "provenance_class": "explicit_sequence",
+          "start_ply": 1,
+          "end_ply": 1,
+          "source_section": "検証済みMixed",
+          "evidence_note": "分類、境界、sectionを検証済み。"
+        },
+        {
+          "provenance_class": "diagram_reconstruction",
+          "start_ply": 2,
+          "end_ply": 2,
+          "source_section": "検証済みMixed",
+          "evidence_note": "分類、境界、sectionを検証済み。"
+        }
+      ],
+      "verification": {
+        "status": "verified",
+        "method": "fixture-controlled mixed evidence",
+        "checked_on": "2026-08-15",
+        "note": "verified Mの全segment section制約を検証する。"
+      },
+      "audit_issues": []
+    }
+  ]
+}

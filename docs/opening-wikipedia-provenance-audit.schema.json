@@ -694,7 +694,22 @@
                       }
                     }
                   }
-                ]
+                ],
+                "items": {
+                  "allOf": [
+                    {
+                      "$ref": "#/definitions/segment"
+                    },
+                    {
+                      "properties": {
+                        "source_section": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      }
+                    }
+                  ]
+                }
               }
             }
           }
