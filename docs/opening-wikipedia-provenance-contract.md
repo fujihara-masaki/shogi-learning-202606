@@ -63,7 +63,7 @@ record は `subject_kind` を discriminator とする `catalog_item` / `move_lin
 
 move-line の `covered_through_ply` は収録済み終端の 1-origin ply、`covered_through_move` はその USI、`omitted_after` は判明している未収録の後続（なければ `null`）である。終端は `covered_through_ply == move_count == len(moves)` かつ `covered_through_move == moves[-1]` を満たす。
 
-M は `segments` を2件以上持ち、各要素に `provenance_class`（A/B のみ）、包含的 `start_ply` / `end_ply`、`source_section`, `evidence_note` を持つ。範囲は 1 から `move_count` までを隙間・重複なく覆い、昇順で、少なくとも A と B を各1件含む。同じ section でも根拠種別が変わる境界で分割する。外部取得不能な `unavailable` / `needs_review` recordでは未知のsegment sectionを推測せず`null`にできる。一方、`verified`なMは**全segment**の`source_section`が非空でなければならず、D1 validatorは未解決sectionをrejectする。A/B の単一 provenance line は必ず `segments: []` とし、schemaもnon-empty配列を拒否する。
+verified M は `segments` を2件以上持ち、各要素に `provenance_class`（A/B のみ）、包含的 `start_ply` / `end_ply`、`source_section`, `evidence_note` を持つ。範囲は 1 から `move_count` までを隙間・重複なく覆い、昇順で、AとBを各1件以上含む。同じsectionでも根拠種別が変わる境界で分割する。外部取得不能な`unavailable` / `needs_review` MでA/B境界を確認できない場合に限り、`segments: []`とnodeの`provenance_class: null`を許し、`mixed_segment_boundary_unresolved` audit issueを必須とする。境界を推測して仮segmentを作ってはならない。`review_status: verified`のnodeとverified move-lineの全nodeはA/Bいずれかが必須である。verified Mは全segmentのsectionが非空でなければならず、D1 validatorは未解決境界、範囲不備、未分類node、未解決sectionをrejectする。A/B の単一 provenance line は必ず `segments: []` とし、schemaもnon-empty配列を拒否する。
 
 ### 5.4 main / branch node snapshot
 
@@ -73,7 +73,7 @@ M は `segments` を2件以上持ち、各要素に `provenance_class`（A/B の
 
 監査 artifact は seed snapshot にある `backend/app/seed.py` の `SAMPLE_OPENING_LINES` 全件を機械抽出した、一line一 record、main/branchを合わせた全328 nodeの棚卸しである。`audit_issues` は既存データまたは外部確認の未完了を隠さず記録するための field であり、配列が空であることを schema 適合条件にはしない。つまり **schema valid は production metadata verified/compliant と同義ではない**。
 
-2026-08-15 の監査では shell の HTTPS proxy が 403、別の web retrieval が 401 を返したため、全 source の current revision、redirect、canonical URL、section の存在を確認できなかった。したがって全34件を `unavailable`、revision/canonical を `null` とした。requested URL、legacy note/license/section は seed から機械抽出した値であり「current Wikipedia で確認済み」ではない。section が seed にない31件は `source_section_missing_in_seed`、升田式石田流には既知の終端主張不一致を記録した。
+2026-08-15 の監査では shell の HTTPS proxy が 403、別の web retrieval が 401 を返したため、全 source の current revision、redirect、canonical URL、section の存在を確認できなかった。したがって全34件を `unavailable`、revision/canonical を `null` とした。requested URL、legacy note/license/section は seed から機械抽出した値であり「current Wikipedia で確認済み」ではない。section が seed にない31件は `source_section_missing_in_seed`、升田式石田流には既知の終端主張不一致を記録した。新・早石田は既存noteが本文・図示の混在を主張するためMとしたが、A/B境界を推測せず`mixed_segment_boundary_unresolved`として保持する。
 
 ## 7. PR-D1 validator の規範要件
 
@@ -82,7 +82,7 @@ PR-D1 の production validator は最低限、次を失敗にする。
 1. Wikipedia move-line の必須 metadata 欠落、または source section/revision/retrieved date/license の欠落。
 2. provenance/coverage が列挙外、または第3節にない組合せ。
 3. C/catalog record から move seed を生成、または catalog provenance を move-line evidence として継承。
-4. M に segment がない、A/B 両方を含まない、範囲に隙間・重複・逆転・範囲外がある。
+4. M の境界が`mixed_segment_boundary_unresolved`のまま、segmentがA/B両方を含まない、範囲に隙間・重複・逆転・範囲外がある、またはverified nodeがA/B未分類である。
 5. `move_count != len(moves)`、`covered_through_ply != len(moves)`、または終端 USI 不一致。
 6. A の各 move が cited revision/section の連続本文列で確認できない、B を A と表示、または Wikipedia にない中間手を他の知識で補完。
 7. `source_note` / `evidence_note` が `moves` にない後続を「手順化」「収録済み」と主張する。未収録なら `omitted_after` と明記する。
@@ -94,4 +94,4 @@ PR-D1 の production validator は最低限、次を失敗にする。
 
 ## 8. fixture の期待値
 
-[`fixtures/opening-wikipedia-provenance-valid.json`](fixtures/opening-wikipedia-provenance-valid.json) はsource、verified revision/section/license、coverage boundary、canonical node treeをすべて持つproduction `move_line` fixtureで、`expected_errors: []`まで含めてproduction schemaに適合する。[`fixtures/opening-wikipedia-provenance-valid-name-only.json`](fixtures/opening-wikipedia-provenance-valid-name-only.json) はunavailableなC/catalog artifact、[`fixtures/opening-wikipedia-provenance-valid-name-only-verified.json`](fixtures/opening-wikipedia-provenance-valid-name-only-verified.json) は記事全体を根拠としてverifiedだがsectionは`null`のC/catalog artifactであり、いずれもmove fieldを持たない。[`fixtures/opening-wikipedia-provenance-valid-mixed-unavailable.json`](fixtures/opening-wikipedia-provenance-valid-mixed-unavailable.json) は取得不能なMのsegment sectionを`null`のまま保持できるschema fixtureである。top-levelの任意`expected_errors`はfixtureに期待するD1 validator error codeの配列で、通常のaudit artifactは省略する。invalid Masuda fixtureはproduction artifactそのものではなく、意図的なsemantic違反と期待error codeを固定するvalidator入力である。
+[`fixtures/opening-wikipedia-provenance-valid.json`](fixtures/opening-wikipedia-provenance-valid.json) はsource、verified revision/section/license、coverage boundary、canonical node treeをすべて持つproduction `move_line` fixtureで、`expected_errors: []`まで含めてproduction schemaに適合する。[`fixtures/opening-wikipedia-provenance-valid-name-only.json`](fixtures/opening-wikipedia-provenance-valid-name-only.json) はunavailableなC/catalog artifact、[`fixtures/opening-wikipedia-provenance-valid-name-only-verified.json`](fixtures/opening-wikipedia-provenance-valid-name-only-verified.json) は記事全体を根拠としてverifiedだがsectionは`null`のC/catalog artifactである。[`fixtures/opening-wikipedia-provenance-valid-mixed-unavailable.json`](fixtures/opening-wikipedia-provenance-valid-mixed-unavailable.json) は取得不能だが境界を記録済みのM、[`fixtures/opening-wikipedia-provenance-valid-mixed-unresolved.json`](fixtures/opening-wikipedia-provenance-valid-mixed-unresolved.json) は境界を捏造せず空segment・未分類node・明示issueで保持する監査途中状態のschema fixtureである。top-levelの任意`expected_errors`はfixtureに期待するD1 validator error codeの配列で、通常のaudit artifactは省略する。invalid Masuda fixtureはproduction artifactそのものではなく、意図的なsemantic違反と期待error codeを固定するvalidator入力である。

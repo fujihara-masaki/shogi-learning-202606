@@ -3620,8 +3620,8 @@
         "8d8e",
         "7e7d"
       ],
-      "provenance_class": "explicit_sequence",
-      "coverage": "partial_explicit_sequence",
+      "provenance_class": "mixed",
+      "coverage": "mixed",
       "legacy_coverage_status": "Wikipedia本文明示の初手からの手順",
       "source": {
         "source_type": "wikipedia",
@@ -3639,7 +3639,7 @@
         "covered_through_move": "7e7d",
         "omitted_after": null
       },
-      "evidence_note": "新・早石田節の第7手▲7四歩までの本文・図示手順を対象化。以降は本文にある範囲のみ。",
+      "evidence_note": "Wikipedia本文と図示に基づく手が混在すると現行seed noteは主張するが、外部取得不能のためA/B境界は未確認。",
       "segments": [],
       "verification": {
         "status": "unavailable",
@@ -3647,7 +3647,9 @@
         "note": "Network access was denied (shell CONNECT tunnel HTTP 403; web retrieval HTTP 401). Revision, redirect, canonical URL, and current section presence were not verified and are not inferred.",
         "checked_on": "2026-08-15"
       },
-      "audit_issues": [],
+      "audit_issues": [
+        "mixed_segment_boundary_unresolved"
+      ],
       "node_count": 7,
       "nodes": [
         {
@@ -3658,9 +3660,9 @@
           "sort_order": 0,
           "variation_group": "main",
           "provenance": {
-            "provenance_class": "explicit_sequence",
+            "provenance_class": null,
             "source_section": "新・早石田",
-            "evidence_note": "新・早石田節の第7手▲7四歩までの本文・図示手順を対象化。以降は本文にある範囲のみ。",
+            "evidence_note": "本文・図示のどちらに基づくか外部取得不能のため未確認。",
             "review_status": "unavailable"
           }
         },
@@ -3672,9 +3674,9 @@
           "sort_order": 0,
           "variation_group": "main",
           "provenance": {
-            "provenance_class": "explicit_sequence",
+            "provenance_class": null,
             "source_section": "新・早石田",
-            "evidence_note": "新・早石田節の第7手▲7四歩までの本文・図示手順を対象化。以降は本文にある範囲のみ。",
+            "evidence_note": "本文・図示のどちらに基づくか外部取得不能のため未確認。",
             "review_status": "unavailable"
           }
         },
@@ -3686,9 +3688,9 @@
           "sort_order": 0,
           "variation_group": "main",
           "provenance": {
-            "provenance_class": "explicit_sequence",
+            "provenance_class": null,
             "source_section": "新・早石田",
-            "evidence_note": "新・早石田節の第7手▲7四歩までの本文・図示手順を対象化。以降は本文にある範囲のみ。",
+            "evidence_note": "本文・図示のどちらに基づくか外部取得不能のため未確認。",
             "review_status": "unavailable"
           }
         },
@@ -3700,9 +3702,9 @@
           "sort_order": 0,
           "variation_group": "main",
           "provenance": {
-            "provenance_class": "explicit_sequence",
+            "provenance_class": null,
             "source_section": "新・早石田",
-            "evidence_note": "新・早石田節の第7手▲7四歩までの本文・図示手順を対象化。以降は本文にある範囲のみ。",
+            "evidence_note": "本文・図示のどちらに基づくか外部取得不能のため未確認。",
             "review_status": "unavailable"
           }
         },
@@ -3714,9 +3716,9 @@
           "sort_order": 0,
           "variation_group": "main",
           "provenance": {
-            "provenance_class": "explicit_sequence",
+            "provenance_class": null,
             "source_section": "新・早石田",
-            "evidence_note": "新・早石田節の第7手▲7四歩までの本文・図示手順を対象化。以降は本文にある範囲のみ。",
+            "evidence_note": "本文・図示のどちらに基づくか外部取得不能のため未確認。",
             "review_status": "unavailable"
           }
         },
@@ -3728,9 +3730,9 @@
           "sort_order": 0,
           "variation_group": "main",
           "provenance": {
-            "provenance_class": "explicit_sequence",
+            "provenance_class": null,
             "source_section": "新・早石田",
-            "evidence_note": "新・早石田節の第7手▲7四歩までの本文・図示手順を対象化。以降は本文にある範囲のみ。",
+            "evidence_note": "本文・図示のどちらに基づくか外部取得不能のため未確認。",
             "review_status": "unavailable"
           }
         },
@@ -3742,9 +3744,9 @@
           "sort_order": 0,
           "variation_group": "main",
           "provenance": {
-            "provenance_class": "explicit_sequence",
+            "provenance_class": null,
             "source_section": "新・早石田",
-            "evidence_note": "新・早石田節の第7手▲7四歩までの本文・図示手順を対象化。以降は本文にある範囲のみ。",
+            "evidence_note": "本文・図示のどちらに基づくか外部取得不能のため未確認。",
             "review_status": "unavailable"
           }
         }

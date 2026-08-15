@@ -215,7 +215,8 @@
         "provenance_class": {
           "enum": [
             "explicit_sequence",
-            "diagram_reconstruction"
+            "diagram_reconstruction",
+            null
           ]
         },
         "source_section": {
@@ -232,7 +233,28 @@
             "needs_review"
           ]
         }
-      }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "review_status": {
+                "const": "verified"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "provenance_class": {
+                "enum": [
+                  "explicit_sequence",
+                  "diagram_reconstruction"
+                ]
+              }
+            }
+          }
+        }
+      ]
     },
     "moveNode": {
       "type": "object",
@@ -518,7 +540,34 @@
                 "const": "mixed"
               },
               "segments": {
-                "minItems": 2
+                "anyOf": [
+                  {
+                    "maxItems": 0
+                  },
+                  {
+                    "minItems": 2,
+                    "allOf": [
+                      {
+                        "contains": {
+                          "properties": {
+                            "provenance_class": {
+                              "const": "explicit_sequence"
+                            }
+                          }
+                        }
+                      },
+                      {
+                        "contains": {
+                          "properties": {
+                            "provenance_class": {
+                              "const": "diagram_reconstruction"
+                            }
+                          }
+                        }
+                      }
+                    ]
+                  }
+                ]
               }
             }
           }
@@ -528,6 +577,127 @@
         },
         {
           "$ref": "#/definitions/verifiedMoveSectionConstraint"
+        },
+        {
+          "if": {
+            "allOf": [
+              {
+                "properties": {
+                  "provenance_class": {
+                    "const": "mixed"
+                  }
+                }
+              },
+              {
+                "properties": {
+                  "segments": {
+                    "maxItems": 0
+                  }
+                }
+              }
+            ]
+          },
+          "then": {
+            "properties": {
+              "audit_issues": {
+                "contains": {
+                  "const": "mixed_segment_boundary_unresolved"
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "verification": {
+                "properties": {
+                  "status": {
+                    "const": "verified"
+                  }
+                }
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "nodes": {
+                "items": {
+                  "properties": {
+                    "provenance": {
+                      "properties": {
+                        "provenance_class": {
+                          "enum": [
+                            "explicit_sequence",
+                            "diagram_reconstruction"
+                          ]
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "allOf": [
+              {
+                "properties": {
+                  "provenance_class": {
+                    "const": "mixed"
+                  }
+                }
+              },
+              {
+                "properties": {
+                  "verification": {
+                    "properties": {
+                      "status": {
+                        "const": "verified"
+                      }
+                    }
+                  }
+                }
+              }
+            ]
+          },
+          "then": {
+            "properties": {
+              "segments": {
+                "minItems": 2,
+                "allOf": [
+                  {
+                    "contains": {
+                      "properties": {
+                        "provenance_class": {
+                          "const": "explicit_sequence"
+                        },
+                        "source_section": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      }
+                    }
+                  },
+                  {
+                    "contains": {
+                      "properties": {
+                        "provenance_class": {
+                          "const": "diagram_reconstruction"
+                        },
+                        "source_section": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          }
         }
       ]
     },
