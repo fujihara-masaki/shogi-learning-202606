@@ -243,7 +243,7 @@ def _seed_errors(artifact: dict[str, Any], seed_lines: list[dict[str, Any]]) -> 
         initial = line.get("initial_sfen", shogi.STARTING_SFEN)
         try:
             prepared = _prepare_opening_move_nodes(line, initial)
-        except (ValueError, TypeError, AttributeError, KeyError):
+        except (ValueError, TypeError, AttributeError, KeyError, OverflowError):
             # The parser/legality/tree error text is intentionally not part of
             # the stable API.  Keep validating the remaining audited lines and
             # let the CLI serialize this record-scoped failure as JSON.
