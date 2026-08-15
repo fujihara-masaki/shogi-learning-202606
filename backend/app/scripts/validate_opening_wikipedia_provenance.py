@@ -214,7 +214,14 @@ def _seed_errors(artifact: dict[str, Any], seed_lines: list[dict[str, Any]]) -> 
             errors.append(ValidationError("seed_line_missing", line["name"]))
             continue
         initial = line.get("initial_sfen", shogi.STARTING_SFEN)
-        prepared = _prepare_opening_move_nodes(line, initial)
+        try:
+            prepared = _prepare_opening_move_nodes(line, initial)
+        except ValueError:
+            # The parser/legality/tree error text is intentionally not part of
+            # the stable API.  Keep validating the remaining audited lines and
+            # let the CLI serialize this record-scoped failure as JSON.
+            errors.append(_error("seed_tree_invalid", record, "seed"))
+            continue
         expected = [{"move_key": n["key"], "parent_key": n["parent_key"], "usi": n["usi"], "is_main": n["is_main"], "sort_order": n["sort_order"], "variation_group": n["variation_group"]} for n in prepared]
         actual = [{key: n.get(key) for key in expected[0]} for n in record.get("nodes", [])] if expected else []
         if {tuple(item.items()) for item in expected} != {tuple(item.items()) for item in actual}:
