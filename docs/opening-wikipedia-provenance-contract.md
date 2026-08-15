@@ -51,13 +51,13 @@ record は `subject_kind` を discriminator とする `catalog_item` / `move_lin
 | `source_title` | 必須。取得時の人間可読 title |
 | `requested_url` | 必須。seed/調査者が要求した URL。redirect 後 URL で上書きしない |
 | `canonical_url` | verified なら必須。redirect 解決後の canonical URL。取得不能時だけ `null` |
-| `source_section` | move provenance が verified なら非空必須。取得不能/既存欠落の監査表現だけ `null` |
+| `source_section` | verifiedなmove provenanceでは非空必須。catalog itemは記事ページ全体で名称を確認できるため、verifiedでも`null`可。未確認moveの監査表現も`null`可 |
 | `revision_id` | verified なら正整数必須。current revision を推測しない |
 | `revision_timestamp` | verified なら revision の UTC timestamp 必須 |
 | `retrieved_at` | 必須。取得を試みた UTC calendar date (`YYYY-MM-DD`) |
 | `source_license` | 必須。取得時に確認した、または現行 seed が主張する license。後者は verification note で区別 |
 
-`verification.status` は `verified`, `needs_review`, `unavailable`。verified recordでは canonical URL、section、revision ID/timestamp が必須である。取得不能なら値を捏造せず `null` とし、方法、日付、理由を note に残す。擬似的な時刻精度を避けるため、artifact生成日は`generated_on`、確認日は`verification.checked_on`というdate-only fieldにする。revision timestampだけはsourceが提供する実時刻を保持する。
+`verification.status` は `verified`, `needs_review`, `unavailable`。verified catalog/move共通でcanonical URLとrevision ID/timestampを必須とし、verified move-lineだけはさらにsource sectionを必須とする。verified catalogのsectionはnullableである。取得不能なら値を捏造せず`null`とし、方法、日付、理由をnoteに残す。擬似的な時刻精度を避けるため、artifact生成日は`generated_on`、確認日は`verification.checked_on`というdate-only fieldにする。revision timestampだけはsourceが提供する実時刻を保持する。
 
 ### 5.3 coverage boundary と M segment
 
@@ -94,4 +94,4 @@ PR-D1 の production validator は最低限、次を失敗にする。
 
 ## 8. fixture の期待値
 
-[`fixtures/opening-wikipedia-provenance-valid.json`](fixtures/opening-wikipedia-provenance-valid.json) はsource、verified revision/section/license、coverage boundary、canonical node treeをすべて持つproduction `move_line` fixtureで、`expected_errors: []`まで含めてproduction schemaに適合する。[`fixtures/opening-wikipedia-provenance-valid-name-only.json`](fixtures/opening-wikipedia-provenance-valid-name-only.json) はproduction schemaに適合するC/catalog artifactであり、move fieldを持たない。[`fixtures/opening-wikipedia-provenance-valid-mixed-unavailable.json`](fixtures/opening-wikipedia-provenance-valid-mixed-unavailable.json) は取得不能なMのsegment sectionを`null`のまま保持できるschema fixtureである。top-levelの任意`expected_errors`はfixtureに期待するD1 validator error codeの配列で、通常のaudit artifactは省略する。invalid Masuda fixtureはproduction artifactそのものではなく、意図的なsemantic違反と期待error codeを固定するvalidator入力である。
+[`fixtures/opening-wikipedia-provenance-valid.json`](fixtures/opening-wikipedia-provenance-valid.json) はsource、verified revision/section/license、coverage boundary、canonical node treeをすべて持つproduction `move_line` fixtureで、`expected_errors: []`まで含めてproduction schemaに適合する。[`fixtures/opening-wikipedia-provenance-valid-name-only.json`](fixtures/opening-wikipedia-provenance-valid-name-only.json) はunavailableなC/catalog artifact、[`fixtures/opening-wikipedia-provenance-valid-name-only-verified.json`](fixtures/opening-wikipedia-provenance-valid-name-only-verified.json) は記事全体を根拠としてverifiedだがsectionは`null`のC/catalog artifactであり、いずれもmove fieldを持たない。[`fixtures/opening-wikipedia-provenance-valid-mixed-unavailable.json`](fixtures/opening-wikipedia-provenance-valid-mixed-unavailable.json) は取得不能なMのsegment sectionを`null`のまま保持できるschema fixtureである。top-levelの任意`expected_errors`はfixtureに期待するD1 validator error codeの配列で、通常のaudit artifactは省略する。invalid Masuda fixtureはproduction artifactそのものではなく、意図的なsemantic違反と期待error codeを固定するvalidator入力である。
