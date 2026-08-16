@@ -41,15 +41,14 @@ def _note_claims_unrecorded_move(note: str, omitted_after: str | None) -> bool:
     recorded_claims = ("手順化", "収録済み", "収録した", "収録しています")
     exclusion = ("未収録", "収録していない", "手順化していない")
     continuation_markers = ("実戦以下", "続く", "続いて", "その後", "以降")
-    for clause in re.split(r"[。！？\n]+", note):
+    # Split both sentences and contrastive/coordinating subclauses so an
+    # exclusion for one move cannot negate a recorded claim about another.
+    for clause in re.split(r"[。！？\n、]+|(?:だが|ですが|けれども|一方|なお)", note):
         if not any(word in clause for word in recorded_claims):
             continue
         has_exclusion = any(word in clause for word in exclusion)
         mentions_omitted = bool(omitted_after and omitted_after in clause)
-        # An exclusion only negates a recorded claim in its own clause.  When
-        # the clause names the omitted USI explicitly, that target wins over an
-        # unrelated exclusion elsewhere in the same clause.
-        if has_exclusion and not mentions_omitted:
+        if has_exclusion:
             continue
         if any(marker in clause for marker in continuation_markers) or mentions_omitted:
             return True

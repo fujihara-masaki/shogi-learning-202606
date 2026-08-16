@@ -126,6 +126,22 @@ def test_exclusion_for_omitted_move_does_not_hide_unrelated_recording():
     assert "note_claims_unrecorded_move" not in {error.code for error in validate_artifact(artifact)}
 
 
+def test_same_sentence_omitted_move_exclusion_is_not_overridden_by_other_recording():
+    artifact = _valid_record_artifact()
+    record = artifact["records"][0]
+    record["coverage_boundary"]["omitted_after"] = "7h7f"
+    record["evidence_note"] = "続く7h7fは未収録だが、8h8fを収録した。"
+    assert "note_claims_unrecorded_move" not in {error.code for error in validate_artifact(artifact)}
+
+
+def test_same_sentence_omitted_move_recording_is_not_hidden_by_other_exclusion():
+    artifact = _valid_record_artifact()
+    record = artifact["records"][0]
+    record["coverage_boundary"]["omitted_after"] = "7h7f"
+    record["evidence_note"] = "続く7h7fを収録したが、8h8fは未収録。"
+    assert "note_claims_unrecorded_move" in {error.code for error in validate_artifact(artifact)}
+
+
 @pytest.mark.parametrize(
     ("artifact_text", "schema_text", "expected_codes"),
     [
