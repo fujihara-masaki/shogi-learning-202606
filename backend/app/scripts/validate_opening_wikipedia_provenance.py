@@ -46,7 +46,9 @@ def _is_valid_https_url(value: Any) -> bool:
         return False
 
 
-def _note_claims_unrecorded_move(note: str, omitted_after: str | None) -> bool:
+def _note_claims_unrecorded_move(
+    note: str, omitted_after: str | None, omitted_aliases: set[str] | None = None
+) -> bool:
     recorded_claims = ("手順化", "収録済み", "収録した", "収録しています")
     exclusion = ("未収録", "収録していない", "手順化していない")
     continuation_markers = ("実戦以下", "続く", "続いて", "その後", "以降")
@@ -56,12 +58,38 @@ def _note_claims_unrecorded_move(note: str, omitted_after: str | None) -> bool:
         if not any(word in clause for word in recorded_claims):
             continue
         has_exclusion = any(word in clause for word in exclusion)
-        mentions_omitted = bool(omitted_after and omitted_after in clause)
+        aliases = ({omitted_after} if omitted_after else set()) | (omitted_aliases or set())
+        mentions_omitted = any(alias in clause for alias in aliases)
         if has_exclusion:
             continue
         if any(marker in clause for marker in continuation_markers) or mentions_omitted:
             return True
     return False
+
+
+def _japanese_omitted_move_aliases(moves: list[str], omitted_after: str | None) -> set[str]:
+    """Derive a piece-specific Japanese alias without asserting next-ply legality."""
+    if not omitted_after or len(omitted_after) != 4 or "*" in omitted_after or omitted_after.endswith("+"):
+        return set()
+    import shogi
+
+    try:
+        board = shogi.Board()
+        for usi in moves:
+            move = shogi.Move.from_usi(usi)
+            if move not in board.legal_moves:
+                return set()
+            board.push(move)
+        omitted_move = shogi.Move.from_usi(omitted_after)
+        piece = board.piece_at(omitted_move.from_square)
+    except (ValueError, TypeError, AttributeError):
+        return set()
+    if piece is None:
+        return set()
+    rank_kanji = "一二三四五六七八九"
+    destination = omitted_after[2] + rank_kanji[ord(omitted_after[3]) - ord("a")]
+    side = "▲" if piece.color == shogi.BLACK else "△"
+    return {f"{side}{destination}{piece.japanese_symbol()}"}
 
 
 def _semantic_errors(record: dict[str, Any]) -> list[ValidationError]:
@@ -110,11 +138,12 @@ def _semantic_errors(record: dict[str, Any]) -> list[ValidationError]:
             shogi.Move.from_usi(omitted_after)
         except (ValueError, TypeError):
             errors.append(_error("omitted_after_invalid_usi", record, "coverage_boundary.omitted_after"))
+    omitted_aliases = _japanese_omitted_move_aliases(moves, omitted_after)
 
     notes = [record.get("evidence_note", "")]
     notes += [node.get("provenance", {}).get("evidence_note", "") for node in nodes]
     notes += [segment.get("evidence_note", "") for segment in record.get("segments", [])]
-    if any(_note_claims_unrecorded_move(note, omitted_after) for note in notes):
+    if any(_note_claims_unrecorded_move(note, omitted_after, omitted_aliases) for note in notes):
         errors.append(_error("note_claims_unrecorded_move", record))
 
     verification = record.get("verification", {})

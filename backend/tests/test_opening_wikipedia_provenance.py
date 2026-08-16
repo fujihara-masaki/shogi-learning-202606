@@ -166,6 +166,45 @@ def test_canonical_masuda_omitted_after_remains_valid():
     assert "omitted_after_invalid_usi" not in {error.code for error in validate_artifact(artifact)}
 
 
+def _canonical_masuda_artifact_and_record():
+    artifact = json.loads((DOCS / "opening-wikipedia-provenance-audit.json").read_text())
+    record = next(record for record in artifact["records"] if record.get("line_name", "").startswith("升田式石田流"))
+    return artifact, record
+
+
+def test_japanese_omitted_move_claim_is_rejected_on_line():
+    artifact, record = _canonical_masuda_artifact_and_record()
+    record["evidence_note"] = "▲7六飛を収録した。"
+    assert "note_claims_unrecorded_move" in {error.code for error in validate_artifact(artifact)}
+
+
+def test_japanese_omitted_move_claim_is_rejected_on_node():
+    artifact, record = _canonical_masuda_artifact_and_record()
+    record["nodes"][0]["provenance"]["evidence_note"] = "▲7六飛を収録した。"
+    assert "note_claims_unrecorded_move" in {error.code for error in validate_artifact(artifact)}
+
+
+def test_japanese_omitted_move_claim_is_rejected_on_segment():
+    artifact, record = _canonical_masuda_artifact_and_record()
+    record["segments"].append(
+        {
+            "provenance_class": "explicit_sequence",
+            "start_ply": 1,
+            "end_ply": 7,
+            "source_section": "升田式石田流",
+            "evidence_note": "▲7六飛を収録した。",
+        }
+    )
+    assert "note_claims_unrecorded_move" in {error.code for error in validate_artifact(artifact)}
+
+
+@pytest.mark.parametrize("note", ["▲7六飛は未収録。", "▲7六歩を収録した。"])
+def test_japanese_non_claim_or_different_piece_is_accepted(note):
+    artifact, record = _canonical_masuda_artifact_and_record()
+    record["evidence_note"] = note
+    assert "note_claims_unrecorded_move" not in {error.code for error in validate_artifact(artifact)}
+
+
 def test_mixed_segment_contradictory_evidence_note_is_rejected():
     artifact = json.loads((DOCS / "fixtures/opening-wikipedia-provenance-valid-mixed-verified.json").read_text())
     record = artifact["records"][0]
