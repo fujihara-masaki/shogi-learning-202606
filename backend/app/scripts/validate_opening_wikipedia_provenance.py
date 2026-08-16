@@ -42,10 +42,10 @@ def _note_claims_unrecorded_move(note: str, omitted_after: str | None) -> bool:
     has_recorded_claim = any(word in note for word in recorded_claims)
     if not has_recorded_claim or any(word in note for word in exclusion):
         return False
-    if omitted_after:
-        return True
     continuation_markers = ("実戦以下", "続く", "続いて", "その後", "以降")
-    return any(marker in note for marker in continuation_markers)
+    if any(marker in note for marker in continuation_markers):
+        return True
+    return bool(omitted_after and omitted_after in note)
 
 
 def _semantic_errors(record: dict[str, Any]) -> list[ValidationError]:

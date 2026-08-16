@@ -71,6 +71,36 @@ def test_terminal_recording_note_does_not_claim_unrecorded_move(note):
     assert "note_claims_unrecorded_move" not in {error.code for error in validate_artifact(artifact)}
 
 
+def test_terminal_recording_note_is_valid_with_omitted_boundary_on_line_and_nodes():
+    artifact = _valid_record_artifact()
+    record = artifact["records"][0]
+    record["coverage_boundary"]["omitted_after"] = "7h7f"
+    note = "引用sectionの終端である▲4八玉までを収録した。"
+    record["evidence_note"] = note
+    for node in record["nodes"]:
+        node["provenance"]["evidence_note"] = note
+    assert "note_claims_unrecorded_move" not in {error.code for error in validate_artifact(artifact)}
+
+
+def test_normal_masuda_note_is_valid_with_omitted_boundary():
+    artifact = _valid_record_artifact()
+    record = artifact["records"][0]
+    record["coverage_boundary"]["omitted_after"] = "7h7f"
+    note = "▲4八玉までを収録。続く▲7六飛は未収録。"
+    record["evidence_note"] = note
+    for node in record["nodes"]:
+        node["provenance"]["evidence_note"] = note
+    assert "note_claims_unrecorded_move" not in {error.code for error in validate_artifact(artifact)}
+
+
+def test_direct_omitted_usi_recording_claim_is_rejected():
+    artifact = _valid_record_artifact()
+    record = artifact["records"][0]
+    record["coverage_boundary"]["omitted_after"] = "7h7f"
+    record["evidence_note"] = "7h7fを収録した。"
+    assert "note_claims_unrecorded_move" in {error.code for error in validate_artifact(artifact)}
+
+
 def test_canonical_artifact_matches_every_wikipedia_seed_node():
     artifact = json.loads((DOCS / "opening-wikipedia-provenance-audit.json").read_text())
     assert validate_artifact(artifact, SCHEMA, SAMPLE_OPENING_LINES) == []
