@@ -120,20 +120,20 @@ def test_unrelated_node_exclusion_does_not_hide_omitted_move_claim():
     assert "note_claims_unrecorded_move" in {error.code for error in validate_artifact(artifact)}
 
 
-def test_exclusion_for_omitted_move_does_not_hide_unrelated_recording():
+def test_exclusion_for_omitted_move_does_not_hide_unrelated_absent_recording():
     artifact = _valid_record_artifact()
     record = artifact["records"][0]
     record["coverage_boundary"]["omitted_after"] = "7h7f"
     record["evidence_note"] = "続く7h7fは未収録。なお8h8fを収録した。"
-    assert "note_claims_unrecorded_move" not in {error.code for error in validate_artifact(artifact)}
+    assert "note_claims_unrecorded_move" in {error.code for error in validate_artifact(artifact)}
 
 
-def test_same_sentence_omitted_move_exclusion_is_not_overridden_by_other_recording():
+def test_same_sentence_omitted_move_exclusion_does_not_hide_other_absent_recording():
     artifact = _valid_record_artifact()
     record = artifact["records"][0]
     record["coverage_boundary"]["omitted_after"] = "7h7f"
     record["evidence_note"] = "続く7h7fは未収録だが、8h8fを収録した。"
-    assert "note_claims_unrecorded_move" not in {error.code for error in validate_artifact(artifact)}
+    assert "note_claims_unrecorded_move" in {error.code for error in validate_artifact(artifact)}
 
 
 def test_same_sentence_omitted_move_recording_is_not_hidden_by_other_exclusion():
@@ -185,7 +185,7 @@ def test_each_alias_occurrence_has_an_independent_claim_scope(note, rejected):
         ("手順化したのは7h7f。", True),
         ("未収録なのは続く7h7f。", False),
         ("未収録なのは続く▲7六飛。", False),
-        ("8h8fを収録した。未収録なのは7h7f。", False),
+        ("8h8fを収録した。未収録なのは7h7f。", True),
         ("収録したのは7h7f。8h8fは未収録。", True),
         ("収録したのは7h7fだが、7h7fは未収録。", True),
     ],
@@ -344,6 +344,36 @@ def test_normal_omitted_move_side_neutral_alias(note, rejected):
     assert ("note_claims_unrecorded_move" in codes) is rejected
 
 
+@pytest.mark.parametrize(
+    ("note", "rejected"),
+    [
+        ("6五歩を収録。", True),
+        ("6五歩は未収録。", False),
+        ("6f6eを収録。", True),
+        ("6f6eは未収録。", False),
+        ("9九飛を収録。", True),
+    ],
+)
+def test_explicit_absent_move_with_non_null_unreplayable_omitted_boundary(note, rejected):
+    artifact, record = _canonical_masuda_artifact_and_record()
+    record["coverage_boundary"]["omitted_after"] = "6f6e"
+    record["evidence_note"] = note
+    codes = {error.code for error in validate_artifact(artifact)}
+    assert ("note_claims_unrecorded_move" in codes) is rejected
+
+
+@pytest.mark.parametrize(
+    ("line_prefix", "note"),
+    [("升田式石田流", "7六歩を収録。"), ("原始鬼殺し", "6二銀を収録。")],
+)
+def test_recorded_japanese_move_remains_valid_with_non_null_omitted_boundary(line_prefix, note):
+    artifact = json.loads((DOCS / "opening-wikipedia-provenance-audit.json").read_text())
+    record = next(record for record in artifact["records"] if record.get("line_name", "").startswith(line_prefix))
+    record["coverage_boundary"]["omitted_after"] = "6f6e"
+    record["evidence_note"] = note
+    assert "note_claims_unrecorded_move" not in {error.code for error in validate_artifact(artifact)}
+
+
 def test_japanese_omitted_move_claim_is_rejected_on_node():
     artifact, record = _canonical_masuda_artifact_and_record()
     record["nodes"][0]["provenance"]["evidence_note"] = "▲7六飛を収録した。"
@@ -405,7 +435,7 @@ def test_promoted_japanese_omitted_move_alias(note, rejected):
 
 @pytest.mark.parametrize(
     ("note", "rejected"),
-    [("▲7七角打を収録した。", True), ("△7七角打を収録した。", True), ("▲7七歩打を収録した。", False)],
+    [("▲7七角打を収録した。", True), ("△7七角打を収録した。", True), ("▲7七歩打を収録した。", True)],
 )
 def test_dropped_japanese_omitted_move_alias_is_side_neutral(note, rejected):
     artifact = _valid_record_artifact()

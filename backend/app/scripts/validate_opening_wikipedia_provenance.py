@@ -122,7 +122,7 @@ def _note_claims_unrecorded_move(
             continue
 
         notation_matches = list(move_notation.finditer(clause))
-        if recorded_notations is not None and omitted_after is None and notation_matches:
+        if recorded_notations is not None and notation_matches:
             for index, match in enumerate(notation_matches):
                 notation = match.group(0)
                 if notation in recorded_notations:
