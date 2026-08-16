@@ -1,4 +1,6 @@
 import json
+import subprocess
+import sys
 from copy import deepcopy
 from pathlib import Path
 from types import SimpleNamespace
@@ -387,6 +389,27 @@ def test_out_of_recording_scope_is_target_scoped_exclusion(note, rejected):
 
 
 @pytest.mark.parametrize(
+    ("note", "rejected"),
+    [
+        ("9a9bは将来の収録予定。", False),
+        ("9a9bは収録候補。", False),
+        ("9a9bは手順化予定。", False),
+        ("9a9bは手順化候補。", False),
+        ("9a9bを収録。", True),
+        ("9a9bを手順化。", True),
+        ("9a9bは収録予定。なお8h8fを収録。", True),
+        ("9a9bを収録。なお8h8fは収録予定。", True),
+    ],
+)
+def test_prospective_wording_is_target_scoped_exclusion(note, rejected):
+    artifact, record = _canonical_masuda_artifact_and_record()
+    record["coverage_boundary"]["omitted_after"] = None
+    record["evidence_note"] = note
+    codes = {error.code for error in validate_artifact(artifact)}
+    assert ("note_claims_unrecorded_move" in codes) is rejected
+
+
+@pytest.mark.parametrize(
     ("line_prefix", "note"),
     [("升田式石田流", "7六歩を収録。"), ("原始鬼殺し", "6二銀を収録。")],
 )
@@ -625,6 +648,37 @@ def test_cli_reads_valid_inputs_as_utf8(tmp_path, monkeypatch, capsys):
     assert main() == 0
     assert encodings == [(artifact_path, "utf-8"), (schema_path, "utf-8")]
     assert json.loads(capsys.readouterr().out)["valid"] is True
+
+
+@pytest.mark.parametrize(
+    ("cwd", "command"),
+    [
+        (DOCS.parent, ["backend/app/scripts/validate_opening_wikipedia_provenance.py"]),
+        (DOCS.parent / "backend", ["app/scripts/validate_opening_wikipedia_provenance.py"]),
+        (DOCS.parent / "backend", ["-m", "app.scripts.validate_opening_wikipedia_provenance"]),
+    ],
+)
+def test_cli_file_and_module_execution_reach_production_validation(tmp_path, cwd, command):
+    artifact_path = tmp_path / "artifact.json"
+    schema_path = tmp_path / "schema.json"
+    artifact_path.write_text("{}", encoding="utf-8")
+    schema_path.write_text('{"type": 3}', encoding="utf-8")
+
+    completed = subprocess.run(
+        [sys.executable, *command, str(artifact_path), "--schema", str(schema_path)],
+        cwd=cwd,
+        check=False,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+    )
+
+    assert completed.returncode == 1
+    assert json.loads(completed.stdout) == {
+        "valid": False,
+        "errors": [{"code": "schema_definition_invalid", "path": "schema"}],
+    }
+    assert completed.stderr == ""
 
 
 @pytest.mark.parametrize(

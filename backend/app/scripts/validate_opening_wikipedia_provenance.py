@@ -12,10 +12,16 @@ import ipaddress
 import json
 import re
 import subprocess
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlsplit
+
+if __package__ in {None, ""}:
+    backend_root = Path(__file__).resolve().parents[2]
+    if str(backend_root) not in sys.path:
+        sys.path.insert(0, str(backend_root))
 
 PROVENANCE_COVERAGE = {
     "explicit_sequence": {"complete_for_cited_sequence", "partial_explicit_sequence"},
@@ -81,7 +87,17 @@ def _note_claims_unrecorded_move(
     recorded_notations: set[str] | None = None,
 ) -> bool:
     recorded_claims = ("手順化", "収録")
-    exclusion = ("未収録", "収録していない", "収録対象外", "手順化していない", "手順化対象外")
+    exclusion = (
+        "未収録",
+        "収録していない",
+        "収録対象外",
+        "収録予定",
+        "収録候補",
+        "手順化していない",
+        "手順化対象外",
+        "手順化予定",
+        "手順化候補",
+    )
     continuation_markers = ("実戦以下", "続く", "続いて", "その後", "以降")
     aliases = ({omitted_after} if omitted_after else set()) | (omitted_aliases or set())
     move_notation = re.compile(
