@@ -81,7 +81,7 @@ def _note_claims_unrecorded_move(
     recorded_notations: set[str] | None = None,
 ) -> bool:
     recorded_claims = ("手順化", "収録")
-    exclusion = ("未収録", "収録していない", "手順化していない")
+    exclusion = ("未収録", "収録していない", "収録対象外", "手順化していない", "手順化対象外")
     continuation_markers = ("実戦以下", "続く", "続いて", "その後", "以降")
     aliases = ({omitted_after} if omitted_after else set()) | (omitted_aliases or set())
     move_notation = re.compile(
@@ -596,9 +596,16 @@ def validate_artifact(data: dict[str, Any], schema: dict[str, Any] | None = None
     errors: list[ValidationError] = []
     if schema is not None:
         from jsonschema import Draft7Validator, FormatChecker
+        from jsonschema.exceptions import SchemaError
+        from referencing.exceptions import Unresolvable
 
-        validator = Draft7Validator(schema, format_checker=FormatChecker())
-        for failure in sorted(validator.iter_errors(data), key=lambda item: list(item.absolute_path)):
+        try:
+            Draft7Validator.check_schema(schema)
+            validator = Draft7Validator(schema, format_checker=FormatChecker())
+            failures = sorted(validator.iter_errors(data), key=lambda item: list(item.absolute_path))
+        except (SchemaError, Unresolvable):
+            return [ValidationError("schema_definition_invalid", path="schema")]
+        for failure in failures:
             errors.append(ValidationError("schema_validation_error", path="/".join(map(str, failure.absolute_path))))
         if errors:
             return errors
@@ -644,7 +651,7 @@ def validate_production_artifact(data: dict[str, Any], schema: dict[str, Any] | 
     from app.seed import SAMPLE_OPENING_LINES
 
     errors = validate_artifact(data, schema, SAMPLE_OPENING_LINES)
-    if any(error.code == "schema_validation_error" for error in errors):
+    if any(error.code in {"schema_validation_error", "schema_definition_invalid"} for error in errors):
         return errors
     errors.extend(_declared_snapshot_errors(data, current_seed_lines=SAMPLE_OPENING_LINES))
     return errors

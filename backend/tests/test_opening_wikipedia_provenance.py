@@ -363,6 +363,24 @@ def test_explicit_absent_move_with_non_null_unreplayable_omitted_boundary(note, 
 
 
 @pytest.mark.parametrize(
+    ("note", "rejected"),
+    [
+        ("9a9bは収録対象外。", False),
+        ("9a9bは未収録。", False),
+        ("9a9bを収録。", True),
+        ("9a9bは収録対象外。なお8h8fを収録。", True),
+        ("9a9bを収録。なお8h8fは収録対象外。", True),
+    ],
+)
+def test_out_of_recording_scope_is_target_scoped_exclusion(note, rejected):
+    artifact, record = _canonical_masuda_artifact_and_record()
+    record["coverage_boundary"]["omitted_after"] = None
+    record["evidence_note"] = note
+    codes = {error.code for error in validate_artifact(artifact)}
+    assert ("note_claims_unrecorded_move" in codes) is rejected
+
+
+@pytest.mark.parametrize(
     ("line_prefix", "note"),
     [("升田式石田流", "7六歩を収録。"), ("原始鬼殺し", "6二銀を収録。")],
 )
@@ -614,6 +632,37 @@ def test_cli_serializes_unreadable_paths(
     assert [error["path"] for error in output["errors"]] == [
         "artifact" if code.startswith("artifact") else "schema" for code in expected_codes
     ]
+
+
+@pytest.mark.parametrize(
+    "invalid_schema",
+    [
+        {"type": 3},
+        {"$schema": "http://json-schema.org/draft-07/schema#", "$ref": "#/definitions/missing"},
+    ],
+)
+def test_structurally_invalid_schema_has_stable_error(invalid_schema):
+    errors = validate_artifact({}, invalid_schema)
+    assert [error.code for error in errors] == ["schema_definition_invalid"]
+    assert errors[0].path == "schema"
+
+
+def test_cli_serializes_structurally_invalid_schema(tmp_path, monkeypatch, capsys):
+    artifact_path = tmp_path / "artifact.json"
+    schema_path = tmp_path / "schema.json"
+    artifact_path.write_text(json.dumps({}))
+    schema_path.write_text(json.dumps({"type": 3}))
+    monkeypatch.setattr(
+        "sys.argv",
+        ["validate_opening_wikipedia_provenance", str(artifact_path), "--schema", str(schema_path)],
+    )
+
+    assert main() == 1
+    output = json.loads(capsys.readouterr().out)
+    assert output == {
+        "valid": False,
+        "errors": [{"code": "schema_definition_invalid", "path": "schema"}],
+    }
 
 
 def test_canonical_artifact_matches_every_wikipedia_seed_node():
