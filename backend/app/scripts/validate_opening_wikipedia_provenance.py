@@ -185,7 +185,8 @@ def _japanese_omitted_move_aliases(
         if piece.is_promoted():
             return set()
         piece_name += "成"
-    return {f"{side}{destination}{piece_name}"}
+    neutral_alias = f"{destination}{piece_name}"
+    return {f"{side}{neutral_alias}", neutral_alias}
 
 
 def _recorded_move_notations(nodes: list[dict[str, Any]], initial_sfen: str | None = None) -> set[str]:

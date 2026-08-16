@@ -265,8 +265,8 @@ def test_recorded_root_normal_alias_uses_custom_initial_position():
 def test_omitted_japanese_alias_uses_custom_initial_position():
     initial_sfen = "9/9/9/9/9/9/9/9/K7k b - 1"
     aliases = _japanese_omitted_move_aliases([], "9i9h", initial_sfen)
-    assert aliases == {"▲9八玉"}
-    assert _note_claims_unrecorded_move("▲9八玉を収録。", "9i9h", aliases, set())
+    assert aliases == {"▲9八玉", "9八玉"}
+    assert _note_claims_unrecorded_move("9八玉を収録。", "9i9h", aliases, set())
 
 
 def test_validate_artifact_passes_normalized_seed_initial_position_to_semantics(monkeypatch):
@@ -333,6 +333,17 @@ def test_japanese_omitted_move_claim_is_rejected_on_line():
     assert "note_claims_unrecorded_move" in {error.code for error in validate_artifact(artifact)}
 
 
+@pytest.mark.parametrize(
+    ("note", "rejected"),
+    [("7六飛を収録。", True), ("▲7六飛を収録。", True), ("7六飛は未収録。", False)],
+)
+def test_normal_omitted_move_side_neutral_alias(note, rejected):
+    artifact, record = _canonical_masuda_artifact_and_record()
+    record["evidence_note"] = note
+    codes = {error.code for error in validate_artifact(artifact)}
+    assert ("note_claims_unrecorded_move" in codes) is rejected
+
+
 def test_japanese_omitted_move_claim_is_rejected_on_node():
     artifact, record = _canonical_masuda_artifact_and_record()
     record["nodes"][0]["provenance"]["evidence_note"] = "▲7六飛を収録した。"
@@ -376,7 +387,12 @@ def test_plain_recording_marker_respects_exclusion(note):
 
 @pytest.mark.parametrize(
     ("note", "rejected"),
-    [("△7七角成を収録した。", True), ("続く△7七角成も収録。", True), ("△7七角成は未収録。", False)],
+    [
+        ("△7七角成を収録した。", True),
+        ("7七角成を収録した。", True),
+        ("続く△7七角成も収録。", True),
+        ("△7七角成は未収録。", False),
+    ],
 )
 def test_promoted_japanese_omitted_move_alias(note, rejected):
     artifact = _valid_record_artifact()
