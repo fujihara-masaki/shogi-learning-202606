@@ -49,7 +49,7 @@ def _is_valid_https_url(value: Any) -> bool:
 def _note_claims_unrecorded_move(
     note: str, omitted_after: str | None, omitted_aliases: set[str] | None = None
 ) -> bool:
-    recorded_claims = ("手順化", "収録済み", "収録した", "収録しています")
+    recorded_claims = ("手順化", "収録")
     exclusion = ("未収録", "収録していない", "手順化していない")
     continuation_markers = ("実戦以下", "続く", "続いて", "その後", "以降")
     # Split both sentences and contrastive/coordinating subclauses so an
@@ -69,7 +69,7 @@ def _note_claims_unrecorded_move(
 
 def _japanese_omitted_move_aliases(moves: list[str], omitted_after: str | None) -> set[str]:
     """Derive a piece-specific Japanese alias without asserting next-ply legality."""
-    if not omitted_after or len(omitted_after) != 4 or "*" in omitted_after or omitted_after.endswith("+"):
+    if not omitted_after:
         return set()
     import shogi
 
@@ -81,15 +81,31 @@ def _japanese_omitted_move_aliases(moves: list[str], omitted_after: str | None) 
                 return set()
             board.push(move)
         omitted_move = shogi.Move.from_usi(omitted_after)
-        piece = board.piece_at(omitted_move.from_square)
     except (ValueError, TypeError, AttributeError):
         return set()
+    rank_kanji = "一二三四五六七八九"
+    destination_usi = omitted_after.split("*", 1)[-1][:2] if "*" in omitted_after else omitted_after[2:4]
+    destination = destination_usi[0] + rank_kanji[ord(destination_usi[1]) - ord("a")]
+
+    if "*" in omitted_after:
+        try:
+            piece_name = shogi.Piece.from_symbol(omitted_after[0]).japanese_symbol()
+        except (ValueError, TypeError, AttributeError):
+            return set()
+        # The source may omit intervening plies, so the dropping side is not
+        # inferred from board.turn.  This side-neutral alias matches either ▲/△.
+        return {f"{destination}{piece_name}打"}
+
+    piece = board.piece_at(omitted_move.from_square)
     if piece is None:
         return set()
-    rank_kanji = "一二三四五六七八九"
-    destination = omitted_after[2] + rank_kanji[ord(omitted_after[3]) - ord("a")]
     side = "▲" if piece.color == shogi.BLACK else "△"
-    return {f"{side}{destination}{piece.japanese_symbol()}"}
+    piece_name = piece.japanese_symbol()
+    if omitted_after.endswith("+"):
+        if piece.is_promoted():
+            return set()
+        piece_name += "成"
+    return {f"{side}{destination}{piece_name}"}
 
 
 def _semantic_errors(record: dict[str, Any]) -> list[ValidationError]:
@@ -463,12 +479,12 @@ def main() -> int:
     decode_errors = []
     try:
         data = json.loads(args.artifact.read_text())
-    except json.JSONDecodeError:
+    except (json.JSONDecodeError, UnicodeDecodeError):
         decode_errors.append(ValidationError("artifact_json_invalid", path="artifact"))
         data = None
     try:
         schema = json.loads(args.schema.read_text())
-    except json.JSONDecodeError:
+    except (json.JSONDecodeError, UnicodeDecodeError):
         decode_errors.append(ValidationError("schema_json_invalid", path="schema"))
         schema = None
     if decode_errors:

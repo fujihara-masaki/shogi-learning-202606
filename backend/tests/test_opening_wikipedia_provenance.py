@@ -205,6 +205,46 @@ def test_japanese_non_claim_or_different_piece_is_accepted(note):
     assert "note_claims_unrecorded_move" not in {error.code for error in validate_artifact(artifact)}
 
 
+@pytest.mark.parametrize("note", ["続く7h7fも収録。", "続く▲7六飛も収録。"])
+def test_plain_recording_marker_rejects_omitted_move_claim(note):
+    artifact, record = _canonical_masuda_artifact_and_record()
+    record["evidence_note"] = note
+    assert "note_claims_unrecorded_move" in {error.code for error in validate_artifact(artifact)}
+
+
+@pytest.mark.parametrize("note", ["続く7h7fは未収録。", "続く▲7六飛は未収録。"])
+def test_plain_recording_marker_respects_exclusion(note):
+    artifact, record = _canonical_masuda_artifact_and_record()
+    record["evidence_note"] = note
+    assert "note_claims_unrecorded_move" not in {error.code for error in validate_artifact(artifact)}
+
+
+@pytest.mark.parametrize(
+    ("note", "rejected"),
+    [("△7七角成を収録した。", True), ("続く△7七角成も収録。", True), ("△7七角成は未収録。", False)],
+)
+def test_promoted_japanese_omitted_move_alias(note, rejected):
+    artifact = _valid_record_artifact()
+    record = artifact["records"][0]
+    record["coverage_boundary"]["omitted_after"] = "2b7g+"
+    record["evidence_note"] = note
+    codes = {error.code for error in validate_artifact(artifact)}
+    assert ("note_claims_unrecorded_move" in codes) is rejected
+
+
+@pytest.mark.parametrize(
+    ("note", "rejected"),
+    [("▲7七角打を収録した。", True), ("△7七角打を収録した。", True), ("▲7七歩打を収録した。", False)],
+)
+def test_dropped_japanese_omitted_move_alias_is_side_neutral(note, rejected):
+    artifact = _valid_record_artifact()
+    record = artifact["records"][0]
+    record["coverage_boundary"]["omitted_after"] = "B*7g"
+    record["evidence_note"] = note
+    codes = {error.code for error in validate_artifact(artifact)}
+    assert ("note_claims_unrecorded_move" in codes) is rejected
+
+
 def test_mixed_segment_contradictory_evidence_note_is_rejected():
     artifact = json.loads((DOCS / "fixtures/opening-wikipedia-provenance-valid-mixed-verified.json").read_text())
     record = artifact["records"][0]
@@ -281,6 +321,30 @@ def test_cli_serializes_malformed_json(tmp_path, monkeypatch, capsys, artifact_t
     assert [error["path"] for error in output["errors"]] == [
         "artifact" if code.startswith("artifact") else "schema" for code in expected_codes
     ]
+
+
+@pytest.mark.parametrize(
+    ("artifact_bytes", "schema_bytes", "expected_codes"),
+    [
+        (b"\xff", json.dumps(SCHEMA).encode(), ["artifact_json_invalid"]),
+        (json.dumps({"valid": "artifact"}).encode(), b"\xff", ["schema_json_invalid"]),
+        (b"\xff", b"\xff", ["artifact_json_invalid", "schema_json_invalid"]),
+    ],
+)
+def test_cli_serializes_invalid_utf8(tmp_path, monkeypatch, capsys, artifact_bytes, schema_bytes, expected_codes):
+    artifact_path = tmp_path / "artifact.json"
+    schema_path = tmp_path / "schema.json"
+    artifact_path.write_bytes(artifact_bytes)
+    schema_path.write_bytes(schema_bytes)
+    monkeypatch.setattr(
+        "sys.argv",
+        ["validate_opening_wikipedia_provenance", str(artifact_path), "--schema", str(schema_path)],
+    )
+
+    assert main() == 1
+    output = json.loads(capsys.readouterr().out)
+    assert output["valid"] is False
+    assert [error["code"] for error in output["errors"]] == expected_codes
 
 
 def test_canonical_artifact_matches_every_wikipedia_seed_node():
