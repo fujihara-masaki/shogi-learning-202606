@@ -479,12 +479,12 @@ def main() -> int:
     decode_errors = []
     try:
         data = json.loads(args.artifact.read_text())
-    except (json.JSONDecodeError, UnicodeDecodeError):
+    except (json.JSONDecodeError, UnicodeDecodeError, OSError):
         decode_errors.append(ValidationError("artifact_json_invalid", path="artifact"))
         data = None
     try:
         schema = json.loads(args.schema.read_text())
-    except (json.JSONDecodeError, UnicodeDecodeError):
+    except (json.JSONDecodeError, UnicodeDecodeError, OSError):
         decode_errors.append(ValidationError("schema_json_invalid", path="schema"))
         schema = None
     if decode_errors:

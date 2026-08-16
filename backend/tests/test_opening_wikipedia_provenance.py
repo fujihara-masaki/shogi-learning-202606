@@ -347,6 +347,43 @@ def test_cli_serializes_invalid_utf8(tmp_path, monkeypatch, capsys, artifact_byt
     assert [error["code"] for error in output["errors"]] == expected_codes
 
 
+@pytest.mark.parametrize(
+    ("artifact_kind", "schema_kind", "expected_codes"),
+    [
+        ("missing", "valid", ["artifact_json_invalid"]),
+        ("valid", "missing", ["schema_json_invalid"]),
+        ("directory", "valid", ["artifact_json_invalid"]),
+        ("valid", "directory", ["schema_json_invalid"]),
+        ("missing", "directory", ["artifact_json_invalid", "schema_json_invalid"]),
+    ],
+)
+def test_cli_serializes_unreadable_paths(
+    tmp_path, monkeypatch, capsys, artifact_kind, schema_kind, expected_codes
+):
+    def input_path(name, kind, valid_content):
+        path = tmp_path / name
+        if kind == "valid":
+            path.write_text(json.dumps(valid_content))
+        elif kind == "directory":
+            path.mkdir()
+        return path
+
+    artifact_path = input_path("artifact-input", artifact_kind, {"artifact": "decodable"})
+    schema_path = input_path("schema-input", schema_kind, SCHEMA)
+    monkeypatch.setattr(
+        "sys.argv",
+        ["validate_opening_wikipedia_provenance", str(artifact_path), "--schema", str(schema_path)],
+    )
+
+    assert main() == 1
+    output = json.loads(capsys.readouterr().out)
+    assert output["valid"] is False
+    assert [error["code"] for error in output["errors"]] == expected_codes
+    assert [error["path"] for error in output["errors"]] == [
+        "artifact" if code.startswith("artifact") else "schema" for code in expected_codes
+    ]
+
+
 def test_canonical_artifact_matches_every_wikipedia_seed_node():
     artifact = json.loads((DOCS / "opening-wikipedia-provenance-audit.json").read_text())
     assert validate_artifact(artifact, SCHEMA, SAMPLE_OPENING_LINES) == []
