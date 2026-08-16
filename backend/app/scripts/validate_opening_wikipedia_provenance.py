@@ -218,13 +218,15 @@ def _recorded_move_notations(nodes: list[dict[str, Any]]) -> set[str]:
             if "*" in node["usi"]:
                 piece_name = shogi.Piece.from_symbol(node["usi"][0]).japanese_symbol()
                 side = "▲" if board.turn == shogi.BLACK else "△"
-                result.add(f"{side}{destination}{piece_name}打")
+                neutral_alias = f"{destination}{piece_name}打"
+                result.update({f"{side}{neutral_alias}", neutral_alias})
             else:
                 piece = board.piece_at(move.from_square)
                 if piece is not None:
                     piece_name = piece.japanese_symbol() + ("成" if node["usi"].endswith("+") else "")
                     side = "▲" if piece.color == shogi.BLACK else "△"
-                    result.add(f"{side}{destination}{piece_name}")
+                    neutral_alias = f"{destination}{piece_name}"
+                    result.update({f"{side}{neutral_alias}", neutral_alias})
             board.push(move)
             after_positions[key] = board.sfen()
         except (ValueError, TypeError, AttributeError, KeyError, IndexError):

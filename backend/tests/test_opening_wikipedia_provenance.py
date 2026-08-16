@@ -11,6 +11,7 @@ from app.scripts.validate_opening_wikipedia_provenance import (
     _declared_snapshot_errors,
     _extract_snapshot_seed_lines,
     _initial_positions_match,
+    _recorded_move_notations,
     main,
     validate_artifact,
     validate_production_artifact,
@@ -219,6 +220,41 @@ def test_explicitly_named_recorded_main_or_branch_move_is_valid(line_prefix, not
     record["coverage_boundary"]["omitted_after"] = None
     record["evidence_note"] = note
     assert "note_claims_unrecorded_move" not in {error.code for error in validate_artifact(artifact)}
+
+
+@pytest.mark.parametrize(
+    ("line_prefix", "note"),
+    [
+        ("升田式石田流", "7六歩を収録。"),
+        ("升田式石田流", "▲7六歩を収録。"),
+        ("原始鬼殺し", "6二銀を収録。"),
+    ],
+)
+def test_recorded_japanese_move_claim_is_valid_with_or_without_side(line_prefix, note):
+    artifact = json.loads((DOCS / "opening-wikipedia-provenance-audit.json").read_text())
+    record = next(record for record in artifact["records"] if record.get("line_name", "").startswith(line_prefix))
+    record["coverage_boundary"]["omitted_after"] = None
+    record["evidence_note"] = note
+    assert "note_claims_unrecorded_move" not in {error.code for error in validate_artifact(artifact)}
+
+
+def test_recorded_japanese_promotion_and_drop_have_side_neutral_aliases():
+    moves = ["7g7f", "3c3d", "8h2b+", "3a2b", "2g2f", "B*7g"]
+    nodes = [
+        {"move_key": f"main-{index}", "parent_key": None if index == 1 else f"main-{index - 1}", "usi": usi}
+        for index, usi in enumerate(moves, 1)
+    ]
+    notations = _recorded_move_notations(nodes)
+    assert {"▲2二角成", "2二角成", "△7七角打", "7七角打"} <= notations
+
+
+@pytest.mark.parametrize(("note", "rejected"), [("9九飛を収録。", True), ("9九飛は未収録。", False)])
+def test_absent_side_neutral_japanese_move_claim(note, rejected):
+    artifact, record = _canonical_masuda_artifact_and_record()
+    record["coverage_boundary"]["omitted_after"] = None
+    record["evidence_note"] = note
+    codes = {error.code for error in validate_artifact(artifact)}
+    assert ("note_claims_unrecorded_move" in codes) is rejected
 
 
 def test_recorded_move_claim_and_absent_move_exclusion_do_not_mix_scopes():
