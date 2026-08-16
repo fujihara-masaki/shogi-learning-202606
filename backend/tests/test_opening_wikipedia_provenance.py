@@ -200,6 +200,23 @@ def test_needs_review_null_or_https_canonical_url_is_accepted(canonical_url):
     assert "canonical_url_invalid" not in {error.code for error in validate_artifact(artifact)}
 
 
+@pytest.mark.parametrize("requested_url", ["https://", "garbage", "http://ja.wikipedia.org/wiki/石田流"])
+def test_invalid_requested_url_is_rejected(requested_url):
+    artifact = _valid_record_artifact()
+    record = artifact["records"][0]
+    record["source"]["requested_url"] = requested_url
+    invalid = [error for error in validate_artifact(artifact) if error.code == "requested_url_invalid"]
+    assert len(invalid) == 1
+    assert invalid[0].record_id == record["record_id"]
+    assert invalid[0].path == "source.requested_url"
+
+
+def test_https_requested_url_is_accepted():
+    artifact = _valid_record_artifact()
+    artifact["records"][0]["source"]["requested_url"] = "https://ja.wikipedia.org/wiki/石田流"
+    assert "requested_url_invalid" not in {error.code for error in validate_artifact(artifact)}
+
+
 @pytest.mark.parametrize(
     ("artifact_text", "schema_text", "expected_codes"),
     [

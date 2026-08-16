@@ -38,6 +38,14 @@ def _error(code: str, record: dict[str, Any] | None = None, path: str | None = N
     return ValidationError(code, record.get("record_id") if record else None, path)
 
 
+def _is_valid_https_url(value: Any) -> bool:
+    try:
+        parsed = urlsplit(value)
+        return parsed.scheme == "https" and bool(parsed.netloc and parsed.hostname)
+    except (TypeError, ValueError):
+        return False
+
+
 def _note_claims_unrecorded_move(note: str, omitted_after: str | None) -> bool:
     recorded_claims = ("手順化", "収録済み", "収録した", "収録しています")
     exclusion = ("未収録", "収録していない", "手順化していない")
@@ -66,15 +74,12 @@ def _semantic_errors(record: dict[str, Any]) -> list[ValidationError]:
         errors.append(_error("invalid_provenance_coverage", record))
 
     source = record.get("source", {})
+    requested_url = source.get("requested_url")
+    if requested_url is not None and not _is_valid_https_url(requested_url):
+        errors.append(_error("requested_url_invalid", record, "source.requested_url"))
     canonical_url = source.get("canonical_url")
-    if canonical_url is not None:
-        try:
-            parsed_url = urlsplit(canonical_url)
-            canonical_url_valid = parsed_url.scheme == "https" and bool(parsed_url.netloc and parsed_url.hostname)
-        except (TypeError, ValueError):
-            canonical_url_valid = False
-        if not canonical_url_valid:
-            errors.append(_error("canonical_url_invalid", record, "source.canonical_url"))
+    if canonical_url is not None and not _is_valid_https_url(canonical_url):
+        errors.append(_error("canonical_url_invalid", record, "source.canonical_url"))
 
     # D0's intentionally small legacy fixture exercises the note rule directly.
     if "fixture_version" in record:
