@@ -158,6 +158,23 @@ def test_exclusion_is_tied_to_the_move_it_negates(note, rejected):
     assert ("note_claims_unrecorded_move" in codes) is rejected
 
 
+@pytest.mark.parametrize(
+    ("note", "rejected"),
+    [
+        ("続く7h7fを収録したものの▲7六飛は未収録。", True),
+        ("続く▲7六飛を収録したものの7h7fは未収録。", True),
+        ("続く7h7fは未収録。▲7六飛も未収録。", False),
+        ("続く▲7六飛（7h7f）は未収録。", False),
+        ("続く▲7六飛（7h7f）を収録した。", True),
+    ],
+)
+def test_each_alias_occurrence_has_an_independent_claim_scope(note, rejected):
+    artifact, record = _canonical_masuda_artifact_and_record()
+    record["evidence_note"] = note
+    codes = {error.code for error in validate_artifact(artifact)}
+    assert ("note_claims_unrecorded_move" in codes) is rejected
+
+
 @pytest.mark.parametrize("omitted_after", ["", "xxxx", "9z9z"])
 def test_invalid_omitted_after_usi_is_rejected(omitted_after):
     artifact = _valid_record_artifact()

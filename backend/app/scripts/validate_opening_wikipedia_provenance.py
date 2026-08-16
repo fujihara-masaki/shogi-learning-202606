@@ -71,9 +71,8 @@ def _note_claims_unrecorded_move(
             for _alias, _start, end in occurrences:
                 scope_end = len(clause)
                 for match in move_notation.finditer(clause, end):
-                    if match.group(0) not in aliases:
-                        scope_end = match.start()
-                        break
+                    scope_end = match.start()
+                    break
                 scope = clause[end:scope_end]
                 if any(word in scope for word in exclusion):
                     continue
