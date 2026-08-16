@@ -22,7 +22,13 @@ from app.seed import SAMPLE_OPENING_LINES
 
 
 DOCS = Path(__file__).parents[2] / "docs"
-SCHEMA = json.loads((DOCS / "opening-wikipedia-provenance-audit.schema.json").read_text())
+
+
+def _load_json(path: Path):
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+SCHEMA = _load_json(DOCS / "opening-wikipedia-provenance-audit.schema.json")
 
 
 @pytest.mark.parametrize(
@@ -37,17 +43,17 @@ SCHEMA = json.loads((DOCS / "opening-wikipedia-provenance-audit.schema.json").re
     ],
 )
 def test_valid_provenance_fixtures(fixture):
-    artifact = json.loads((DOCS / "fixtures" / fixture).read_text())
+    artifact = _load_json((DOCS / "fixtures" / fixture))
     assert validate_artifact(artifact, SCHEMA) == []
 
 
 def test_invalid_masuda_note_has_stable_error_code():
-    artifact = json.loads((DOCS / "fixtures/opening-wikipedia-provenance-invalid-masuda.json").read_text())
+    artifact = _load_json((DOCS / "fixtures/opening-wikipedia-provenance-invalid-masuda.json"))
     assert [error.code for error in validate_artifact(artifact)] == artifact["expected_errors"]
 
 
 def test_invalid_continuation_note_is_rejected_without_omitted_boundary():
-    artifact = json.loads((DOCS / "fixtures/opening-wikipedia-provenance-invalid-masuda.json").read_text())
+    artifact = _load_json((DOCS / "fixtures/opening-wikipedia-provenance-invalid-masuda.json"))
     artifact["omitted_after"] = None
     assert "note_claims_unrecorded_move" in {error.code for error in validate_artifact(artifact)}
 
@@ -217,7 +223,7 @@ def test_explicitly_named_absent_move_exclusion_is_valid():
     [("升田式石田流", "7g7fを収録。"), ("原始鬼殺し", "6a6bを収録。")],
 )
 def test_explicitly_named_recorded_main_or_branch_move_is_valid(line_prefix, note):
-    artifact = json.loads((DOCS / "opening-wikipedia-provenance-audit.json").read_text())
+    artifact = _load_json((DOCS / "opening-wikipedia-provenance-audit.json"))
     record = next(record for record in artifact["records"] if record.get("line_name", "").startswith(line_prefix))
     record["coverage_boundary"]["omitted_after"] = None
     record["evidence_note"] = note
@@ -233,7 +239,7 @@ def test_explicitly_named_recorded_main_or_branch_move_is_valid(line_prefix, not
     ],
 )
 def test_recorded_japanese_move_claim_is_valid_with_or_without_side(line_prefix, note):
-    artifact = json.loads((DOCS / "opening-wikipedia-provenance-audit.json").read_text())
+    artifact = _load_json((DOCS / "opening-wikipedia-provenance-audit.json"))
     record = next(record for record in artifact["records"] if record.get("line_name", "").startswith(line_prefix))
     record["coverage_boundary"]["omitted_after"] = None
     record["evidence_note"] = note
@@ -315,14 +321,14 @@ def test_valid_omitted_after_values_are_accepted(omitted_after):
 
 
 def test_canonical_masuda_omitted_after_remains_valid():
-    artifact = json.loads((DOCS / "opening-wikipedia-provenance-audit.json").read_text())
+    artifact = _load_json((DOCS / "opening-wikipedia-provenance-audit.json"))
     masuda = next(record for record in artifact["records"] if record.get("line_name", "").startswith("升田式石田流"))
     assert masuda["coverage_boundary"]["omitted_after"] == "7h7f"
     assert "omitted_after_invalid_usi" not in {error.code for error in validate_artifact(artifact)}
 
 
 def _canonical_masuda_artifact_and_record():
-    artifact = json.loads((DOCS / "opening-wikipedia-provenance-audit.json").read_text())
+    artifact = _load_json((DOCS / "opening-wikipedia-provenance-audit.json"))
     record = next(record for record in artifact["records"] if record.get("line_name", "").startswith("升田式石田流"))
     return artifact, record
 
@@ -385,7 +391,7 @@ def test_out_of_recording_scope_is_target_scoped_exclusion(note, rejected):
     [("升田式石田流", "7六歩を収録。"), ("原始鬼殺し", "6二銀を収録。")],
 )
 def test_recorded_japanese_move_remains_valid_with_non_null_omitted_boundary(line_prefix, note):
-    artifact = json.loads((DOCS / "opening-wikipedia-provenance-audit.json").read_text())
+    artifact = _load_json((DOCS / "opening-wikipedia-provenance-audit.json"))
     record = next(record for record in artifact["records"] if record.get("line_name", "").startswith(line_prefix))
     record["coverage_boundary"]["omitted_after"] = "6f6e"
     record["evidence_note"] = note
@@ -465,7 +471,7 @@ def test_dropped_japanese_omitted_move_alias_is_side_neutral(note, rejected):
 
 
 def test_mixed_segment_contradictory_evidence_note_is_rejected():
-    artifact = json.loads((DOCS / "fixtures/opening-wikipedia-provenance-valid-mixed-verified.json").read_text())
+    artifact = _load_json((DOCS / "fixtures/opening-wikipedia-provenance-valid-mixed-verified.json"))
     record = artifact["records"][0]
     record["coverage_boundary"]["omitted_after"] = "7h7f"
     record["segments"][0]["evidence_note"] = "続く7h7fを収録した。"
@@ -473,7 +479,7 @@ def test_mixed_segment_contradictory_evidence_note_is_rejected():
 
 
 def test_valid_mixed_segment_evidence_notes_are_accepted():
-    artifact = json.loads((DOCS / "fixtures/opening-wikipedia-provenance-valid-mixed-verified.json").read_text())
+    artifact = _load_json((DOCS / "fixtures/opening-wikipedia-provenance-valid-mixed-verified.json"))
     assert validate_artifact(artifact) == []
 
 
@@ -597,6 +603,30 @@ def test_cli_serializes_invalid_utf8(tmp_path, monkeypatch, capsys, artifact_byt
     assert [error["code"] for error in output["errors"]] == expected_codes
 
 
+def test_cli_reads_valid_inputs_as_utf8(tmp_path, monkeypatch, capsys):
+    artifact_path = tmp_path / "artifact.json"
+    schema_path = tmp_path / "schema.json"
+    encodings = []
+
+    def read_text(path, *, encoding=None, errors=None):
+        encodings.append((path, encoding))
+        return json.dumps({"日本語": True})
+
+    monkeypatch.setattr(Path, "read_text", read_text)
+    monkeypatch.setattr(
+        "app.scripts.validate_opening_wikipedia_provenance.validate_production_artifact",
+        lambda data, schema: [],
+    )
+    monkeypatch.setattr(
+        "sys.argv",
+        ["validate_opening_wikipedia_provenance", str(artifact_path), "--schema", str(schema_path)],
+    )
+
+    assert main() == 0
+    assert encodings == [(artifact_path, "utf-8"), (schema_path, "utf-8")]
+    assert json.loads(capsys.readouterr().out)["valid"] is True
+
+
 @pytest.mark.parametrize(
     ("artifact_kind", "schema_kind", "expected_codes"),
     [
@@ -666,12 +696,12 @@ def test_cli_serializes_structurally_invalid_schema(tmp_path, monkeypatch, capsy
 
 
 def test_canonical_artifact_matches_every_wikipedia_seed_node():
-    artifact = json.loads((DOCS / "opening-wikipedia-provenance-audit.json").read_text())
+    artifact = _load_json((DOCS / "opening-wikipedia-provenance-audit.json"))
     assert validate_artifact(artifact, SCHEMA, SAMPLE_OPENING_LINES) == []
 
 
 def test_production_validation_always_checks_canonical_seed():
-    artifact = json.loads((DOCS / "opening-wikipedia-provenance-audit.json").read_text())
+    artifact = _load_json((DOCS / "opening-wikipedia-provenance-audit.json"))
     record = artifact["records"][0]
     record["moves"][0] = "1a1b"
     main_root = next(node for node in record["nodes"] if node["parent_key"] is None and node["is_main"])
@@ -685,12 +715,12 @@ def test_production_validation_always_checks_canonical_seed():
 
 
 def test_production_validation_requires_schema():
-    artifact = json.loads((DOCS / "opening-wikipedia-provenance-audit.json").read_text())
+    artifact = _load_json((DOCS / "opening-wikipedia-provenance-audit.json"))
     assert [error.code for error in validate_production_artifact(artifact, None)] == ["production_schema_required"]
 
 
 def test_fixture_version_cannot_bypass_production_schema_validation():
-    artifact = json.loads((DOCS / "opening-wikipedia-provenance-audit.json").read_text())
+    artifact = _load_json((DOCS / "opening-wikipedia-provenance-audit.json"))
     artifact["fixture_version"] = "legacy-bypass-attempt"
     artifact.pop("generated_on")
     codes = {error.code for error in validate_production_artifact(artifact, SCHEMA)}
@@ -698,7 +728,7 @@ def test_fixture_version_cannot_bypass_production_schema_validation():
 
 
 def test_canonical_seed_snapshot_references_audited_revision():
-    artifact = json.loads((DOCS / "opening-wikipedia-provenance-audit.json").read_text())
+    artifact = _load_json((DOCS / "opening-wikipedia-provenance-audit.json"))
     assert artifact["seed_snapshot"] == {
         "commit": "8a0ec732a799f95b58546feb4f9e0413b8af61a7",
         "source_file": "backend/app/seed.py",
@@ -708,7 +738,7 @@ def test_canonical_seed_snapshot_references_audited_revision():
 
 
 def test_initial_position_drift_is_part_of_snapshot_identity():
-    artifact = json.loads((DOCS / "opening-wikipedia-provenance-audit.json").read_text())
+    artifact = _load_json((DOCS / "opening-wikipedia-provenance-audit.json"))
     current = deepcopy(SAMPLE_OPENING_LINES)
     snapshot = deepcopy(SAMPLE_OPENING_LINES)
     current[0]["initial_sfen"] = shogi.STARTING_SFEN.replace(" b - 1", " b P 1")
@@ -716,7 +746,7 @@ def test_initial_position_drift_is_part_of_snapshot_identity():
 
 
 def test_implicit_and_explicit_starting_positions_are_equivalent():
-    artifact = json.loads((DOCS / "opening-wikipedia-provenance-audit.json").read_text())
+    artifact = _load_json((DOCS / "opening-wikipedia-provenance-audit.json"))
     current = deepcopy(SAMPLE_OPENING_LINES)
     snapshot = deepcopy(SAMPLE_OPENING_LINES)
     current[0].pop("initial_sfen", None)
@@ -725,7 +755,7 @@ def test_implicit_and_explicit_starting_positions_are_equivalent():
 
 
 def test_semantically_different_initial_position_is_snapshot_mismatch():
-    artifact = json.loads((DOCS / "opening-wikipedia-provenance-audit.json").read_text())
+    artifact = _load_json((DOCS / "opening-wikipedia-provenance-audit.json"))
     current = deepcopy(SAMPLE_OPENING_LINES)
     snapshot = deepcopy(SAMPLE_OPENING_LINES)
     fields = shogi.STARTING_SFEN.split()
@@ -735,7 +765,7 @@ def test_semantically_different_initial_position_is_snapshot_mismatch():
 
 
 def test_declared_snapshot_check_rejects_current_initial_position_drift(monkeypatch):
-    artifact = json.loads((DOCS / "opening-wikipedia-provenance-audit.json").read_text())
+    artifact = _load_json((DOCS / "opening-wikipedia-provenance-audit.json"))
     current = deepcopy(SAMPLE_OPENING_LINES)
     current[0]["initial_sfen"] = shogi.STARTING_SFEN.replace(" b - 1", " b P 1")
     source = (DOCS.parent / "backend/app/seed.py").read_text(encoding="utf-8")
@@ -749,7 +779,7 @@ def test_declared_snapshot_check_rejects_current_initial_position_drift(monkeypa
 
 
 def test_missing_declared_snapshot_commit_is_rejected():
-    artifact = json.loads((DOCS / "opening-wikipedia-provenance-audit.json").read_text())
+    artifact = _load_json((DOCS / "opening-wikipedia-provenance-audit.json"))
     artifact["seed_snapshot"]["commit"] = "0" * 40
     assert [error.code for error in _declared_snapshot_errors(artifact)] == [
         "seed_snapshot_commit_unavailable"
@@ -757,8 +787,8 @@ def test_missing_declared_snapshot_commit_is_rejected():
 
 
 def test_declared_snapshot_content_mismatch_is_rejected(monkeypatch):
-    artifact = json.loads((DOCS / "opening-wikipedia-provenance-audit.json").read_text())
-    source = (DOCS.parent / "backend/app/seed.py").read_text()
+    artifact = _load_json((DOCS / "opening-wikipedia-provenance-audit.json"))
+    source = (DOCS.parent / "backend/app/seed.py").read_text(encoding="utf-8")
     drifted_source = source.replace('"7g7f"', '"1a1b"', 1)
     monkeypatch.setattr(
         "app.scripts.validate_opening_wikipedia_provenance.subprocess.run",
@@ -770,8 +800,8 @@ def test_declared_snapshot_content_mismatch_is_rejected(monkeypatch):
 
 
 def test_declared_snapshot_matching_content_is_valid(monkeypatch):
-    artifact = json.loads((DOCS / "opening-wikipedia-provenance-audit.json").read_text())
-    source = (DOCS.parent / "backend/app/seed.py").read_text()
+    artifact = _load_json((DOCS / "opening-wikipedia-provenance-audit.json"))
+    source = (DOCS.parent / "backend/app/seed.py").read_text(encoding="utf-8")
     monkeypatch.setattr(
         "app.scripts.validate_opening_wikipedia_provenance.subprocess.run",
         lambda *args, **kwargs: SimpleNamespace(returncode=0, stdout=source),
@@ -780,7 +810,7 @@ def test_declared_snapshot_matching_content_is_valid(monkeypatch):
 
 
 def test_declared_snapshot_git_show_uses_utf8_and_parses_japanese(monkeypatch):
-    artifact = json.loads((DOCS / "opening-wikipedia-provenance-audit.json").read_text())
+    artifact = _load_json((DOCS / "opening-wikipedia-provenance-audit.json"))
     source = (DOCS.parent / "backend/app/seed.py").read_text(encoding="utf-8")
     assert "升田式石田流" in source
     captured = {}
@@ -799,7 +829,7 @@ def test_declared_snapshot_git_show_uses_utf8_and_parses_japanese(monkeypatch):
 
 
 def test_declared_snapshot_decode_failure_is_stable_error(monkeypatch):
-    artifact = json.loads((DOCS / "opening-wikipedia-provenance-audit.json").read_text())
+    artifact = _load_json((DOCS / "opening-wikipedia-provenance-audit.json"))
 
     def fail_decode(*args, **kwargs):
         raise UnicodeDecodeError("utf-8", b"\xff", 0, 1, "invalid start byte")
@@ -838,21 +868,21 @@ def test_snapshot_source_parser_rejects_missing_or_nonliteral_seed(source):
     ],
 )
 def test_seed_metadata_drift_has_stable_error_code(field, code):
-    artifact = json.loads((DOCS / "opening-wikipedia-provenance-audit.json").read_text())
+    artifact = _load_json((DOCS / "opening-wikipedia-provenance-audit.json"))
     seed_lines = deepcopy(SAMPLE_OPENING_LINES)
     seed_lines[0][field] = "intentional validator regression drift"
     assert code in {error.code for error in validate_artifact(artifact, None, seed_lines)}
 
 
 def test_seed_retrieved_date_is_not_compared_with_audit_attempt_date():
-    artifact = json.loads((DOCS / "opening-wikipedia-provenance-audit.json").read_text())
+    artifact = _load_json((DOCS / "opening-wikipedia-provenance-audit.json"))
     seed_lines = deepcopy(SAMPLE_OPENING_LINES)
     seed_lines[0]["source_retrieved_at"] = "2000-01-01"
     assert validate_artifact(artifact, None, seed_lines) == []
 
 
 def test_seed_entry_without_name_is_stable_validation_error():
-    artifact = json.loads((DOCS / "opening-wikipedia-provenance-audit.json").read_text())
+    artifact = _load_json((DOCS / "opening-wikipedia-provenance-audit.json"))
     seed_lines = deepcopy(SAMPLE_OPENING_LINES)
     del seed_lines[0]["name"]
     invalid = [
@@ -863,7 +893,7 @@ def test_seed_entry_without_name_is_stable_validation_error():
 
 
 def test_duplicate_seed_line_name_is_rejected_and_not_double_counted():
-    artifact = json.loads((DOCS / "opening-wikipedia-provenance-audit.json").read_text())
+    artifact = _load_json((DOCS / "opening-wikipedia-provenance-audit.json"))
     seed_lines = deepcopy(SAMPLE_OPENING_LINES)
     seed_lines[1] = deepcopy(seed_lines[0])
     errors = validate_artifact(artifact, None, seed_lines)
@@ -875,7 +905,7 @@ def test_duplicate_seed_line_name_is_rejected_and_not_double_counted():
 
 
 def test_non_dict_seed_entry_is_stable_validation_error():
-    artifact = json.loads((DOCS / "opening-wikipedia-provenance-audit.json").read_text())
+    artifact = _load_json((DOCS / "opening-wikipedia-provenance-audit.json"))
     seed_lines = deepcopy(SAMPLE_OPENING_LINES)
     seed_lines[0] = None
     invalid = [
@@ -886,7 +916,7 @@ def test_non_dict_seed_entry_is_stable_validation_error():
 
 
 def test_invalid_seed_entry_does_not_stop_later_metadata_validation():
-    artifact = json.loads((DOCS / "opening-wikipedia-provenance-audit.json").read_text())
+    artifact = _load_json((DOCS / "opening-wikipedia-provenance-audit.json"))
     seed_lines = deepcopy(SAMPLE_OPENING_LINES)
     seed_lines[0] = None
     seed_lines[1]["source_title"] = "later line metadata drift"
@@ -895,7 +925,7 @@ def test_invalid_seed_entry_does_not_stop_later_metadata_validation():
 
 
 def test_seed_metadata_normalization_failure_is_stable_error(monkeypatch):
-    artifact = json.loads((DOCS / "opening-wikipedia-provenance-audit.json").read_text())
+    artifact = _load_json((DOCS / "opening-wikipedia-provenance-audit.json"))
     seed_lines = deepcopy(SAMPLE_OPENING_LINES)
     from app import seed as seed_module
 
@@ -918,7 +948,7 @@ def test_seed_metadata_normalization_failure_is_stable_error(monkeypatch):
 
 @pytest.mark.parametrize("invalid_move", ["xxxx", "1a1b"])
 def test_invalid_seed_move_becomes_stable_validation_error(invalid_move):
-    artifact = json.loads((DOCS / "opening-wikipedia-provenance-audit.json").read_text())
+    artifact = _load_json((DOCS / "opening-wikipedia-provenance-audit.json"))
     seed_lines = deepcopy(SAMPLE_OPENING_LINES)
     seed_lines[0]["moves"][0] = invalid_move
     errors = validate_artifact(artifact, None, seed_lines)
@@ -929,7 +959,7 @@ def test_invalid_seed_move_becomes_stable_validation_error(invalid_move):
 
 
 def test_none_initial_sfen_becomes_stable_validation_error():
-    artifact = json.loads((DOCS / "opening-wikipedia-provenance-audit.json").read_text())
+    artifact = _load_json((DOCS / "opening-wikipedia-provenance-audit.json"))
     seed_lines = deepcopy(SAMPLE_OPENING_LINES)
     seed_lines[0]["initial_sfen"] = None
     errors = validate_artifact(artifact, None, seed_lines)
@@ -940,7 +970,7 @@ def test_none_initial_sfen_becomes_stable_validation_error():
 
 
 def test_none_move_node_sort_order_becomes_stable_validation_error():
-    artifact = json.loads((DOCS / "opening-wikipedia-provenance-audit.json").read_text())
+    artifact = _load_json((DOCS / "opening-wikipedia-provenance-audit.json"))
     seed_lines = deepcopy(SAMPLE_OPENING_LINES)
     seed_lines[0]["move_nodes"] = [
         {
@@ -959,7 +989,7 @@ def test_none_move_node_sort_order_becomes_stable_validation_error():
 
 
 def test_overflowing_move_node_sort_order_becomes_stable_validation_error():
-    artifact = json.loads((DOCS / "opening-wikipedia-provenance-audit.json").read_text())
+    artifact = _load_json((DOCS / "opening-wikipedia-provenance-audit.json"))
     seed_lines = deepcopy(SAMPLE_OPENING_LINES)
     seed_lines[0]["move_nodes"] = [
         {
@@ -978,7 +1008,7 @@ def test_overflowing_move_node_sort_order_becomes_stable_validation_error():
 
 
 def test_invalid_seed_line_does_not_stop_validation_of_following_lines():
-    artifact = json.loads((DOCS / "opening-wikipedia-provenance-audit.json").read_text())
+    artifact = _load_json((DOCS / "opening-wikipedia-provenance-audit.json"))
     seed_lines = deepcopy(SAMPLE_OPENING_LINES)
     seed_lines[0]["moves"][0] = "xxxx"
     seed_lines[1]["source_title"] = "later line metadata drift"
@@ -987,7 +1017,7 @@ def test_invalid_seed_line_does_not_stop_validation_of_following_lines():
 
 
 def _valid_record_artifact():
-    return json.loads((DOCS / "fixtures/opening-wikipedia-provenance-valid.json").read_text())
+    return _load_json((DOCS / "fixtures/opening-wikipedia-provenance-valid.json"))
 
 
 def test_duplicate_record_id_is_rejected_without_seed_check():
@@ -1087,14 +1117,14 @@ def test_diagram_line_rejects_explicit_node_provenance():
 
 
 def test_seed_snapshot_line_count_drift_is_rejected():
-    artifact = json.loads((DOCS / "opening-wikipedia-provenance-audit.json").read_text())
+    artifact = _load_json((DOCS / "opening-wikipedia-provenance-audit.json"))
     artifact["seed_snapshot"]["line_count"] += 1
     errors = validate_artifact(artifact, None, SAMPLE_OPENING_LINES)
     assert "seed_snapshot_line_count_mismatch" in {error.code for error in errors}
 
 
 def test_new_wikipedia_seed_without_audit_record_is_rejected():
-    artifact = json.loads((DOCS / "opening-wikipedia-provenance-audit.json").read_text())
+    artifact = _load_json((DOCS / "opening-wikipedia-provenance-audit.json"))
     seed_lines = deepcopy(SAMPLE_OPENING_LINES)
     new_line = deepcopy(seed_lines[0])
     new_line.update(name="監査未登録Wikipedia line", source_type="wikipedia")
@@ -1104,7 +1134,7 @@ def test_new_wikipedia_seed_without_audit_record_is_rejected():
 
 
 def test_verified_mixed_segments_follow_semantic_main_chain_not_node_order():
-    artifact = json.loads((DOCS / "fixtures/opening-wikipedia-provenance-valid-mixed-verified.json").read_text())
+    artifact = _load_json((DOCS / "fixtures/opening-wikipedia-provenance-valid-mixed-verified.json"))
     record = artifact["records"][0]
     branch = deepcopy(record["nodes"][0])
     branch.update(
@@ -1128,7 +1158,7 @@ def test_verified_mixed_segments_follow_semantic_main_chain_not_node_order():
 
 
 def test_malformed_mixed_main_cycle_terminates_with_stable_errors():
-    artifact = json.loads((DOCS / "fixtures/opening-wikipedia-provenance-valid-mixed-verified.json").read_text())
+    artifact = _load_json((DOCS / "fixtures/opening-wikipedia-provenance-valid-mixed-verified.json"))
     nodes = artifact["records"][0]["nodes"]
     nodes[0]["parent_key"] = nodes[1]["move_key"]
     nodes[1]["parent_key"] = nodes[0]["move_key"]
@@ -1138,14 +1168,14 @@ def test_malformed_mixed_main_cycle_terminates_with_stable_errors():
 
 
 def test_mixed_unresolved_marker_cannot_coexist_with_segments():
-    artifact = json.loads((DOCS / "fixtures/opening-wikipedia-provenance-valid-mixed-verified.json").read_text())
+    artifact = _load_json((DOCS / "fixtures/opening-wikipedia-provenance-valid-mixed-verified.json"))
     artifact["records"][0]["audit_issues"].append("mixed_segment_boundary_unresolved")
     codes = {error.code for error in validate_artifact(artifact)}
     assert "mixed_unresolved_with_segments" in codes
 
 
 def test_masuda_boundary_and_metadata_only_change_are_fixed():
-    artifact = json.loads((DOCS / "opening-wikipedia-provenance-audit.json").read_text())
+    artifact = _load_json((DOCS / "opening-wikipedia-provenance-audit.json"))
     record = next(record for record in artifact["records"] if record.get("line_name", "").startswith("升田式石田流"))
     assert record["coverage_boundary"] == {
         "covered_through_ply": 7,
