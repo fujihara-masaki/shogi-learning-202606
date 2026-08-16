@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import argparse
 import ast
+import ipaddress
 import json
 import re
 import subprocess
@@ -39,11 +40,38 @@ def _error(code: str, record: dict[str, Any] | None = None, path: str | None = N
 
 
 def _is_valid_https_url(value: Any) -> bool:
+    if not isinstance(value, str) or not value or any(character.isspace() for character in value):
+        return False
     try:
         parsed = urlsplit(value)
-        return parsed.scheme == "https" and bool(parsed.netloc and parsed.hostname)
+        port = parsed.port
     except (TypeError, ValueError):
         return False
+    if parsed.scheme != "https" or not parsed.netloc or not parsed.hostname:
+        return False
+    if parsed.username is not None or parsed.password is not None:
+        return False
+    if port is not None and not 1 <= port <= 65535:
+        return False
+    hostname = parsed.hostname
+    try:
+        ipaddress.ip_address(hostname)
+        return True
+    except ValueError:
+        pass
+    if len(hostname) > 253:
+        return False
+    labels = hostname.split(".")
+    if any(not label for label in labels):
+        return False
+    for label in labels:
+        try:
+            ascii_label = label.encode("idna").decode("ascii")
+        except UnicodeError:
+            return False
+        if len(ascii_label) > 63 or not re.fullmatch(r"[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?", ascii_label):
+            return False
+    return True
 
 
 def _note_claims_unrecorded_move(
@@ -68,16 +96,24 @@ def _note_claims_unrecorded_move(
             for match in re.finditer(re.escape(alias), clause)
         ]
         if occurrences:
-            for _alias, _start, end in occurrences:
+            for _alias, start, end in occurrences:
+                scope_start = 0
+                has_previous_move = False
+                for match in move_notation.finditer(clause, 0, start):
+                    scope_start = match.end()
+                    has_previous_move = True
                 scope_end = len(clause)
                 for match in move_notation.finditer(clause, end):
                     scope_end = match.start()
                     break
-                scope = clause[end:scope_end]
-                if any(word in scope for word in exclusion):
-                    continue
-                if any(word in scope for word in recorded_claims):
-                    return True
+                scopes = [clause[end:scope_end]]
+                if not has_previous_move:
+                    scopes.insert(0, clause[scope_start:start])
+                for scope in scopes:
+                    if any(word in scope for word in exclusion):
+                        continue
+                    if any(word in scope for word in recorded_claims):
+                        return True
             # Explicit aliases make target-scoped evidence authoritative; an
             # unrelated exclusion or recording claim must not affect them.
             continue

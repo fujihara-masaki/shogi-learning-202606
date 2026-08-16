@@ -175,6 +175,26 @@ def test_each_alias_occurrence_has_an_independent_claim_scope(note, rejected):
     assert ("note_claims_unrecorded_move" in codes) is rejected
 
 
+@pytest.mark.parametrize(
+    ("note", "rejected"),
+    [
+        ("収録したのは続く7h7f。", True),
+        ("収録したのは続く▲7六飛。", True),
+        ("手順化したのは7h7f。", True),
+        ("未収録なのは続く7h7f。", False),
+        ("未収録なのは続く▲7六飛。", False),
+        ("8h8fを収録した。未収録なのは7h7f。", False),
+        ("収録したのは7h7f。8h8fは未収録。", True),
+        ("収録したのは7h7fだが、7h7fは未収録。", True),
+    ],
+)
+def test_recording_claim_before_omitted_alias_is_scoped_to_that_move(note, rejected):
+    artifact, record = _canonical_masuda_artifact_and_record()
+    record["evidence_note"] = note
+    codes = {error.code for error in validate_artifact(artifact)}
+    assert ("note_claims_unrecorded_move" in codes) is rejected
+
+
 @pytest.mark.parametrize("omitted_after", ["", "xxxx", "9z9z"])
 def test_invalid_omitted_after_usi_is_rejected(omitted_after):
     artifact = _valid_record_artifact()
@@ -291,7 +311,19 @@ def test_valid_mixed_segment_evidence_notes_are_accepted():
     assert validate_artifact(artifact) == []
 
 
-@pytest.mark.parametrize("canonical_url", ["garbage", "http://ja.wikipedia.org/wiki/石田流", "https://"])
+@pytest.mark.parametrize(
+    "canonical_url",
+    [
+        "garbage",
+        "http://ja.wikipedia.org/wiki/石田流",
+        "https://",
+        "https://ja.wikipedia .org/wiki/x",
+        "https://ja.wikipedia.org:abc/wiki/x",
+        "https://ja.wikipedia.org:70000/wiki/x",
+        "https://-wikipedia.org/wiki/x",
+        "https://wikipedia..org/wiki/x",
+    ],
+)
 def test_needs_review_invalid_canonical_url_is_rejected(canonical_url):
     artifact = _valid_record_artifact()
     record = artifact["records"][0]
@@ -303,7 +335,10 @@ def test_needs_review_invalid_canonical_url_is_rejected(canonical_url):
     assert invalid[0].path == "source.canonical_url"
 
 
-@pytest.mark.parametrize("canonical_url", [None, "https://ja.wikipedia.org/wiki/石田流"])
+@pytest.mark.parametrize(
+    "canonical_url",
+    [None, "https://ja.wikipedia.org/wiki/石田流", "https://ja.wikipedia.org/wiki/x?oldid=123#section"],
+)
 def test_needs_review_null_or_https_canonical_url_is_accepted(canonical_url):
     artifact = _valid_record_artifact()
     record = artifact["records"][0]
@@ -312,7 +347,19 @@ def test_needs_review_null_or_https_canonical_url_is_accepted(canonical_url):
     assert "canonical_url_invalid" not in {error.code for error in validate_artifact(artifact)}
 
 
-@pytest.mark.parametrize("requested_url", ["https://", "garbage", "http://ja.wikipedia.org/wiki/石田流"])
+@pytest.mark.parametrize(
+    "requested_url",
+    [
+        "https://",
+        "garbage",
+        "http://ja.wikipedia.org/wiki/石田流",
+        "https://ja.wikipedia .org/wiki/x",
+        "https://ja.wikipedia.org:abc/wiki/x",
+        "https://ja.wikipedia.org:70000/wiki/x",
+        "https://-wikipedia.org/wiki/x",
+        "https://wikipedia..org/wiki/x",
+    ],
+)
 def test_invalid_requested_url_is_rejected(requested_url):
     artifact = _valid_record_artifact()
     record = artifact["records"][0]
@@ -323,9 +370,13 @@ def test_invalid_requested_url_is_rejected(requested_url):
     assert invalid[0].path == "source.requested_url"
 
 
-def test_https_requested_url_is_accepted():
+@pytest.mark.parametrize(
+    "requested_url",
+    ["https://ja.wikipedia.org/wiki/石田流", "https://ja.wikipedia.org/wiki/x?oldid=123#section"],
+)
+def test_https_requested_url_is_accepted(requested_url):
     artifact = _valid_record_artifact()
-    artifact["records"][0]["source"]["requested_url"] = "https://ja.wikipedia.org/wiki/石田流"
+    artifact["records"][0]["source"]["requested_url"] = requested_url
     assert "requested_url_invalid" not in {error.code for error in validate_artifact(artifact)}
 
 
