@@ -145,14 +145,16 @@ def _note_claims_unrecorded_move(
     return False
 
 
-def _japanese_omitted_move_aliases(moves: list[str], omitted_after: str | None) -> set[str]:
+def _japanese_omitted_move_aliases(
+    moves: list[str], omitted_after: str | None, initial_sfen: str | None = None
+) -> set[str]:
     """Derive a piece-specific Japanese alias without asserting next-ply legality."""
     if not omitted_after:
         return set()
     import shogi
 
     try:
-        board = shogi.Board()
+        board = shogi.Board(initial_sfen) if initial_sfen is not None else shogi.Board()
         for usi in moves:
             move = shogi.Move.from_usi(usi)
             if move not in board.legal_moves:
@@ -186,7 +188,7 @@ def _japanese_omitted_move_aliases(moves: list[str], omitted_after: str | None) 
     return {f"{side}{destination}{piece_name}"}
 
 
-def _recorded_move_notations(nodes: list[dict[str, Any]]) -> set[str]:
+def _recorded_move_notations(nodes: list[dict[str, Any]], initial_sfen: str | None = None) -> set[str]:
     """Return USIs plus safely reconstructable Japanese aliases for all tree nodes."""
     import shogi
 
@@ -207,7 +209,10 @@ def _recorded_move_notations(nodes: list[dict[str, Any]]) -> set[str]:
             if parent_key not in after_positions:
                 visiting.remove(key)
                 return
-        board = shogi.Board(after_positions[parent_key]) if parent_key is not None else shogi.Board()
+        if parent_key is not None:
+            board = shogi.Board(after_positions[parent_key])
+        else:
+            board = shogi.Board(initial_sfen) if initial_sfen is not None else shogi.Board()
         try:
             move = shogi.Move.from_usi(node["usi"])
             if move not in board.legal_moves:
@@ -239,7 +244,7 @@ def _recorded_move_notations(nodes: list[dict[str, Any]]) -> set[str]:
     return result
 
 
-def _semantic_errors(record: dict[str, Any]) -> list[ValidationError]:
+def _semantic_errors(record: dict[str, Any], initial_sfen: str | None = None) -> list[ValidationError]:
     errors: list[ValidationError] = []
     provenance = record.get("provenance_class")
     coverage = record.get("coverage")
@@ -285,8 +290,8 @@ def _semantic_errors(record: dict[str, Any]) -> list[ValidationError]:
             shogi.Move.from_usi(omitted_after)
         except (ValueError, TypeError):
             errors.append(_error("omitted_after_invalid_usi", record, "coverage_boundary.omitted_after"))
-    omitted_aliases = _japanese_omitted_move_aliases(moves, omitted_after)
-    recorded_notations = _recorded_move_notations(nodes)
+    omitted_aliases = _japanese_omitted_move_aliases(moves, omitted_after, initial_sfen)
+    recorded_notations = _recorded_move_notations(nodes, initial_sfen)
 
     notes = [record.get("evidence_note", "")]
     notes += [node.get("provenance", {}).get("evidence_note", "") for node in nodes]
@@ -606,8 +611,19 @@ def validate_artifact(data: dict[str, Any], schema: dict[str, Any] | None = None
     ]
     if len(line_names) != len(set(line_names)):
         errors.append(ValidationError("duplicate_move_line_name"))
+    initial_by_line_name: dict[str, str] = {}
+    if seed_lines is not None:
+        for line in seed_lines:
+            if not isinstance(line, dict) or not isinstance(line.get("name"), str):
+                continue
+            try:
+                initial_by_line_name[line["name"]] = _normalized_initial_sfen(line)
+            except (ValueError, TypeError, AttributeError, KeyError, OverflowError):
+                # _seed_errors reports malformed canonical seed data using its
+                # stable seed_tree_invalid/seed_entry_invalid contract.
+                continue
     for record in records:
-        errors.extend(_semantic_errors(record))
+        errors.extend(_semantic_errors(record, initial_by_line_name.get(record.get("line_name"))))
     if seed_lines is not None:
         errors.extend(_seed_errors(data, seed_lines))
     return errors

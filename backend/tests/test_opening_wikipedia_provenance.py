@@ -11,6 +11,8 @@ from app.scripts.validate_opening_wikipedia_provenance import (
     _declared_snapshot_errors,
     _extract_snapshot_seed_lines,
     _initial_positions_match,
+    _japanese_omitted_move_aliases,
+    _note_claims_unrecorded_move,
     _recorded_move_notations,
     main,
     validate_artifact,
@@ -246,6 +248,37 @@ def test_recorded_japanese_promotion_and_drop_have_side_neutral_aliases():
     ]
     notations = _recorded_move_notations(nodes)
     assert {"▲2二角成", "2二角成", "△7七角打", "7七角打"} <= notations
+
+
+def test_recorded_root_drop_aliases_use_custom_initial_position():
+    initial_sfen = "lnsgkgsnl/1r5b1/ppppppppp/9/9/9/PP1PPPPPP/1B5R1/LNSGKGSNL b B 1"
+    nodes = [{"move_key": "main-1", "parent_key": None, "usi": "B*7g"}]
+    assert {"▲7七角打", "7七角打"} <= _recorded_move_notations(nodes, initial_sfen)
+
+
+def test_recorded_root_normal_alias_uses_custom_initial_position():
+    initial_sfen = "9/9/9/9/9/9/9/9/K7k b - 1"
+    nodes = [{"move_key": "main-1", "parent_key": None, "usi": "9i9h"}]
+    assert {"▲9八玉", "9八玉"} <= _recorded_move_notations(nodes, initial_sfen)
+
+
+def test_omitted_japanese_alias_uses_custom_initial_position():
+    initial_sfen = "9/9/9/9/9/9/9/9/K7k b - 1"
+    aliases = _japanese_omitted_move_aliases([], "9i9h", initial_sfen)
+    assert aliases == {"▲9八玉"}
+    assert _note_claims_unrecorded_move("▲9八玉を収録。", "9i9h", aliases, set())
+
+
+def test_validate_artifact_passes_normalized_seed_initial_position_to_semantics(monkeypatch):
+    import app.scripts.validate_opening_wikipedia_provenance as validator
+
+    seen = []
+    monkeypatch.setattr(validator, "_semantic_errors", lambda record, initial_sfen=None: seen.append(initial_sfen) or [])
+    monkeypatch.setattr(validator, "_seed_errors", lambda artifact, seed_lines: [])
+    artifact = {"records": [{"record_id": "custom", "subject_kind": "move_line", "line_name": "custom"}]}
+    seed_lines = [{"name": "custom", "initial_sfen": "startpos"}]
+    assert validate_artifact(artifact, None, seed_lines) == []
+    assert seen == [shogi.Board().sfen()]
 
 
 @pytest.mark.parametrize(("note", "rejected"), [("9九飛を収録。", True), ("9九飛は未収録。", False)])
