@@ -4,11 +4,13 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
+import shogi
 
 from app.scripts.validate_opening_wikipedia_provenance import (
     ValidationError,
     _declared_snapshot_errors,
     _extract_snapshot_seed_lines,
+    _initial_positions_match,
     main,
     validate_artifact,
     validate_production_artifact,
@@ -63,8 +65,7 @@ def test_node_continuation_evidence_is_rejected_without_omitted_boundary():
     ],
 )
 def test_terminal_recording_note_does_not_claim_unrecorded_move(note):
-    artifact = _valid_record_artifact()
-    record = artifact["records"][0]
+    artifact, record = _canonical_masuda_artifact_and_record()
     record["coverage_boundary"]["omitted_after"] = None
     record["evidence_note"] = note
     for node in record["nodes"]:
@@ -73,8 +74,7 @@ def test_terminal_recording_note_does_not_claim_unrecorded_move(note):
 
 
 def test_terminal_recording_note_is_valid_with_omitted_boundary_on_line_and_nodes():
-    artifact = _valid_record_artifact()
-    record = artifact["records"][0]
+    artifact, record = _canonical_masuda_artifact_and_record()
     record["coverage_boundary"]["omitted_after"] = "7h7f"
     note = "引用sectionの終端である▲4八玉までを収録した。"
     record["evidence_note"] = note
@@ -84,8 +84,7 @@ def test_terminal_recording_note_is_valid_with_omitted_boundary_on_line_and_node
 
 
 def test_normal_masuda_note_is_valid_with_omitted_boundary():
-    artifact = _valid_record_artifact()
-    record = artifact["records"][0]
+    artifact, record = _canonical_masuda_artifact_and_record()
     record["coverage_boundary"]["omitted_after"] = "7h7f"
     note = "▲4八玉までを収録。続く▲7六飛は未収録。"
     record["evidence_note"] = note
@@ -193,6 +192,40 @@ def test_recording_claim_before_omitted_alias_is_scoped_to_that_move(note, rejec
     record["evidence_note"] = note
     codes = {error.code for error in validate_artifact(artifact)}
     assert ("note_claims_unrecorded_move" in codes) is rejected
+
+
+@pytest.mark.parametrize("note", ["▲7六飛を収録。", "9a9bを収録。", "収録したのは9a9b。"])
+def test_explicitly_named_absent_move_is_rejected_without_omitted_boundary(note):
+    artifact, record = _canonical_masuda_artifact_and_record()
+    record["coverage_boundary"]["omitted_after"] = None
+    record["evidence_note"] = note
+    assert "note_claims_unrecorded_move" in {error.code for error in validate_artifact(artifact)}
+
+
+def test_explicitly_named_absent_move_exclusion_is_valid():
+    artifact, record = _canonical_masuda_artifact_and_record()
+    record["coverage_boundary"]["omitted_after"] = None
+    record["evidence_note"] = "9a9bは未収録。"
+    assert "note_claims_unrecorded_move" not in {error.code for error in validate_artifact(artifact)}
+
+
+@pytest.mark.parametrize(
+    ("line_prefix", "note"),
+    [("升田式石田流", "7g7fを収録。"), ("原始鬼殺し", "6a6bを収録。")],
+)
+def test_explicitly_named_recorded_main_or_branch_move_is_valid(line_prefix, note):
+    artifact = json.loads((DOCS / "opening-wikipedia-provenance-audit.json").read_text())
+    record = next(record for record in artifact["records"] if record.get("line_name", "").startswith(line_prefix))
+    record["coverage_boundary"]["omitted_after"] = None
+    record["evidence_note"] = note
+    assert "note_claims_unrecorded_move" not in {error.code for error in validate_artifact(artifact)}
+
+
+def test_recorded_move_claim_and_absent_move_exclusion_do_not_mix_scopes():
+    artifact, record = _canonical_masuda_artifact_and_record()
+    record["coverage_boundary"]["omitted_after"] = None
+    record["evidence_note"] = "7g7fを収録。9a9bは未収録。"
+    assert "note_claims_unrecorded_move" not in {error.code for error in validate_artifact(artifact)}
 
 
 @pytest.mark.parametrize("omitted_after", ["", "xxxx", "9z9z"])
@@ -508,6 +541,47 @@ def test_canonical_seed_snapshot_references_audited_revision():
         "line_count": 34,
         "node_count": 328,
     }
+
+
+def test_initial_position_drift_is_part_of_snapshot_identity():
+    artifact = json.loads((DOCS / "opening-wikipedia-provenance-audit.json").read_text())
+    current = deepcopy(SAMPLE_OPENING_LINES)
+    snapshot = deepcopy(SAMPLE_OPENING_LINES)
+    current[0]["initial_sfen"] = shogi.STARTING_SFEN.replace(" b - 1", " b P 1")
+    assert not _initial_positions_match(artifact, current, snapshot)
+
+
+def test_implicit_and_explicit_starting_positions_are_equivalent():
+    artifact = json.loads((DOCS / "opening-wikipedia-provenance-audit.json").read_text())
+    current = deepcopy(SAMPLE_OPENING_LINES)
+    snapshot = deepcopy(SAMPLE_OPENING_LINES)
+    current[0].pop("initial_sfen", None)
+    snapshot[0]["initial_sfen"] = shogi.STARTING_SFEN
+    assert _initial_positions_match(artifact, current, snapshot)
+
+
+def test_semantically_different_initial_position_is_snapshot_mismatch():
+    artifact = json.loads((DOCS / "opening-wikipedia-provenance-audit.json").read_text())
+    current = deepcopy(SAMPLE_OPENING_LINES)
+    snapshot = deepcopy(SAMPLE_OPENING_LINES)
+    fields = shogi.STARTING_SFEN.split()
+    fields[1] = "w"
+    current[0]["initial_sfen"] = " ".join(fields)
+    assert not _initial_positions_match(artifact, current, snapshot)
+
+
+def test_declared_snapshot_check_rejects_current_initial_position_drift(monkeypatch):
+    artifact = json.loads((DOCS / "opening-wikipedia-provenance-audit.json").read_text())
+    current = deepcopy(SAMPLE_OPENING_LINES)
+    current[0]["initial_sfen"] = shogi.STARTING_SFEN.replace(" b - 1", " b P 1")
+    source = (DOCS.parent / "backend/app/seed.py").read_text(encoding="utf-8")
+    monkeypatch.setattr(
+        "app.scripts.validate_opening_wikipedia_provenance.subprocess.run",
+        lambda *args, **kwargs: SimpleNamespace(returncode=0, stdout=source),
+    )
+    assert _declared_snapshot_errors(artifact, current_seed_lines=current) == [
+        ValidationError("seed_snapshot_content_mismatch", path="initial_sfen")
+    ]
 
 
 def test_missing_declared_snapshot_commit_is_rejected():

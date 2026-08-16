@@ -75,7 +75,10 @@ def _is_valid_https_url(value: Any) -> bool:
 
 
 def _note_claims_unrecorded_move(
-    note: str, omitted_after: str | None, omitted_aliases: set[str] | None = None
+    note: str,
+    omitted_after: str | None,
+    omitted_aliases: set[str] | None = None,
+    recorded_notations: set[str] | None = None,
 ) -> bool:
     recorded_claims = ("手順化", "収録")
     exclusion = ("未収録", "収録していない", "手順化していない")
@@ -116,6 +119,23 @@ def _note_claims_unrecorded_move(
                         return True
             # Explicit aliases make target-scoped evidence authoritative; an
             # unrelated exclusion or recording claim must not affect them.
+            continue
+
+        notation_matches = list(move_notation.finditer(clause))
+        if recorded_notations is not None and omitted_after is None and notation_matches:
+            for index, match in enumerate(notation_matches):
+                notation = match.group(0)
+                if notation in recorded_notations:
+                    continue
+                left = clause[notation_matches[index - 1].end() if index else 0:match.start()]
+                right = clause[match.end():notation_matches[index + 1].start() if index + 1 < len(notation_matches) else len(clause)]
+                for scope in (left, right):
+                    if any(word in scope for word in exclusion):
+                        continue
+                    if any(word in scope for word in recorded_claims):
+                        return True
+            # Explicitly named recorded moves and explicit exclusions are more
+            # precise than the continuation-marker fallback.
             continue
 
         if any(word in clause for word in exclusion):
@@ -166,6 +186,57 @@ def _japanese_omitted_move_aliases(moves: list[str], omitted_after: str | None) 
     return {f"{side}{destination}{piece_name}"}
 
 
+def _recorded_move_notations(nodes: list[dict[str, Any]]) -> set[str]:
+    """Return USIs plus safely reconstructable Japanese aliases for all tree nodes."""
+    import shogi
+
+    result = {node.get("usi") for node in nodes if isinstance(node.get("usi"), str)}
+    by_key = {node.get("move_key"): node for node in nodes}
+    after_positions: dict[str, str] = {}
+    visiting: set[str] = set()
+    rank_kanji = "一二三四五六七八九"
+
+    def prepare(key: str) -> None:
+        if key in after_positions or key in visiting or key not in by_key:
+            return
+        visiting.add(key)
+        node = by_key[key]
+        parent_key = node.get("parent_key")
+        if parent_key is not None:
+            prepare(parent_key)
+            if parent_key not in after_positions:
+                visiting.remove(key)
+                return
+        board = shogi.Board(after_positions[parent_key]) if parent_key is not None else shogi.Board()
+        try:
+            move = shogi.Move.from_usi(node["usi"])
+            if move not in board.legal_moves:
+                visiting.remove(key)
+                return
+            destination_usi = node["usi"].split("*", 1)[-1][:2] if "*" in node["usi"] else node["usi"][2:4]
+            destination = destination_usi[0] + rank_kanji[ord(destination_usi[1]) - ord("a")]
+            if "*" in node["usi"]:
+                piece_name = shogi.Piece.from_symbol(node["usi"][0]).japanese_symbol()
+                side = "▲" if board.turn == shogi.BLACK else "△"
+                result.add(f"{side}{destination}{piece_name}打")
+            else:
+                piece = board.piece_at(move.from_square)
+                if piece is not None:
+                    piece_name = piece.japanese_symbol() + ("成" if node["usi"].endswith("+") else "")
+                    side = "▲" if piece.color == shogi.BLACK else "△"
+                    result.add(f"{side}{destination}{piece_name}")
+            board.push(move)
+            after_positions[key] = board.sfen()
+        except (ValueError, TypeError, AttributeError, KeyError, IndexError):
+            pass
+        visiting.remove(key)
+
+    for key in by_key:
+        if isinstance(key, str):
+            prepare(key)
+    return result
+
+
 def _semantic_errors(record: dict[str, Any]) -> list[ValidationError]:
     errors: list[ValidationError] = []
     provenance = record.get("provenance_class")
@@ -213,11 +284,15 @@ def _semantic_errors(record: dict[str, Any]) -> list[ValidationError]:
         except (ValueError, TypeError):
             errors.append(_error("omitted_after_invalid_usi", record, "coverage_boundary.omitted_after"))
     omitted_aliases = _japanese_omitted_move_aliases(moves, omitted_after)
+    recorded_notations = _recorded_move_notations(nodes)
 
     notes = [record.get("evidence_note", "")]
     notes += [node.get("provenance", {}).get("evidence_note", "") for node in nodes]
     notes += [segment.get("evidence_note", "") for segment in record.get("segments", [])]
-    if any(_note_claims_unrecorded_move(note, omitted_after, omitted_aliases) for note in notes):
+    if any(
+        _note_claims_unrecorded_move(note, omitted_after, omitted_aliases, recorded_notations)
+        for note in notes
+    ):
         errors.append(_error("note_claims_unrecorded_move", record))
 
     verification = record.get("verification", {})
@@ -452,7 +527,35 @@ def _extract_snapshot_seed_lines(source: str) -> list[dict[str, Any]]:
     return result
 
 
-def _declared_snapshot_errors(artifact: dict[str, Any], repo_root: Path | None = None) -> list[ValidationError]:
+def _normalized_initial_sfen(line: dict[str, Any]) -> str:
+    import shogi
+
+    initial = line.get("initial_sfen", shogi.STARTING_SFEN)
+    if initial == "startpos":
+        initial = shogi.STARTING_SFEN
+    return shogi.Board(initial).sfen()
+
+
+def _initial_positions_match(
+    artifact: dict[str, Any], current_lines: list[dict[str, Any]], snapshot_lines: list[dict[str, Any]]
+) -> bool:
+    audited_names = {
+        record.get("line_name") for record in artifact.get("records", [])
+        if record.get("subject_kind") == "move_line"
+    }
+    current = {line.get("name"): line for line in current_lines if isinstance(line, dict) and line.get("name") in audited_names}
+    snapshot = {line.get("name"): line for line in snapshot_lines if isinstance(line, dict) and line.get("name") in audited_names}
+    if set(current) != audited_names or set(snapshot) != audited_names:
+        return False
+    try:
+        return all(_normalized_initial_sfen(current[name]) == _normalized_initial_sfen(snapshot[name]) for name in audited_names)
+    except (ValueError, TypeError, AttributeError, KeyError):
+        return False
+
+
+def _declared_snapshot_errors(
+    artifact: dict[str, Any], repo_root: Path | None = None, current_seed_lines: list[dict[str, Any]] | None = None
+) -> list[ValidationError]:
     snapshot = artifact.get("seed_snapshot", {})
     commit, source_file = snapshot.get("commit"), snapshot.get("source_file")
     root = repo_root or Path(__file__).resolve().parents[3]
@@ -476,6 +579,8 @@ def _declared_snapshot_errors(artifact: dict[str, Any], repo_root: Path | None =
         return [ValidationError("seed_snapshot_source_invalid")]
     if _seed_errors(artifact, snapshot_lines):
         return [ValidationError("seed_snapshot_content_mismatch")]
+    if current_seed_lines is not None and not _initial_positions_match(artifact, current_seed_lines, snapshot_lines):
+        return [ValidationError("seed_snapshot_content_mismatch", path="initial_sfen")]
     return []
 
 
@@ -522,7 +627,7 @@ def validate_production_artifact(data: dict[str, Any], schema: dict[str, Any] | 
     errors = validate_artifact(data, schema, SAMPLE_OPENING_LINES)
     if any(error.code == "schema_validation_error" for error in errors):
         return errors
-    errors.extend(_declared_snapshot_errors(data))
+    errors.extend(_declared_snapshot_errors(data, current_seed_lines=SAMPLE_OPENING_LINES))
     return errors
 
 
