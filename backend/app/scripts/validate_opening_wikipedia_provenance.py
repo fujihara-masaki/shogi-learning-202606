@@ -9,6 +9,7 @@ from __future__ import annotations
 import argparse
 import ast
 import json
+import re
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
@@ -39,13 +40,20 @@ def _error(code: str, record: dict[str, Any] | None = None, path: str | None = N
 def _note_claims_unrecorded_move(note: str, omitted_after: str | None) -> bool:
     recorded_claims = ("手順化", "収録済み", "収録した", "収録しています")
     exclusion = ("未収録", "収録していない", "手順化していない")
-    has_recorded_claim = any(word in note for word in recorded_claims)
-    if not has_recorded_claim or any(word in note for word in exclusion):
-        return False
     continuation_markers = ("実戦以下", "続く", "続いて", "その後", "以降")
-    if any(marker in note for marker in continuation_markers):
-        return True
-    return bool(omitted_after and omitted_after in note)
+    for clause in re.split(r"[。！？\n]+", note):
+        if not any(word in clause for word in recorded_claims):
+            continue
+        has_exclusion = any(word in clause for word in exclusion)
+        mentions_omitted = bool(omitted_after and omitted_after in clause)
+        # An exclusion only negates a recorded claim in its own clause.  When
+        # the clause names the omitted USI explicitly, that target wins over an
+        # unrelated exclusion elsewhere in the same clause.
+        if has_exclusion and not mentions_omitted:
+            continue
+        if any(marker in clause for marker in continuation_markers) or mentions_omitted:
+            return True
+    return False
 
 
 def _semantic_errors(record: dict[str, Any]) -> list[ValidationError]:
@@ -397,7 +405,20 @@ def main() -> int:
     # during review.  The production CLI now *always* checks the seed.
     parser.add_argument("--check-seed", action="store_true", help=argparse.SUPPRESS)
     args = parser.parse_args()
-    data, schema = json.loads(args.artifact.read_text()), json.loads(args.schema.read_text())
+    decode_errors = []
+    try:
+        data = json.loads(args.artifact.read_text())
+    except json.JSONDecodeError:
+        decode_errors.append(ValidationError("artifact_json_invalid", path="artifact"))
+        data = None
+    try:
+        schema = json.loads(args.schema.read_text())
+    except json.JSONDecodeError:
+        decode_errors.append(ValidationError("schema_json_invalid", path="schema"))
+        schema = None
+    if decode_errors:
+        print(json.dumps({"valid": False, "errors": [error.as_dict() for error in decode_errors]}, ensure_ascii=False))
+        return 1
     errors = validate_production_artifact(data, schema)
     print(json.dumps({"valid": not errors, "errors": [error.as_dict() for error in errors]}, ensure_ascii=False))
     return bool(errors)

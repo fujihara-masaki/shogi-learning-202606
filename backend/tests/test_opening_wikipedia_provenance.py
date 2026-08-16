@@ -9,6 +9,7 @@ from app.scripts.validate_opening_wikipedia_provenance import (
     ValidationError,
     _declared_snapshot_errors,
     _extract_snapshot_seed_lines,
+    main,
     validate_artifact,
     validate_production_artifact,
 )
@@ -99,6 +100,57 @@ def test_direct_omitted_usi_recording_claim_is_rejected():
     record["coverage_boundary"]["omitted_after"] = "7h7f"
     record["evidence_note"] = "7h7fを収録した。"
     assert "note_claims_unrecorded_move" in {error.code for error in validate_artifact(artifact)}
+
+
+def test_unrelated_exclusion_does_not_hide_omitted_move_claim():
+    artifact = _valid_record_artifact()
+    record = artifact["records"][0]
+    record["coverage_boundary"]["omitted_after"] = "7h7f"
+    record["evidence_note"] = "続く7h7fを収録した。なお8h8fは未収録。"
+    assert "note_claims_unrecorded_move" in {error.code for error in validate_artifact(artifact)}
+
+
+def test_unrelated_node_exclusion_does_not_hide_omitted_move_claim():
+    artifact = _valid_record_artifact()
+    record = artifact["records"][0]
+    record["coverage_boundary"]["omitted_after"] = "7h7f"
+    record["nodes"][0]["provenance"]["evidence_note"] = "続く7h7fを収録した。なお8h8fは未収録。"
+    assert "note_claims_unrecorded_move" in {error.code for error in validate_artifact(artifact)}
+
+
+def test_exclusion_for_omitted_move_does_not_hide_unrelated_recording():
+    artifact = _valid_record_artifact()
+    record = artifact["records"][0]
+    record["coverage_boundary"]["omitted_after"] = "7h7f"
+    record["evidence_note"] = "続く7h7fは未収録。なお8h8fを収録した。"
+    assert "note_claims_unrecorded_move" not in {error.code for error in validate_artifact(artifact)}
+
+
+@pytest.mark.parametrize(
+    ("artifact_text", "schema_text", "expected_codes"),
+    [
+        ('{"broken":', json.dumps(SCHEMA), ["artifact_json_invalid"]),
+        (json.dumps({"valid": "artifact"}), '{"broken":', ["schema_json_invalid"]),
+        ('{"broken":', '{"also-broken":', ["artifact_json_invalid", "schema_json_invalid"]),
+    ],
+)
+def test_cli_serializes_malformed_json(tmp_path, monkeypatch, capsys, artifact_text, schema_text, expected_codes):
+    artifact_path = tmp_path / "artifact.json"
+    schema_path = tmp_path / "schema.json"
+    artifact_path.write_text(artifact_text)
+    schema_path.write_text(schema_text)
+    monkeypatch.setattr(
+        "sys.argv",
+        ["validate_opening_wikipedia_provenance", str(artifact_path), "--schema", str(schema_path)],
+    )
+
+    assert main() == 1
+    output = json.loads(capsys.readouterr().out)
+    assert output["valid"] is False
+    assert [error["code"] for error in output["errors"]] == expected_codes
+    assert [error["path"] for error in output["errors"]] == [
+        "artifact" if code.startswith("artifact") else "schema" for code in expected_codes
+    ]
 
 
 def test_canonical_artifact_matches_every_wikipedia_seed_node():
