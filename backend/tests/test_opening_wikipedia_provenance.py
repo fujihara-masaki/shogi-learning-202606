@@ -142,6 +142,22 @@ def test_same_sentence_omitted_move_recording_is_not_hidden_by_other_exclusion()
     assert "note_claims_unrecorded_move" in {error.code for error in validate_artifact(artifact)}
 
 
+@pytest.mark.parametrize(
+    ("note", "rejected"),
+    [
+        ("続く7h7fを収録したものの8h8fは未収録。", True),
+        ("続く▲7六飛を収録したものの8h8fは未収録。", True),
+        ("8h8fを収録したものの7h7fは未収録。", False),
+        ("8h8fを収録したものの▲7六飛は未収録。", False),
+    ],
+)
+def test_exclusion_is_tied_to_the_move_it_negates(note, rejected):
+    artifact, record = _canonical_masuda_artifact_and_record()
+    record["evidence_note"] = note
+    codes = {error.code for error in validate_artifact(artifact)}
+    assert ("note_claims_unrecorded_move" in codes) is rejected
+
+
 @pytest.mark.parametrize("omitted_after", ["", "xxxx", "9z9z"])
 def test_invalid_omitted_after_usi_is_rejected(omitted_after):
     artifact = _valid_record_artifact()

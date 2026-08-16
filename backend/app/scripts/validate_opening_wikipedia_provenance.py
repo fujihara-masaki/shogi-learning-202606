@@ -52,17 +52,40 @@ def _note_claims_unrecorded_move(
     recorded_claims = ("手順化", "収録")
     exclusion = ("未収録", "収録していない", "手順化していない")
     continuation_markers = ("実戦以下", "続く", "続いて", "その後", "以降")
+    aliases = ({omitted_after} if omitted_after else set()) | (omitted_aliases or set())
+    move_notation = re.compile(
+        r"(?:[1-9][a-i][1-9][a-i]\+?|[PLNSGBR]\*[1-9][a-i]|[▲△]?[1-9][一二三四五六七八九][歩香桂銀金角飛玉と杏圭全馬龍](?:成|打)?)"
+    )
     # Split both sentences and contrastive/coordinating subclauses so an
     # exclusion for one move cannot negate a recorded claim about another.
     for clause in re.split(r"[。！？\n、]+|(?:だが|ですが|けれども|一方|なお)", note):
         if not any(word in clause for word in recorded_claims):
             continue
-        has_exclusion = any(word in clause for word in exclusion)
-        aliases = ({omitted_after} if omitted_after else set()) | (omitted_aliases or set())
-        mentions_omitted = any(alias in clause for alias in aliases)
-        if has_exclusion:
+
+        occurrences = [
+            (alias, match.start(), match.end())
+            for alias in aliases
+            for match in re.finditer(re.escape(alias), clause)
+        ]
+        if occurrences:
+            for _alias, _start, end in occurrences:
+                scope_end = len(clause)
+                for match in move_notation.finditer(clause, end):
+                    if match.group(0) not in aliases:
+                        scope_end = match.start()
+                        break
+                scope = clause[end:scope_end]
+                if any(word in scope for word in exclusion):
+                    continue
+                if any(word in scope for word in recorded_claims):
+                    return True
+            # Explicit aliases make target-scoped evidence authoritative; an
+            # unrelated exclusion or recording claim must not affect them.
             continue
-        if any(marker in clause for marker in continuation_markers) or mentions_omitted:
+
+        if any(word in clause for word in exclusion):
+            continue
+        if any(marker in clause for marker in continuation_markers):
             return True
     return False
 
