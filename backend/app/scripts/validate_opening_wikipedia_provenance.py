@@ -14,6 +14,7 @@ import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlsplit
 
 PROVENANCE_COVERAGE = {
     "explicit_sequence": {"complete_for_cited_sequence", "partial_explicit_sequence"},
@@ -64,6 +65,17 @@ def _semantic_errors(record: dict[str, Any]) -> list[ValidationError]:
     elif coverage not in PROVENANCE_COVERAGE[provenance]:
         errors.append(_error("invalid_provenance_coverage", record))
 
+    source = record.get("source", {})
+    canonical_url = source.get("canonical_url")
+    if canonical_url is not None:
+        try:
+            parsed_url = urlsplit(canonical_url)
+            canonical_url_valid = parsed_url.scheme == "https" and bool(parsed_url.netloc and parsed_url.hostname)
+        except (TypeError, ValueError):
+            canonical_url_valid = False
+        if not canonical_url_valid:
+            errors.append(_error("canonical_url_invalid", record, "source.canonical_url"))
+
     # D0's intentionally small legacy fixture exercises the note rule directly.
     if "fixture_version" in record:
         if _note_claims_unrecorded_move(record.get("source_note", ""), record.get("omitted_after")):
@@ -85,12 +97,22 @@ def _semantic_errors(record: dict[str, Any]) -> list[ValidationError]:
     if moves and boundary.get("covered_through_move") != moves[-1]:
         errors.append(_error("covered_through_move_mismatch", record))
 
+    omitted_after = boundary.get("omitted_after")
+    if omitted_after is not None:
+        import shogi
+
+        try:
+            shogi.Move.from_usi(omitted_after)
+        except (ValueError, TypeError):
+            errors.append(_error("omitted_after_invalid_usi", record, "coverage_boundary.omitted_after"))
+
     notes = [record.get("evidence_note", "")]
     notes += [node.get("provenance", {}).get("evidence_note", "") for node in nodes]
-    if any(_note_claims_unrecorded_move(note, boundary.get("omitted_after")) for note in notes):
+    notes += [segment.get("evidence_note", "") for segment in record.get("segments", [])]
+    if any(_note_claims_unrecorded_move(note, omitted_after) for note in notes):
         errors.append(_error("note_claims_unrecorded_move", record))
 
-    source, verification = record.get("source", {}), record.get("verification", {})
+    verification = record.get("verification", {})
     status = verification.get("status")
     if status == "verified":
         required = ("canonical_url", "source_section", "revision_id", "revision_timestamp", "retrieved_at", "source_license")

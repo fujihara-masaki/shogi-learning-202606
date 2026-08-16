@@ -142,6 +142,64 @@ def test_same_sentence_omitted_move_recording_is_not_hidden_by_other_exclusion()
     assert "note_claims_unrecorded_move" in {error.code for error in validate_artifact(artifact)}
 
 
+@pytest.mark.parametrize("omitted_after", ["", "xxxx", "9z9z"])
+def test_invalid_omitted_after_usi_is_rejected(omitted_after):
+    artifact = _valid_record_artifact()
+    artifact["records"][0]["coverage_boundary"]["omitted_after"] = omitted_after
+    invalid = [error for error in validate_artifact(artifact) if error.code == "omitted_after_invalid_usi"]
+    assert len(invalid) == 1
+    assert invalid[0].record_id == artifact["records"][0]["record_id"]
+    assert invalid[0].path == "coverage_boundary.omitted_after"
+
+
+@pytest.mark.parametrize("omitted_after", [None, "7h7f"])
+def test_valid_omitted_after_values_are_accepted(omitted_after):
+    artifact = _valid_record_artifact()
+    artifact["records"][0]["coverage_boundary"]["omitted_after"] = omitted_after
+    assert "omitted_after_invalid_usi" not in {error.code for error in validate_artifact(artifact)}
+
+
+def test_canonical_masuda_omitted_after_remains_valid():
+    artifact = json.loads((DOCS / "opening-wikipedia-provenance-audit.json").read_text())
+    masuda = next(record for record in artifact["records"] if record.get("line_name", "").startswith("升田式石田流"))
+    assert masuda["coverage_boundary"]["omitted_after"] == "7h7f"
+    assert "omitted_after_invalid_usi" not in {error.code for error in validate_artifact(artifact)}
+
+
+def test_mixed_segment_contradictory_evidence_note_is_rejected():
+    artifact = json.loads((DOCS / "fixtures/opening-wikipedia-provenance-valid-mixed-verified.json").read_text())
+    record = artifact["records"][0]
+    record["coverage_boundary"]["omitted_after"] = "7h7f"
+    record["segments"][0]["evidence_note"] = "続く7h7fを収録した。"
+    assert "note_claims_unrecorded_move" in {error.code for error in validate_artifact(artifact)}
+
+
+def test_valid_mixed_segment_evidence_notes_are_accepted():
+    artifact = json.loads((DOCS / "fixtures/opening-wikipedia-provenance-valid-mixed-verified.json").read_text())
+    assert validate_artifact(artifact) == []
+
+
+@pytest.mark.parametrize("canonical_url", ["garbage", "http://ja.wikipedia.org/wiki/石田流", "https://"])
+def test_needs_review_invalid_canonical_url_is_rejected(canonical_url):
+    artifact = _valid_record_artifact()
+    record = artifact["records"][0]
+    record["verification"]["status"] = "needs_review"
+    record["source"]["canonical_url"] = canonical_url
+    invalid = [error for error in validate_artifact(artifact) if error.code == "canonical_url_invalid"]
+    assert len(invalid) == 1
+    assert invalid[0].record_id == record["record_id"]
+    assert invalid[0].path == "source.canonical_url"
+
+
+@pytest.mark.parametrize("canonical_url", [None, "https://ja.wikipedia.org/wiki/石田流"])
+def test_needs_review_null_or_https_canonical_url_is_accepted(canonical_url):
+    artifact = _valid_record_artifact()
+    record = artifact["records"][0]
+    record["verification"]["status"] = "needs_review"
+    record["source"]["canonical_url"] = canonical_url
+    assert "canonical_url_invalid" not in {error.code for error in validate_artifact(artifact)}
+
+
 @pytest.mark.parametrize(
     ("artifact_text", "schema_text", "expected_codes"),
     [
