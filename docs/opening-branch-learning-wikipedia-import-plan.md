@@ -283,7 +283,7 @@ validator は key 一意、親の存在、同一 line、acyclic、root、ply、s
 | 居飛車穴熊 | あり | 13 | なし | B | 要確認 | 対四間 | 低 | 戦法/囲いの分類を維持 |
 | 鬼殺し（短手順） | あり | 9 | なし | B | 原始鬼殺しと整理 | 新・鬼殺し等 | 中 | Wikipedia明示lineとは別 |
 
-この表以外の現行 line（角交換四間飛車、対振り飛車急戦、三間飛車、角交換振り飛車、相振り飛車、嬉野流、筋違い角、雁木、矢倉棒銀、美濃囲い、穴熊、舟囲い、左美濃、向かい飛車）も PR-D で全件 machine-readable CSV/fixture と突合する。既定の `source_note` が全 line を Wikipedia 再構成と読ませる一方、`OPENING_TYPE_SEEDS` には `local seed` / Wikibooks が混在するため、line provenance と catalog provenance を分離する。
+この表以外の現行 line（角交換四間飛車、対振り飛車急戦、三間飛車、角交換振り飛車、相振り飛車、嬉野流、筋違い角、雁木、矢倉棒銀、美濃囲い、穴熊、舟囲い、左美濃、向かい飛車）も、D1cで新canonical artifactへ移す対象をmachine-readableな一覧/fixtureとして突合する。これは過去のWikipediaとの完全一致を遡及証明する作業ではなく、レビュー済みartifactと移行後seed/import結果の差分を管理するためのものとする。既定の `source_note` が全 line を Wikipedia 再構成と読ませる一方、`OPENING_TYPE_SEEDS` には `local seed` / Wikibooks が混在するため、line provenance と catalog provenance を分離する。
 
 ### 7.2 coverage status の改善
 
@@ -295,7 +295,7 @@ validator は key 一意、親の存在、同一 line、acyclic、root、ply、s
 - `name_only`: 名称/catalogのみ、move seedなし。
 - `mixed`: AとBが混在。node/segment単位 provenance が必要。
 
-さらに `covered_through_ply`、`covered_through_move`、`omitted_after`（自由文）、Wikipedia `revision_id` / `oldid` を記録する案を PR-D で決める。source note に未収録手を「収録した」と書けない validator/test fixture を追加する。
+さらに `covered_through_ply`、`covered_through_move`、`omitted_after`（構造化fieldを正とし、必要なら表示文も併記）、Wikipedia `revision_id` / `oldid` を記録する案を PR-D0 で決める。coverage と実movesの整合はこれらの構造化fieldから検査する。`source_note` / `evidence_note` に含まれる「収録」「未収録」などの自然言語をPythonで解釈して正否を推測することは、正規validatorの責務にしない。表示用`source_note`は、可能な範囲で検証済みの構造化metadataから決定論的に生成する。
 
 ## 8. Wikipedia 未収録一覧
 
@@ -313,7 +313,7 @@ validator は key 一意、親の存在、同一 line、acyclic、root、ply、s
 | 向かい飛車 | メリケン向かい飛車、ダイレクト向かい飛車、阪田流向かい飛車、筋違い角向かい飛車、升田流向かい飛車、大野流向かい飛車 | C暫定 | 名称確認だけならcatalog `name_only`。中 |
 | 鬼殺し | 新・鬼殺し、鬼殺し向かい飛車、対振り飛車用鬼殺し、相振り飛車用鬼殺し | C暫定 | 原始鬼殺しと混同せず個別 provenance。中 |
 
-PR-D の外部監査では Wikipedia の曖昧さ回避ページ、redirect、section 見出し、記事 revision を記録し、(1) 名称が現行記事にある、(2) 個別記事がある、(3) 初期局面から連続手順がある、を別 boolean にする。名称だけなら `opening_types` catalog への「準備中」追加は可能だが `opening_lines` / moves は作らない。
+PR-E以降の外部調査・structured extractionでは Wikipedia の曖昧さ回避ページ、redirect、section 見出し、記事 revision を記録し、(1) 名称が現行記事にある、(2) 個別記事がある、(3) 初期局面から連続手順がある、を別 boolean にする。名称だけなら `opening_types` catalog への「準備中」追加は可能だが `opening_lines` / moves は作らない。
 
 ## 9. 既存 seed の延長候補
 
@@ -331,7 +331,7 @@ PR-D の外部監査では Wikipedia の曖昧さ回避ページ、redirect、se
 | ゴキゲン中飛車 | 8手目△8四歩 | B | 初期手順の本文整合、▲5八金右超急戦/超速/丸山ワクチンの分岐点 | 0 | 現行列の先後と手順を先に再監査 |
 | 原始鬼殺し | main 19手目▲7三歩成、branchは1手/3手 | A暫定 | mainと△6二銀が同じ4手目になる重複、△6二金枝の本文範囲 | 0 | sibling同一USIを解消してから延長 |
 
-この「0」は延長不能という意味ではなく、**現行版本文を確認せずに安全と断定できる手数が0**という gate である。PR-E 以降は監査記録に実際の「本文明示終端」「追加手数」「分岐 ply」「revision ID」を埋めてから実装へ進む。
+この「0」は延長不能という意味ではなく、**現行版本文を確認せずに安全と断定できる手数が0**という gate である。PR-E 以降はLLMによるstructured extractionで、監査artifactに実際の「本文明示終端」「追加手数」「分岐 ply」「revision ID」を埋め、PR-D1b/D1cのvalidatorを通してからseed/importへ進む。
 
 ## 10. インポート規則
 
@@ -354,14 +354,14 @@ PR-D の外部監査では Wikipedia の曖昧さ回避ページ、redirect、se
 6. 各手を tsshogi（frontend）と backend の `python-shogi` validator の双方で合法性確認し、初期SFEN、手番、成/不成、駒打ち、前後SFENを固定 fixture で照合する。
 7. `source_url`, `source_title`, `source_section`, `source_license`, `source_retrieved_at`, `source_note`, `coverage_status`, provenance code を必須にする。可能なら `revision_id` / `oldid` も保存する。
 8. 日本語 Wikipedia の CC BY-SA 表記と source link を UI / API / notices で維持する。短い手順の事実性と、文章・図の翻案に必要な帰属を別問題として扱い、本文を大量コピーしない。
-9. `source_note` は「実際にmovesへ入れた終端」を具体的に書く。未収録の後続は「本文には続きがあるが未収録」と書き分ける。
+9. coverageの正規情報は構造化metadataに持たせ、表示用`source_note`は可能な範囲でそこから生成する。手書きする場合も、実際にmovesへ入れた終端と未収録の後続を書き分ける。ただしvalidatorはその日本語を自然言語解析せず、構造化fieldを検査する。
 10. `coverage_status` と moves を test で対応付ける。`covered_through_ply > len(moves)`、終端USI不一致、Aなのにsection/revisionがない状態を失敗させる。
 11. branch は各 edge/segment の出典を持つ。mainの出典を根拠なくbranchへ継承しない。
 12. 取得時に記事 title、section、retrieved date、revision ID、確認者、合法性検査結果を review artifact に残す。
 
 ### 10.3 升田式石田流の即時監査事項
 
-現 seed は7手目 `5i4h`（▲4八玉）で終わるが、`source_note` は「および実戦以下▲7六飛を手順化」と読める。実際の `moves` に `7h7f` はない。PR-D は最低限 note を「▲4八玉まで収録。本文に記載された実戦以下▲7六飛は未収録」のように事実へ合わせる。もし本文の連続性・合法性を再確認して手を追加するなら、その seed 追加は PR-D ではなく石田流系 PR-E に分離する。
+現 seed は7手目 `5i4h`（▲4八玉）で終わるが、`source_note` は「および実戦以下▲7六飛を手順化」と読める。実際の `moves` に `7h7f` はない。PR-D1aは既知のこのmetadata不整合だけを対象とし、noteを「▲4八玉まで収録。本文に記載された実戦以下▲7六飛は未収録」のように事実へ合わせ、**movesは変更しない**。本文の連続性・合法性を再確認して手を追加する場合は、PR-D1aではなく石田流系PR-Eに分離する。
 
 ## 11. PR 分割と実装順序
 
@@ -370,14 +370,14 @@ PR-D の外部監査では Wikipedia の曖昧さ回避ページ、redirect、se
 ```text
 完了:               A0 (#52) → A (#53)
 UX / 構造系:                    B → C
-provenance 系:       D0 → D1 ─────────┐
-Wikipedia seed 系:                 E-linear（線形・小規模、D1必須）
-                                   B → C → E-branch-heavy（D1も必須、推奨gate）
+provenance 系:       D0 → D1a → D1b → D1c → D1d（D1dは再評価後）
+Wikipedia seed 系:                   LLM extraction → D1b → D1c → E-linear
+                              B → C ────────────────→ E-branch-heavy（推奨gate）
 follow-up:                         現計画完了 → visual branch tree検討
 ```
 
 - A0は重複を「修正した」のではなく、現seedに重複がないことと再発防止validatorを実装済み。Aは全候補照合、card、明示的な再生ラベル、path保持、直前分岐復帰まで実装済みである。
-- D0/D1はB/Cと並行でき、線形またはごく小さい一次分岐seedはD1後に追加可能。ただしレビュー・操作対象が多い **branch-heavy seed（多数のsibling、複数分岐点、多段分岐）を追加する前にB/Cを完了することを強く推奨**する。
+- D0/D1a〜D1dはB/Cと並行できる。PR-E以降は、ChatGPT等のLLMがWikipedia本文の意味理解、棋譜抽出、A/B/C/M判定を行ってstructured artifactを生成し、プログラムがD1b/D1cでschema、将棋合法性、tree、coverage、metadata整合を決定論的に検証した後、seed/importする。線形またはごく小さい一次分岐seedはD1b/D1c後に追加可能。ただしレビュー・操作対象が多い **branch-heavy seed（多数のsibling、複数分岐点、多段分岐）を追加する前にB/Cを完了することを強く推奨**する。
 - B前にbranch-heavy seedを入れるとSFEN接続と配列先頭本線の暫定契約へ新データを固定し、B migration/backfillの範囲を増やす。C前に入れると既存card/通過履歴だけでは全体監査と任意node到達が難しい。例外は「多段構造を検証する最小fixture」であり、production Wikipedia seedではない。
 - PR-Eごとに `linear/small-branch` か `branch-heavy` をPR本文で宣言する。branch-heavyの判定例はbranch-of-branchを含む、複数の分岐点を含む、または一覧なしではreviewが困難な規模である。
 
@@ -422,10 +422,31 @@ follow-up:                         現計画完了 → visual branch tree検討
 - **tests**: path変換、current/ancestor、別branchの前後jump、各深さでのmain切替、collapsed初期状態、focus、deep tree、keyboard、360px、500-node fixtureの初期/展開時測定。
 - **非目標**: 横レーン型visual branch tree、棋譜リストとの双方向手数同期、branch比較、大規模tree virtualization。これらはfollow-up文書で扱う。
 
-### PR-D1: Wikipedia coverage監査・metadata整合
+### PR-D1a: 升田式石田流 metadata 整合
 
-- **目的**: 全seedのA/B/C/M確定、source note/coverage修正。升田式石田流の不整合を解消。
-- **seed**: 手順追加なし、metadataのみ。provenance/revision列の採否を決定し、必須field・終端・idempotencyを検査する。
+- **目的と範囲**: 既知の升田式石田流のmetadata不整合だけを修正する小PR。`source_note`等を実データの終端（7手目▲4八玉）に合わせ、▲7六飛は未収録であることを明確にする。
+- **非目標**: movesの追加・削除・並べ替え、他lineの監査、汎用validatorの実装。**movesは一切変更しない**。
+
+### PR-D1b: Structured Wikipedia opening validator
+
+- **目的**: LLMが生成したstructured artifactを、Wikipedia本文の再解釈なしに決定論的に検証する正規validatorを実装する。
+- **検査範囲**: JSON Schema、USI構文、全着手の合法手再生、initial SFEN、direct-parent tree（root/orphan/親子SFENを含む）、cycle、同一parent配下のsibling USI / `sort_order`一意性、semantic mainのexactly-one規則、coverage boundary、A/B/C/M provenance、mixed segment境界とnode/segment metadata。
+- **責務境界**: Wikipedia本文の意味理解・棋譜抽出・A/B/C/M判定はChatGPT等のLLM/人間レビュー側が担う。プログラムはartifactのschema、将棋合法性、tree、coverage、metadata整合だけを検証する。`source_note` / `evidence_note`の「収録」「未収録」等をPythonで自然言語解析して正しさを判定しない。
+- **表示metadata**: `source_note`は可能な範囲でcoverage/provenance/終端等の構造化metadataから生成し、自由文を正規データの代用にしない。
+
+### PR-D1c: canonical artifact ↔ seed 整合
+
+- **目的**: 新しいcanonical structured artifactとseed/import結果が一致することを保証する。stable key、繰り返しimport時のidempotency、既存対象を安全に置換できること（欠落・重複・parent drift・意図しないID driftを起こさないこと）を重視する。
+- **歴史的seedの扱い**: 既存seedが過去のある時点のWikipedia本文と完全一致していたことを遡及的に証明することは主目的にしない。現在レビューされたcanonical artifactを移行基準とし、差分と置換方針を明示する。
+
+### PR-D1d: validator CLI / CI hardening
+
+- **目的**: malformed JSON、invalid UTF-8、missing file、invalid schema、machine-readable errors、module経由でないdirect CLI execution、URL validation等、validator外周の堅牢性を整える。
+- **順序**: D1b/D1c完了後に、実際の利用経路とfailure modeから必要範囲を再評価する。D1bの構造検証やD1cのimport整合をこのPRへ先送りしない。
+
+### PR #58 の扱い
+
+PR #58はWikipedia provenance validatorの実装・レビューを通して責務過大と判明したため**マージしない**。最終状態はtag `pr58-before-d1-split-20260818` に保存済みであり、その成果と知見はD1a〜D1dへ必要な単位で再構成する。本計画がPR #58の従来計画をsupersedeする。
 
 ### PR-E以降: Wikipedia seed追加
 
@@ -437,22 +458,20 @@ follow-up:                         現計画完了 → visual branch tree検討
 6. **PR-E6 鬼殺し系**
 7. **PR-E7以降**: 矢倉、相掛かり、四間、三間、向かい飛車をarticle/section単位の小PR。
 
-各seed PRは一つの出典sectionまたは密接なbranch群を原則とし、巨大な一括PRを禁止する。D1は全seed PRの必須gate。branch-heavyなPR-EはB/C完了後を推奨順序とし、先行させる場合は暫定構造を増やす理由と後続migration/UI監査方法を明記する。
+各seed PRは一つの出典sectionまたは密接なbranch群を原則とし、巨大な一括PRを禁止する。すべてのPR-Eは **LLMによるWikipediaからのstructured extraction → D1b validator → D1c canonical artifact/seed整合 → seed/import** を必須gateとする。D1aは既知metadata修正として先行し、D1dは外周要件の再評価結果に応じてgate範囲を定める。branch-heavyなPR-EはB/C完了後を推奨順序とし、先行させる場合は暫定構造を増やす理由と後続migration/UI監査方法を明記する。
 
 ## 12. テスト戦略と各 PR の受け入れ条件
 
 ### 12.1 共通 test matrix
 
-| 検査 | A0 | A | B | C | D0/D1 | E群 |
-|---|---:|---:|---:|---:|---:|---:|
-| backend unit/pytest | 必須 | 関連なし | 必須 | 関連時 | 必須 | 必須 |
-| frontend Vitest | 関連なし | 必須 | 必須 | 必須 | metadata UI時 | 必須 |
-| frontend lint | 関連なし | 必須 | 必須 | 必須 | frontend変更時 | 必須 |
-| frontend build | 関連なし | 必須 | 必須 | 必須 | frontend変更時 | 必須 |
-| Playwright Chromium | seed smoke | 必須 | 必須 | 必須 | 表示変更時 | 必須 |
-| 360px mobile | 関連なし | 必須 | smoke | 必須 | 表示変更時 | branch追加時 |
-| git diff check | 必須 | 必須 | 必須 | 必須 | 必須 | 必須 |
-| Wikipedia provenance review | 継承確認 | 表示退行のみ | 継承確認 | 表示確認 | 必須 | 必須 |
+| 検査 | A0 | A | B | C | D0/D1a | D1b | D1c | D1d | E群 |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| backend unit/pytest | 必須 | 関連なし | 必須 | 関連時 | D1aは必須 | 必須 | 必須 | 必須 | 必須 |
+| frontend Vitest | 関連なし | 必須 | 必須 | 必須 | metadata UI時 | 関連なし | 関連なし | 関連なし | 必須 |
+| frontend lint/build | 関連なし | 必須 | 必須 | 必須 | frontend変更時 | 関連なし | 関連なし | 関連なし | 必須 |
+| Playwright / 360px | seed smoke | 必須 | 必須/smoke | 必須 | 表示変更時 | 関連なし | import smoke | 関連なし | 必須/branch追加時 |
+| git diff check | 必須 | 必須 | 必須 | 必須 | 必須 | 必須 | 必須 | 必須 | 必須 |
+| Wikipedia provenance review | 継承確認 | 表示退行のみ | 継承確認 | 表示確認 | 契約/既知差分 | artifact入力 | canonical差分 | URL外周 | 必須 |
 
 推奨command（実際の `package.json`/README のscript名を各PR時に再確認）:
 
@@ -509,18 +528,39 @@ git diff --check
 - [ ] 500 node fixtureのrender時間/DOM数を測定してPR本文に記録する。初回は厳格な合否閾値を設けず、結果から最適化課題または将来の基準設定要否を判断する。
 - [ ] accessibility自動検査の利用手段を実装時に具体化し、その検査、Vitest、lint、build、Chromium E2Eを通過する。
 
-#### PR-D0/D1
+#### PR-D0 / PR-D1a
 
-- [ ] 全Wikipedia由来lineがA/B/C/M、coverage enum、section、retrieved date、licenseを持つ。
-- [ ] catalog provenance と move-line provenance を混同しない。
-- [ ] source noteの終端表現が`len(moves)`/終端USIと一致。
-- [ ] 升田式石田流は▲7六飛を未収録と明記するか、別seed PRで実際に追加されるまで収録済みと書かない。
-- [ ] current Wikipedia revision/oldidを監査artifactに記録し、リンク切れ/redirectを確認。
-- [ ] metadata-only再seedとAPI responseのpytestを通過。
-- [ ] frontend変更があればVitest/lint/build/Chromium/360pxを通過。
+- [ ] D0でA/B/C/M、coverage enum、必須metadata、artifact境界を文書化する。
+- [ ] D1aは升田式石田流の既知metadataだけを修正し、▲7六飛を未収録と明記する。
+- [ ] D1aのbefore/afterでmovesがbyte-for-byteまたはfixture上同一である。
+- [ ] metadata-only再seedとAPI responseのpytestを通過する。
+
+#### PR-D1b
+
+- [ ] JSON Schema違反、invalid USI、illegal move、initial SFEN不整合を決定論的なerrorで拒否する。
+- [ ] direct-parent treeのorphan/cycle/複数root/親子SFEN不整合を拒否する。
+- [ ] 同一parent配下のsibling USIと`sort_order`重複、semantic mainの0件/複数件を拒否する。
+- [ ] coverage boundary、A/B/C/M provenance、mixed segmentの境界・必須metadataを検証する。
+- [ ] `source_note` / `evidence_note`の日本語自然言語解析に依存するtestまたは正規判定を持たない。
+- [ ] 同じartifactから常に同じ検証結果とmachine-consumableな診断位置を得る。
+
+#### PR-D1c
+
+- [ ] canonical artifactとseed/import後のmove、SFEN、tree、coverage、metadataが一致する。
+- [ ] stable keyで同じartifactを2回importしても重複、ID/parent driftがない。
+- [ ] 更新artifactによる置換が対象範囲外を変更せず、途中失敗時も安全である。
+- [ ] 歴史的seedとWikipediaの完全一致証明をgateにせず、canonicalとの差分と移行判断を記録する。
+
+#### PR-D1d
+
+- [ ] D1b/D1c後にCLI/CI hardeningの必要範囲を再評価して記録する。
+- [ ] 採用範囲でmalformed JSON、invalid UTF-8、missing file、invalid schemaを安定した終了codeとmachine-readable errorで報告する。
+- [ ] direct CLI executionが動作し、URLのscheme/host等の採用したvalidation規則を検査する。
 
 #### 各 PR-E
 
+- [ ] ChatGPT等のLLMでWikipedia本文を解釈・棋譜抽出・A/B/C/M判定し、review可能なstructured artifactを生成する。
+- [ ] structured artifactがD1bを通過し、D1cでcanonical artifactとseed/import結果の一致を確認する。
 - [ ] Aの各着手が指定revisionの同一sectionで連続確認できる。Bは図番号・再構成手順を別記。Cからmoveを作らない。
 - [ ] source URL/title/section/license/retrieved/revision/note/coverage/provenanceが揃う。
 - [ ] 全手をbackendとfrontend両validatorで検証し、全edgeのSFEN snapshotをassert。
@@ -539,8 +579,9 @@ git diff --check
 | `variation_group`の多義性 | branch-of-branch表示崩れ | 構造・表示・順序を別責務にする |
 | sort変更で`path:number[]`が別nodeを指す | URL/stateの不安定 | pathはsession内、永続jumpはstable node keyを利用 |
 | Wikipedia本文/図/一般知識の混同 | 根拠のないseed | A/B/C/M gateとrevision review |
+| 自由文noteの機械解釈 | 表現揺れで誤判定、責務肥大 | 正規判定はstructured metadataのみ。表示noteは可能な範囲で生成 |
 | 記事改訂/section rename | 再現不能 | oldid/revision、取得日、section記録 |
-| source noteとmoves乖離 | coverage誤表示 | 終端ply/USI validator。升田式を先行修正 |
+| source noteとmoves乖離 | coverage誤表示 | 構造化された終端ply/USIを検証しnoteを可能な範囲で生成。升田式を先行修正 |
 | 同一USI sibling | boardでbranchを識別不能 | sibling USI一意制約/validator |
 | 巨大tree | mobile可読性/性能低下 | branch disclosure、祖先のみ展開、性能fixture |
 | migrationで既存line破損 | 学習URL/進捗退行 | additive schema、backfill、idempotency/legacy E2E |
@@ -556,10 +597,10 @@ git diff --check
 3. direct parentによる任意深さtreeがDB→API→frontendで保持され、semantic mainと表示順が分離され、SFENは合法性・整合性の検査に使われる。
 4. transpositionを意図せずmergeせず、異なる学習pathを保持する。
 5. 通常collapsedの補助的な「この定跡の変化」でcurrent pathとcurrent/ancestorを区別でき、任意nodeへjumpし、各分岐点のexplicit mainへ切り替えられる。
-6. 既存全seedにA/B/C/Mと正規化coverageが付き、source metadataと実moves終端が一致する。
-7. 升田式石田流のnote/実moves不整合が解消する。
+6. canonical structured artifactにA/B/C/Mと正規化coverageが付き、D1bでschema・合法性・tree・coverage・metadataが決定論的に検証され、D1cでseed/import結果と一致する。
+7. D1aで升田式石田流のnote/実moves不整合がmovesを変更せずに解消する。
 8. 未収録一覧の各項目は「名称確認」と「連続手順確認」が分離され、Cからmove seedが生成されない。
-9. 優先8対象は現行Wikipedia revisionに対する監査記録を持ち、追加手数・branch・A/B境界がreview済みである。
+9. 優先8対象は現行Wikipedia revisionに対するLLM structured extractionと監査記録を持ち、追加手数・branch・A/B境界がreview済みである。
 10. 各PRのpytest/Vitest/lint/build/Chromium/360px/後方互換/provenance gateが満たされる。
 11. 既存のstatic opening、learning sample、imported linear line、一次分岐、既存URLが退行しない。
 12. 本書の**[要外部再確認]**項目は、ネットワーク利用可能なseed PRで一次資料（現行Wikipedia記事とrevision）に置き換え、推測を実装へ持ち込まない。
