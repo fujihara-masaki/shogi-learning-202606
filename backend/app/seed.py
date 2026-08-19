@@ -289,8 +289,8 @@ SAMPLE_OPENING_LINES = [
         "source_url": "https://ja.wikipedia.org/wiki/石田流",
         "source_title": "Wikipedia 石田流",
         "source_section": "升田式石田流",
-        "coverage_status": "Wikipedia本文明示の初手からの手順",
-        "source_note": "升田式石田流節の▲7六歩△3四歩▲7五歩△8四歩▲7八飛△8五歩▲4八玉、および実戦以下▲7六飛を手順化。",
+        "coverage_status": "Wikipedia本文明示の初手から▲4八玉まで（続く▲7六飛は未収録）",
+        "source_note": "升田式石田流節の初手▲7六歩から7手目▲4八玉までを収録。本文に記載された続く▲7六飛は未収録。",
         "moves": ["7g7f", "3c3d", "7f7e", "8c8d", "2h7h", "8d8e", "5i4h"],
     },
     {

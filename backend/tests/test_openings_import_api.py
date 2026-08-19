@@ -940,6 +940,87 @@ def test_wikipedia_long_seed_branches_are_idempotent_and_replayable(client):
             assert move_row["to_sfen"] == board.sfen()
 
 
+def test_masuda_ishida_metadata_only_reseed_is_idempotent_and_preserves_moves(client):
+    from app.database import get_connection
+    from app.seed import seed_openings_if_empty
+
+    name = "升田式石田流（Wikipedia明示手順）"
+    expected_moves = ["7g7f", "3c3d", "7f7e", "8c8d", "2h7h", "8d8e", "5i4h"]
+    expected_note = (
+        "升田式石田流節の初手▲7六歩から7手目▲4八玉までを収録。"
+        "本文に記載された続く▲7六飛は未収録。"
+    )
+    expected_coverage = "Wikipedia本文明示の初手から▲4八玉まで（続く▲7六飛は未収録）"
+
+    conn = get_connection()
+    try:
+        line = conn.execute(
+            "SELECT id FROM opening_lines WHERE source_id IS NULL AND name = ?",
+            (name,),
+        ).fetchone()
+        assert line is not None
+        line_id = line["id"]
+        moves_before = [
+            tuple(row)
+            for row in conn.execute(
+                """
+                SELECT ply, usi, from_sfen, to_sfen, variation_group, sort_order
+                FROM opening_line_moves
+                WHERE line_id = ?
+                ORDER BY ply, variation_group, sort_order, id
+                """,
+                (line_id,),
+            ).fetchall()
+        ]
+        assert [row[1] for row in moves_before] == expected_moves
+
+        conn.execute(
+            """
+            UPDATE opening_lines
+            SET source_note = ?, coverage_status = ?
+            WHERE id = ?
+            """,
+            ("不整合な旧source_note", "不整合な旧coverage_status", line_id),
+        )
+        seed_openings_if_empty(conn)
+        seed_openings_if_empty(conn)
+        conn.commit()
+
+        reseeded = conn.execute(
+            "SELECT source_note, coverage_status FROM opening_lines WHERE id = ?",
+            (line_id,),
+        ).fetchone()
+        moves_after = [
+            tuple(row)
+            for row in conn.execute(
+                """
+                SELECT ply, usi, from_sfen, to_sfen, variation_group, sort_order
+                FROM opening_line_moves
+                WHERE line_id = ?
+                ORDER BY ply, variation_group, sort_order, id
+                """,
+                (line_id,),
+            ).fetchall()
+        ]
+        assert dict(reseeded) == {
+            "source_note": expected_note,
+            "coverage_status": expected_coverage,
+        }
+        assert moves_after == moves_before
+    finally:
+        conn.close()
+
+    response = client.get(f"/api/openings/{line_id}")
+    assert response.status_code == 200
+    detail = response.json()
+    assert detail["source"]["source_note"] == expected_note
+    assert detail["source"]["coverage_status"] == expected_coverage
+    assert [move["usi"] for move in detail["moves"]] == expected_moves
+    assert detail["moves"][-1]["ply"] == 7
+    assert detail["moves"][-1]["usi"] == "5i4h"
+    assert all(move["usi"] != "7h7f" for move in detail["moves"])
+
+
 def test_all_seed_opening_siblings_have_unique_usi(client):
     from app.database import get_connection
     from app.seed import find_duplicate_opening_sibling_moves
