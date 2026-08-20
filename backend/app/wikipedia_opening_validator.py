@@ -180,28 +180,39 @@ def _validate_record(record: dict[str, Any], base: str, errors: list[ValidationD
         _diag(errors, "invalid_initial_sfen", f"{base}/initial_sfen", "initial SFEN cannot be loaded")
 
     depths: dict[str, int] = {}
-    visiting: set[str] = set()
-    def replay(key: str) -> None:
-        if key in depths or key in visiting:
-            return
-        visiting.add(key)
+    for key in sorted(by_key):
+        if key in depths:
+            continue
+        chain: list[str] = []
+        chain_keys: set[str] = set()
+        current = key
+        while current in by_key and current not in depths and current not in chain_keys:
+            chain.append(current)
+            chain_keys.add(current)
+            parent_key = by_key[current][1]["parent_key"]
+            if parent_key is None:
+                current = ""
+                base_depth = 0
+                break
+            current = parent_key
+        else:
+            base_depth = depths.get(current, -1 if current not in by_key else 0)
+        for chain_key in reversed(chain):
+            base_depth += 1
+            depths[chain_key] = base_depth
+
+    for key in sorted(by_key):
         index, node = by_key[key]
         parent_key = node["parent_key"]
         if parent_key is None:
             expected_from = initial.sfen() if initial else None
-            depth = 1
         elif parent_key in by_key:
-            replay(parent_key)
             parent = by_key[parent_key][1]
             expected_from = parent["to_sfen"]
-            depth = depths.get(parent_key, 0) + 1
             if node["from_sfen"] != expected_from:
                 _diag(errors, "parent_child_sfen", f"{base}/nodes/{index}/from_sfen", "from_sfen differs from parent to_sfen")
         else:
             expected_from = None
-            depth = 0
-        depths[key] = depth
-        visiting.remove(key)
         if expected_from is not None and node["from_sfen"] != expected_from and parent_key is None:
             _diag(errors, "root_sfen", f"{base}/nodes/{index}/from_sfen", "root from_sfen differs from initial_sfen")
         try:
@@ -215,8 +226,6 @@ def _validate_record(record: dict[str, Any], base: str, errors: list[ValidationD
                 _diag(errors, "to_sfen_mismatch", f"{base}/nodes/{index}/to_sfen", "to_sfen does not equal the replayed position")
         except (ValueError, IndexError):
             _diag(errors, "invalid_node_sfen", f"{base}/nodes/{index}/from_sfen", "node SFEN cannot be loaded")
-    for key in sorted(by_key):
-        replay(key)
 
     _validate_coverage(record, base, by_key, children, depths, errors)
     _validate_provenance(record, base, by_key, children, errors)
@@ -258,6 +267,9 @@ def _validate_initial_inventory(board, base, errors) -> None:
     for color, label in ((shogi.BLACK, "black"), (shogi.WHITE, "white")):
         if king_counts[color] != 1:
             _diag(errors, "initial_king_count", f"{base}/initial_sfen", f"expected exactly one {label} king, found {king_counts[color]}")
+    inactive = shogi.WHITE if board.turn == shogi.BLACK else shogi.BLACK
+    if king_counts[inactive] == 1 and board.is_attacked_by(board.turn, board.king_squares[inactive]):
+        _diag(errors, "initial_inactive_king_in_check", f"{base}/initial_sfen", "side-to-move attacks the inactive king")
     for (color, file_index), count in sorted(unpromoted_pawns.items()):
         if count > 1:
             _diag(errors, "initial_nifu", f"{base}/initial_sfen", f"color {color} has {count} unpromoted pawns on file index {file_index}")

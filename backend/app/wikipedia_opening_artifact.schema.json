@@ -22,9 +22,9 @@
     "omittedMove": {"type": "object", "additionalProperties": false, "required": ["usi"], "properties": {"usi": {"$ref": "#/$defs/usi"}, "note": {"type": "string"}}},
     "moveLineRecord": {
       "type": "object", "additionalProperties": false,
-      "required": ["record_type", "record_key", "line_key", "source", "license", "retrieved_date", "revision", "provenance", "initial_sfen", "coverage", "nodes"],
+      "required": ["record_type", "record_key", "line_key", "line_name", "source", "license", "retrieved_date", "revision", "provenance", "initial_sfen", "coverage", "nodes"],
       "properties": {
-        "record_type": {"const": "move_line"}, "record_key": {"$ref": "#/$defs/key"}, "line_key": {"$ref": "#/$defs/key"}, "source": {"$ref": "#/$defs/source"},
+        "record_type": {"const": "move_line"}, "record_key": {"$ref": "#/$defs/key"}, "line_key": {"$ref": "#/$defs/key"}, "line_name": {"type": "string", "minLength": 1}, "source": {"$ref": "#/$defs/source"},
         "license": {"enum": ["CC BY-SA 4.0", "CC BY-SA 3.0"]}, "retrieved_date": {"type": "string", "format": "date", "pattern": "^\\d{4}-\\d{2}-\\d{2}$"}, "revision": {"$ref": "#/$defs/revision"},
         "provenance": {"enum": ["A", "B", "M"]}, "initial_sfen": {"$ref": "#/$defs/sfen"}, "coverage": {"$ref": "#/$defs/coverage"},
         "source_note": {"type": "string"}, "evidence_note": {"type": "string"}, "nodes": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/node"}}, "segments": {"type": "array", "items": {"$ref": "#/$defs/segment"}}

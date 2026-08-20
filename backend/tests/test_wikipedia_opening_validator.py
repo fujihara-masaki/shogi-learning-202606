@@ -43,7 +43,7 @@ def _artifact(*, branched=False, mixed=False):
                            evidence_note="Alternative line explicitly gives 6g6f"))
     record = {
         "record_type": "move_line",
-        "record_key": "wikipedia.test", "line_key": "test-line",
+        "record_key": "wikipedia.test", "line_key": "test-line", "line_name": "升田式石田流",
         "source": {"url": "https://ja.wikipedia.org/wiki/Test", "title": "Test", "section": "Opening"},
         "license": "CC BY-SA 4.0", "retrieved_date": "2026-08-20", "revision": 12345,
         "provenance": "A", "initial_sfen": start,
@@ -86,6 +86,17 @@ def test_valid_linear_branch_and_mixed_artifacts_pass():
     assert validate_wikipedia_opening_artifact(_artifact()) == ()
     assert validate_wikipedia_opening_artifact(_artifact(branched=True)) == ()
     assert validate_wikipedia_opening_artifact(_artifact(mixed=True)) == ()
+
+
+def test_line_name_preserves_unicode_and_is_required_nonempty():
+    artifact = _artifact()
+    assert artifact["records"][0]["line_name"] == "升田式石田流"
+    assert validate_wikipedia_opening_artifact(artifact) == ()
+    del artifact["records"][0]["line_name"]
+    assert _codes(artifact) == ["schema"]
+    artifact = _artifact()
+    artifact["records"][0]["line_name"] = ""
+    assert _codes(artifact) == ["schema"]
 
 
 def test_artifact_schema_is_valid_draft_2020_12():
@@ -293,6 +304,30 @@ def test_initial_sfen_rejects_nifu_for_both_colors(sfen):
     assert "initial_nifu" in _codes(artifact)
 
 
+@pytest.mark.parametrize("sfen", [
+    "4k4/4R4/9/9/9/9/9/9/4K4 b - 1",
+    "4k4/9/9/9/9/9/9/4r4/4K4 w - 1",
+    "4k4/4K4/9/9/9/9/9/9/9 b - 1",
+])
+def test_initial_sfen_rejects_inactive_king_in_check(sfen):
+    artifact = _artifact()
+    artifact["records"][0]["initial_sfen"] = sfen
+    assert "initial_inactive_king_in_check" in _codes(artifact)
+
+
+def test_side_to_move_may_start_in_check_and_evade_with_root_move():
+    artifact = _artifact()
+    record = artifact["records"][0]
+    initial = "4k4/9/9/9/9/9/9/4r4/4K4 b - 1"
+    board = shogi.Board(initial)
+    assert board.is_check()
+    legal_usi = next(move.usi() for move in board.legal_moves)
+    record["initial_sfen"] = initial
+    record["nodes"] = [_node("n1", None, legal_usi, initial)]
+    record["coverage"] = {"covered_through_ply": 1, "covered_through_move": legal_usi, "omitted_after": None}
+    assert validate_wikipedia_opening_artifact(artifact) == ()
+
+
 def test_promoted_pawn_does_not_count_as_nifu():
     artifact = _artifact()
     record = artifact["records"][0]
@@ -301,6 +336,22 @@ def test_promoted_pawn_does_not_count_as_nifu():
     record["nodes"] = [_node("n1", None, "9g9f", initial)]
     record["coverage"] = {"covered_through_ply": 1, "covered_through_move": "9g9f", "omitted_after": None}
     assert validate_wikipedia_opening_artifact(artifact) == ()
+
+
+def test_deep_parent_chain_does_not_use_python_recursion():
+    artifact = _artifact()
+    record = artifact["records"][0]
+    template = record["nodes"][0]
+    record["nodes"] = [
+        {**template, "key": f"deep-{index}",
+         "parent_key": None if index == 0 else f"deep-{index - 1}"}
+        for index in range(1100)
+    ]
+    record["coverage"] = {"covered_through_ply": 1100,
+                          "covered_through_move": template["usi"], "omitted_after": None}
+    first = validate_wikipedia_opening_artifact(artifact)
+    assert first
+    assert first == validate_wikipedia_opening_artifact(deepcopy(artifact))
 
 
 def test_orphan_cycle_and_root_failures_are_rejected():
