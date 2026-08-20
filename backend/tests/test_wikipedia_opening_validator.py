@@ -1,16 +1,19 @@
 from copy import deepcopy
+import json
 
+import jsonschema
 import shogi
 
-from app.wikipedia_opening_validator import validate_wikipedia_opening_artifact
+from app.wikipedia_opening_validator import SCHEMA_PATH, validate_wikipedia_opening_artifact
 
 
-def _node(key, parent, usi, from_sfen, *, order=0, main=True, provenance="A", segment=None):
+def _node(key, parent, usi, from_sfen, *, order=0, main=True, provenance="A", segment=None,
+          source_section="Main line"):
     board = shogi.Board(from_sfen)
     board.push_usi(usi)
     node = {"key": key, "parent_key": parent, "usi": usi, "sort_order": order,
             "is_main": main, "from_sfen": from_sfen, "to_sfen": board.sfen(),
-            "provenance": provenance}
+            "provenance": provenance, "source_section": source_section}
     if segment is not None:
         node["segment_key"] = segment
     return node
@@ -23,7 +26,8 @@ def _artifact(*, branched=False, mixed=False):
     n3 = _node("n3", "n2", "2g2f", n2["to_sfen"])
     nodes = [n1, n2, n3]
     if branched:
-        nodes.append(_node("branch", "n2", "6g6f", n2["to_sfen"], order=1, main=False))
+        nodes.append(_node("branch", "n2", "6g6f", n2["to_sfen"], order=1, main=False,
+                           source_section="Alternative line"))
     record = {
         "record_type": "move_line",
         "record_key": "wikipedia.test", "line_key": "test-line",
@@ -55,6 +59,28 @@ def test_valid_linear_branch_and_mixed_artifacts_pass():
     assert validate_wikipedia_opening_artifact(_artifact()) == ()
     assert validate_wikipedia_opening_artifact(_artifact(branched=True)) == ()
     assert validate_wikipedia_opening_artifact(_artifact(mixed=True)) == ()
+
+
+def test_artifact_schema_is_valid_draft_2020_12():
+    schema = json.loads(SCHEMA_PATH.read_text(encoding="utf-8"))
+    jsonschema.Draft202012Validator.check_schema(schema)
+
+
+def test_main_and_branch_can_carry_distinct_source_sections():
+    artifact = _artifact(branched=True)
+    nodes = artifact["records"][0]["nodes"]
+    assert nodes[2]["source_section"] == "Main line"
+    assert nodes[3]["source_section"] == "Alternative line"
+    assert validate_wikipedia_opening_artifact(artifact) == ()
+
+
+def test_node_source_section_is_required_and_nonempty():
+    artifact = _artifact()
+    del artifact["records"][0]["nodes"][1]["source_section"]
+    assert _codes(artifact) == ["schema"]
+    artifact = _artifact()
+    artifact["records"][0]["nodes"][1]["source_section"] = ""
+    assert _codes(artifact) == ["schema"]
 
 
 def test_multiple_root_siblings_are_a_valid_initial_position_choice_set():

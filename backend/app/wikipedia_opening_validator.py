@@ -11,9 +11,9 @@ from collections import defaultdict
 from dataclasses import dataclass
 import json
 from pathlib import Path
-import re
 from typing import Any
 
+import jsonschema
 import shogi
 
 
@@ -38,8 +38,19 @@ def _diag(errors: list[ValidationDiagnostic], code: str, path: str, message: str
 def validate_wikipedia_opening_artifact(artifact: Any) -> tuple[ValidationDiagnostic, ...]:
     """Return stable, machine-assertable diagnostics; an empty tuple means valid."""
     schema = json.loads(SCHEMA_PATH.read_text(encoding="utf-8"))
+    jsonschema.Draft202012Validator.check_schema(schema)
     errors: list[ValidationDiagnostic] = []
-    _validate_schema_value(artifact, schema, schema, [], errors)
+    schema_validator = jsonschema.Draft202012Validator(
+        schema, format_checker=jsonschema.FormatChecker()
+    )
+    schema_errors = []
+    for error in schema_validator.iter_errors(artifact):
+        schema_errors.extend(_schema_error_leaves(error))
+    for error in sorted(
+        schema_errors,
+        key=lambda item: (tuple(map(str, item.absolute_path)), item.message),
+    ):
+        _diag(errors, "schema", _pointer(list(error.absolute_path)), error.message)
     if errors:
         return tuple(sorted(errors))
 
@@ -61,64 +72,25 @@ def validate_wikipedia_opening_artifact(artifact: Any) -> tuple[ValidationDiagno
     return tuple(sorted(errors))
 
 
-def _validate_schema_value(value, rule, root, path, errors) -> None:
-    """Evaluate the deliberately small JSON-Schema vocabulary used by our contract."""
-    if "$ref" in rule:
-        target = root
-        for part in rule["$ref"].removeprefix("#/").split("/"):
-            target = target[part]
-        _validate_schema_value(value, target, root, path, errors)
-        return
-    if "anyOf" in rule:
-        trials = []
-        for choice in rule["anyOf"]:
-            trial = []
-            _validate_schema_value(value, choice, root, path, trial)
-            trials.append(trial)
-        if all(trials):
-            errors.extend(min(trials, key=lambda trial: (len(trial), trial)))
-        return
-    expected = rule.get("type")
-    types = expected if isinstance(expected, list) else [expected] if expected else []
-    matches = {"object": lambda: isinstance(value, dict), "array": lambda: isinstance(value, list),
-               "string": lambda: isinstance(value, str), "integer": lambda: isinstance(value, int) and not isinstance(value, bool),
-               "boolean": lambda: isinstance(value, bool), "null": lambda: value is None}
-    if types and not any(matches[k]() for k in types):
-        _diag(errors, "schema", _pointer(path), f"expected {' or '.join(types)}")
-        return
-    if "const" in rule and value != rule["const"]:
-        _diag(errors, "schema", _pointer(path), f"expected constant {rule['const']!r}")
-    if "enum" in rule and value not in rule["enum"]:
-        _diag(errors, "schema", _pointer(path), f"expected one of {rule['enum']!r}")
-    if isinstance(value, str):
-        if len(value) < rule.get("minLength", 0):
-            _diag(errors, "schema", _pointer(path), "string is too short")
-        if "pattern" in rule and re.fullmatch(rule["pattern"], value) is None:
-            _diag(errors, "schema", _pointer(path), "string does not match required pattern")
-        if rule.get("format") == "date":
-            try:
-                from datetime import date
-                date.fromisoformat(value)
-            except ValueError:
-                _diag(errors, "schema", _pointer(path), "invalid date")
-    if isinstance(value, int) and not isinstance(value, bool) and value < rule.get("minimum", value):
-        _diag(errors, "schema", _pointer(path), f"value is below minimum {rule['minimum']}")
-    if isinstance(value, list):
-        if len(value) < rule.get("minItems", 0):
-            _diag(errors, "schema", _pointer(path), "array is too short")
-        if "items" in rule:
-            for index, item in enumerate(value):
-                _validate_schema_value(item, rule["items"], root, path + [index], errors)
-    if isinstance(value, dict):
-        for name in rule.get("required", []):
-            if name not in value:
-                _diag(errors, "schema", _pointer(path), f"required property {name!r} is missing")
-        properties = rule.get("properties", {})
-        if rule.get("additionalProperties") is False:
-            for name in value.keys() - properties.keys():
-                _diag(errors, "schema", _pointer(path + [name]), "additional property is not allowed")
-        for name in value.keys() & properties.keys():
-            _validate_schema_value(value[name], properties[name], root, path + [name], errors)
+def _schema_error_leaves(error):
+    """Select the closest failing ``anyOf`` branch, then expose actionable leaves."""
+    if not error.context:
+        return [error]
+    if error.validator == "anyOf":
+        branches: dict[Any, list[Any]] = defaultdict(list)
+        for child in error.context:
+            relative = list(child.relative_schema_path)
+            branch = relative[0] if relative else -1
+            branches[branch].append(child)
+        selected = min(
+            branches.values(),
+            key=lambda items: (
+                sum(len(_schema_error_leaves(item)) for item in items),
+                str(items[0].absolute_schema_path),
+            ),
+        )
+        return [leaf for child in selected for leaf in _schema_error_leaves(child)]
+    return [leaf for child in error.context for leaf in _schema_error_leaves(child)]
 
 
 def _validate_record(record: dict[str, Any], base: str, errors: list[ValidationDiagnostic]) -> None:
