@@ -21,6 +21,16 @@ def _node(key, parent, usi, from_sfen, *, order=0, main=True, provenance="A", se
     return node
 
 
+def _document(*records, review=None):
+    return {
+        "artifact_version": 1,
+        "review": review or {"review_status": "pending", "legality_checks": {
+            "backend_python_shogi": "pending", "frontend_tsshogi": "pending"
+        }},
+        "records": list(records),
+    }
+
+
 def _artifact(*, branched=False, mixed=False):
     start = shogi.STARTING_SFEN
     n1 = _node("n1", None, "7g7f", start)
@@ -51,7 +61,7 @@ def _artifact(*, branched=False, mixed=False):
             {"key": "explicit", "provenance": "A", "start_node_key": "n1", "end_node_key": "n1", "source_section": "Opening", "evidence_note": "explicit moves"},
             {"key": "diagram", "provenance": "B", "start_node_key": "n2", "end_node_key": "n3", "source_section": "Diagram 1", "evidence_note": "reconstructed from diagram"},
         ]
-    return {"artifact_version": 1, "records": [record]}
+    return _document(record)
 
 
 def _codes(artifact):
@@ -65,6 +75,7 @@ def _catalog_record():
     )}
     catalog.update(
         record_type="catalog_name_only",
+        catalog_name="升田式石田流",
         provenance="C",
         evidence_note="名称が出典記事の一覧に掲載されている",
     )
@@ -121,11 +132,42 @@ def test_multiple_root_siblings_are_a_valid_initial_position_choice_set():
 def test_catalog_c_is_name_only_and_cannot_contain_nodes():
     move_record = _artifact()["records"][0]
     catalog = _catalog_record()
-    assert validate_wikipedia_opening_artifact({"artifact_version": 1, "records": [catalog]}) == ()
+    assert validate_wikipedia_opening_artifact(_document(catalog)) == ()
     catalog["nodes"] = move_record["nodes"]
-    assert _codes({"artifact_version": 1, "records": [catalog]}) == ["schema"]
+    assert _codes(_document(catalog)) == ["schema"]
     move_record["provenance"] = "C"
-    assert _codes({"artifact_version": 1, "records": [move_record]}) == ["schema"]
+    assert _codes(_document(move_record)) == ["schema"]
+
+
+def test_catalog_name_preserves_unicode_and_is_required_nonempty():
+    catalog = _catalog_record()
+    assert catalog["catalog_name"] == "升田式石田流"
+    assert validate_wikipedia_opening_artifact(_document(catalog)) == ()
+    del catalog["catalog_name"]
+    assert _codes(_document(catalog)) == ["schema"]
+    catalog = _catalog_record()
+    catalog["catalog_name"] = ""
+    assert _codes(_document(catalog)) == ["schema"]
+
+
+def test_pending_and_reviewed_audit_metadata_are_structured():
+    assert validate_wikipedia_opening_artifact(_artifact()) == ()
+    reviewed = {"review_status": "reviewed", "reviewed_by": "reviewer@example.com",
+                "reviewed_on": "2026-08-20", "legality_checks": {
+                    "backend_python_shogi": "passed", "frontend_tsshogi": "passed"}}
+    assert validate_wikipedia_opening_artifact(
+        _document(_artifact()["records"][0], review=reviewed)
+    ) == ()
+    del reviewed["reviewed_by"]
+    assert _codes(_document(_artifact()["records"][0], review=reviewed)) == ["schema"]
+
+
+def test_stored_legality_result_never_skips_backend_replay():
+    artifact = _artifact()
+    artifact["review"]["legality_checks"]["backend_python_shogi"] = "passed"
+    artifact["review"]["legality_checks"]["frontend_tsshogi"] = "passed"
+    artifact["records"][0]["nodes"][0]["usi"] = "7g7e"
+    assert "illegal_move" in _codes(artifact)
 
 
 @pytest.mark.parametrize("revision", [0, -1, "unknown", "12345"])
@@ -133,23 +175,23 @@ def test_catalog_c_is_name_only_and_cannot_contain_nodes():
 def test_revision_must_be_a_positive_canonical_integer(record_factory, revision):
     record = record_factory()
     record["revision"] = revision
-    assert _codes({"artifact_version": 1, "records": [record]}) == ["schema"]
+    assert _codes(_document(record)) == ["schema"]
 
 
 def test_positive_integer_revision_is_valid_for_move_line_and_catalog():
     assert validate_wikipedia_opening_artifact(_artifact()) == ()
     assert validate_wikipedia_opening_artifact(
-        {"artifact_version": 1, "records": [_catalog_record()]}
+        _document(_catalog_record())
     ) == ()
 
 
 def test_catalog_evidence_note_is_required_and_nonempty():
     catalog = _catalog_record()
     del catalog["evidence_note"]
-    assert _codes({"artifact_version": 1, "records": [catalog]}) == ["schema"]
+    assert _codes(_document(catalog)) == ["schema"]
     catalog = _catalog_record()
     catalog["evidence_note"] = ""
-    assert _codes({"artifact_version": 1, "records": [catalog]}) == ["schema"]
+    assert _codes(_document(catalog)) == ["schema"]
 
 
 def test_schema_and_provenance_enum_violations_are_stable():
@@ -183,6 +225,26 @@ def test_invalid_initial_sfen_and_replay_mismatches_are_rejected():
     artifact = _artifact()
     artifact["records"][0]["nodes"][0]["to_sfen"] = shogi.STARTING_SFEN
     assert "to_sfen_mismatch" in _codes(artifact)
+
+
+@pytest.mark.parametrize("sfen", [
+    "9/9/9/9/9/9/9/9/9 b - 1",
+    "4k4/9/9/9/9/9/9/9/9 b - 1",
+    "4k4/4k4/9/9/9/9/9/9/4K4 b - 1",
+])
+def test_initial_sfen_requires_exactly_one_king_per_color(sfen):
+    artifact = _artifact()
+    artifact["records"][0]["initial_sfen"] = sfen
+    assert "initial_king_count" in _codes(artifact)
+
+
+def test_initial_sfen_cannot_exceed_standard_piece_inventory():
+    artifact = _artifact()
+    artifact["records"][0]["initial_sfen"] = "4k4/9/9/9/9/9/9/9/4K4 b 19P 1"
+    assert "initial_piece_inventory" in _codes(artifact)
+    artifact = _artifact()
+    artifact["records"][0]["initial_sfen"] = "4k4/9/9/9/9/9/9/9/+P3K4 b 18P 1"
+    assert "initial_piece_inventory" in _codes(artifact)
 
 
 def test_orphan_cycle_and_root_failures_are_rejected():

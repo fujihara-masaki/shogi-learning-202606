@@ -19,6 +19,25 @@ import shogi
 
 SCHEMA_PATH = Path(__file__).with_name("wikipedia_opening_artifact.schema.json")
 
+_UNPROMOTED_TYPE = {
+    shogi.PROM_PAWN: shogi.PAWN,
+    shogi.PROM_LANCE: shogi.LANCE,
+    shogi.PROM_KNIGHT: shogi.KNIGHT,
+    shogi.PROM_SILVER: shogi.SILVER,
+    shogi.PROM_BISHOP: shogi.BISHOP,
+    shogi.PROM_ROOK: shogi.ROOK,
+}
+_INVENTORY_LIMIT = {
+    shogi.PAWN: 18,
+    shogi.LANCE: 4,
+    shogi.KNIGHT: 4,
+    shogi.SILVER: 4,
+    shogi.GOLD: 4,
+    shogi.BISHOP: 2,
+    shogi.ROOK: 2,
+    shogi.KING: 2,
+}
+
 
 @dataclass(frozen=True, order=True)
 class ValidationDiagnostic:
@@ -145,6 +164,7 @@ def _validate_record(record: dict[str, Any], base: str, errors: list[ValidationD
         initial = shogi.Board(record["initial_sfen"])
         if initial.sfen() != record["initial_sfen"]:
             _diag(errors, "initial_sfen_noncanonical", f"{base}/initial_sfen", "initial SFEN is not canonical")
+        _validate_initial_inventory(initial, base, errors)
     except (ValueError, IndexError):
         initial = None
         _diag(errors, "invalid_initial_sfen", f"{base}/initial_sfen", "initial SFEN cannot be loaded")
@@ -190,6 +210,28 @@ def _validate_record(record: dict[str, Any], base: str, errors: list[ValidationD
 
     _validate_coverage(record, base, by_key, children, depths, errors)
     _validate_provenance(record, base, by_key, children, errors)
+
+
+def _validate_initial_inventory(board, base, errors) -> None:
+    counts: dict[int, int] = defaultdict(int)
+    king_counts = {shogi.BLACK: 0, shogi.WHITE: 0}
+    for square in range(81):
+        piece = board.piece_at(square)
+        if piece is None:
+            continue
+        piece_type = _UNPROMOTED_TYPE.get(piece.piece_type, piece.piece_type)
+        counts[piece_type] += 1
+        if piece_type == shogi.KING:
+            king_counts[piece.color] += 1
+    for hand in board.pieces_in_hand:
+        for piece_type, count in hand.items():
+            counts[_UNPROMOTED_TYPE.get(piece_type, piece_type)] += count
+    for color, label in ((shogi.BLACK, "black"), (shogi.WHITE, "white")):
+        if king_counts[color] != 1:
+            _diag(errors, "initial_king_count", f"{base}/initial_sfen", f"expected exactly one {label} king, found {king_counts[color]}")
+    for piece_type, limit in _INVENTORY_LIMIT.items():
+        if counts[piece_type] > limit:
+            _diag(errors, "initial_piece_inventory", f"{base}/initial_sfen", f"piece type {piece_type} count {counts[piece_type]} exceeds inventory limit {limit}")
 
 
 def _validate_coverage(record, base, by_key, children, depths, errors) -> None:

@@ -2,9 +2,10 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "type": "object",
   "additionalProperties": false,
-  "required": ["artifact_version", "records"],
+  "required": ["artifact_version", "review", "records"],
   "properties": {
     "artifact_version": {"const": 1},
+    "review": {"anyOf": [{"$ref": "#/$defs/pendingReview"}, {"$ref": "#/$defs/completedReview"}]},
     "records": {"type": "array", "minItems": 1, "items": {"anyOf": [{"$ref": "#/$defs/moveLineRecord"}, {"$ref": "#/$defs/catalogRecord"}]}}
   },
   "$defs": {
@@ -12,6 +13,10 @@
     "usi": {"type": "string", "pattern": "^(?:[1-9][a-i][1-9][a-i]\\+?|[PLNSGBR]\\*[1-9][a-i])$"},
     "sfen": {"type": "string", "minLength": 1},
     "revision": {"type": "integer", "minimum": 1},
+    "legalityChecks": {"type": "object", "additionalProperties": false, "required": ["backend_python_shogi", "frontend_tsshogi"], "properties": {"backend_python_shogi": {"enum": ["pending", "passed", "failed"]}, "frontend_tsshogi": {"enum": ["pending", "passed", "failed"]}}},
+    "completedLegalityChecks": {"type": "object", "additionalProperties": false, "required": ["backend_python_shogi", "frontend_tsshogi"], "properties": {"backend_python_shogi": {"enum": ["passed", "failed"]}, "frontend_tsshogi": {"enum": ["passed", "failed"]}}},
+    "pendingReview": {"type": "object", "additionalProperties": false, "required": ["review_status", "legality_checks"], "properties": {"review_status": {"const": "pending"}, "legality_checks": {"$ref": "#/$defs/legalityChecks"}}},
+    "completedReview": {"type": "object", "additionalProperties": false, "required": ["review_status", "reviewed_by", "reviewed_on", "legality_checks"], "properties": {"review_status": {"const": "reviewed"}, "reviewed_by": {"type": "string", "minLength": 1}, "reviewed_on": {"type": "string", "format": "date", "pattern": "^\\d{4}-\\d{2}-\\d{2}$"}, "legality_checks": {"$ref": "#/$defs/completedLegalityChecks"}}},
     "source": {"type": "object", "additionalProperties": false, "required": ["url", "title", "section"], "properties": {"url": {"type": "string", "minLength": 1}, "title": {"type": "string", "minLength": 1}, "section": {"type": "string", "minLength": 1}}},
     "coverage": {"type": "object", "additionalProperties": false, "required": ["covered_through_ply", "covered_through_move", "omitted_after"], "properties": {"covered_through_ply": {"type": "integer", "minimum": 1}, "covered_through_move": {"$ref": "#/$defs/usi"}, "omitted_after": {"anyOf": [{"type": "null"}, {"$ref": "#/$defs/omittedMove"}]}}},
     "omittedMove": {"type": "object", "additionalProperties": false, "required": ["usi"], "properties": {"usi": {"$ref": "#/$defs/usi"}, "note": {"type": "string"}}},
@@ -27,9 +32,9 @@
     },
     "catalogRecord": {
       "type": "object", "additionalProperties": false,
-      "required": ["record_type", "record_key", "line_key", "source", "license", "retrieved_date", "revision", "provenance", "evidence_note"],
+      "required": ["record_type", "record_key", "line_key", "catalog_name", "source", "license", "retrieved_date", "revision", "provenance", "evidence_note"],
       "properties": {
-        "record_type": {"const": "catalog_name_only"}, "record_key": {"$ref": "#/$defs/key"}, "line_key": {"$ref": "#/$defs/key"}, "source": {"$ref": "#/$defs/source"},
+        "record_type": {"const": "catalog_name_only"}, "record_key": {"$ref": "#/$defs/key"}, "line_key": {"$ref": "#/$defs/key"}, "catalog_name": {"type": "string", "minLength": 1}, "source": {"$ref": "#/$defs/source"},
         "license": {"enum": ["CC BY-SA 4.0", "CC BY-SA 3.0"]}, "retrieved_date": {"type": "string", "format": "date", "pattern": "^\\d{4}-\\d{2}-\\d{2}$"}, "revision": {"$ref": "#/$defs/revision"},
         "provenance": {"const": "C"}, "source_note": {"type": "string"}, "evidence_note": {"type": "string", "minLength": 1}
       }
