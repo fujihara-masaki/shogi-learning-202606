@@ -77,9 +77,11 @@ verified M は `segments` を2件以上持ち、各要素に `provenance_class`�
 
 2026-08-15 の監査では shell の HTTPS proxy が 403、別の web retrieval が 401 を返したため、全 source の current revision、redirect、canonical URL、section の存在を確認できなかった。したがって全34件を `unavailable`、revision/canonical を `null` とした。requested URL、legacy note/license/section は seed から機械抽出した値であり「current Wikipedia で確認済み」ではない。section が seed にない31件は `source_section_missing_in_seed`、升田式石田流には既知の終端主張不一致を記録した。新・早石田は既存noteが本文・図示の混在を主張するためMとしたが、A/B境界を推測せず`mixed_segment_boundary_unresolved`として保持する。
 
-## 7. PR-D1 validator の規範要件
+## 7. D0時点の旧PR-D1 validator要件（legacy / superseded）
 
-PR-D1 の production validator は最低限、次を失敗にする。
+この節は、D1をD1a〜D1dへ再分割する前に想定していた旧PR-D1（旧PR #58）の要件を、D0監査の履歴として保存するものである。**現在のD1b validatorの規範要件ではない。** 現在の責務境界では、D1bは新canonical structured artifactのschema・将棋合法性・tree・coverage・構造化provenance metadataだけを決定論的に検証し、`source_note` / `evidence_note`の自然言語内容から収録・未収録等を判定しない。新canonical artifactとseed/import結果の完全一致、ID/parent drift、置換・idempotencyの比較はD1cで扱う。
+
+旧PR-D1 の production validator は最低限、次を失敗にする想定だった。
 
 1. Wikipedia move-line の必須 metadata 欠落、または source section/revision/retrieved date/license の欠落。
 2. provenance/coverage が列挙外、または第3節にない組合せ。
@@ -92,8 +94,10 @@ PR-D1 の production validator は最低限、次を失敗にする。
 9. branch/main の根拠を別 branch/segment に暗黙継承すること。
 10. `node_count`、stable `move_key` / `parent_key`、USI、semantic main、表示順、variation groupがseedのcanonical node treeと一致しないこと。
 
-特に升田式石田流の現行 moves は7手目 `5i4h` までだが、note は次の `7h7f` も「手順化」と主張する。D0 は seed を直さず artifact の issue と [`fixtures/opening-wikipedia-provenance-invalid-masuda.json`](fixtures/opening-wikipedia-provenance-invalid-masuda.json) に固定し、D1 validator が `note_claims_unrecorded_move` を返すことを要求する。
+特に升田式石田流の現行 moves は7手目 `5i4h` までだが、note は次の `7h7f` も「手順化」と主張する。D0 は seed を直さず artifact の issue と [`fixtures/opening-wikipedia-provenance-invalid-masuda.json`](fixtures/opening-wikipedia-provenance-invalid-masuda.json) に固定し、旧PR-D1 validator が `note_claims_unrecorded_move` を返すことを要求していた。この自然言語診断は新D1bへ継承しない。
 
-## 8. fixture の期待値
+## 8. legacy D0 fixture の期待値
 
-[`fixtures/opening-wikipedia-provenance-valid.json`](fixtures/opening-wikipedia-provenance-valid.json) はsource、verified revision/section/license、coverage boundary、canonical node treeをすべて持つproduction `move_line` fixtureで、`expected_errors: []`まで含めてproduction schemaに適合する。[`fixtures/opening-wikipedia-provenance-valid-name-only.json`](fixtures/opening-wikipedia-provenance-valid-name-only.json) はunavailableなC/catalog artifact、[`fixtures/opening-wikipedia-provenance-valid-name-only-verified.json`](fixtures/opening-wikipedia-provenance-valid-name-only-verified.json) は記事全体を根拠としてverifiedだがsectionは`null`のC/catalog artifactである。[`fixtures/opening-wikipedia-provenance-valid-mixed-unavailable.json`](fixtures/opening-wikipedia-provenance-valid-mixed-unavailable.json) は取得不能だが境界を記録済みのM、[`fixtures/opening-wikipedia-provenance-valid-mixed-unresolved.json`](fixtures/opening-wikipedia-provenance-valid-mixed-unresolved.json) は境界を捏造せず空segment・未分類node・明示issueで保持する監査途中状態、[`fixtures/opening-wikipedia-provenance-valid-mixed-verified.json`](fixtures/opening-wikipedia-provenance-valid-mixed-verified.json) は全segmentの境界とsectionを確認済みのM fixtureである。top-levelの任意`expected_errors`はfixtureに期待するD1 validator error codeの配列で、通常のaudit artifactは省略する。invalid Masuda fixtureはproduction artifactそのものではなく、意図的なsemantic違反と期待error codeを固定するvalidator入力である。
+以下はすべて旧draft-07 schemaに対するlegacy D0 fixtureであり、新D1b canonical artifactのfixtureではない。
+
+[`fixtures/opening-wikipedia-provenance-valid.json`](fixtures/opening-wikipedia-provenance-valid.json) はsource、verified revision/section/license、coverage boundary、canonical node treeをすべて持つproduction `move_line` fixtureで、`expected_errors: []`まで含めてlegacy production schemaに適合する。[`fixtures/opening-wikipedia-provenance-valid-name-only.json`](fixtures/opening-wikipedia-provenance-valid-name-only.json) はunavailableなC/catalog artifact、[`fixtures/opening-wikipedia-provenance-valid-name-only-verified.json`](fixtures/opening-wikipedia-provenance-valid-name-only-verified.json) は記事全体を根拠としてverifiedだがsectionは`null`のC/catalog artifactである。[`fixtures/opening-wikipedia-provenance-valid-mixed-unavailable.json`](fixtures/opening-wikipedia-provenance-valid-mixed-unavailable.json) は取得不能だが境界を記録済みのM、[`fixtures/opening-wikipedia-provenance-valid-mixed-unresolved.json`](fixtures/opening-wikipedia-provenance-valid-mixed-unresolved.json) は境界を捏造せず空segment・未分類node・明示issueで保持する監査途中状態、[`fixtures/opening-wikipedia-provenance-valid-mixed-verified.json`](fixtures/opening-wikipedia-provenance-valid-mixed-verified.json) は全segmentの境界とsectionを確認済みのM fixtureである。top-levelの任意`expected_errors`はfixtureに期待する旧PR-D1 validator error codeの配列で、通常のlegacy audit artifactは省略する。invalid Masuda fixtureはproduction artifactそのものではなく、意図的なsemantic違反と期待error codeを固定した旧validator入力である。
