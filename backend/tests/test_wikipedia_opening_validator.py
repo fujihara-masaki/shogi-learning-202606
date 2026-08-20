@@ -175,6 +175,15 @@ def test_reviewed_failed_legality_result_is_a_semantic_failure(failed_engine):
     assert diagnostics[0].path == f"/review/legality_checks/{failed_engine}"
 
 
+@pytest.mark.parametrize("failed_engine", ["backend_python_shogi", "frontend_tsshogi"])
+def test_pending_failed_legality_result_is_a_semantic_failure(failed_engine):
+    artifact = _artifact()
+    artifact["review"]["legality_checks"][failed_engine] = "failed"
+    diagnostics = validate_wikipedia_opening_artifact(artifact)
+    assert [diagnostic.code for diagnostic in diagnostics] == ["review_legality_failed"]
+    assert diagnostics[0].path == f"/review/legality_checks/{failed_engine}"
+
+
 def test_stored_legality_result_never_skips_backend_replay():
     artifact = _artifact()
     artifact["review"]["legality_checks"]["backend_python_shogi"] = "passed"
@@ -258,6 +267,40 @@ def test_initial_sfen_cannot_exceed_standard_piece_inventory():
     artifact = _artifact()
     artifact["records"][0]["initial_sfen"] = "4k4/9/9/9/9/9/9/9/+P3K4 b 18P 1"
     assert "initial_piece_inventory" in _codes(artifact)
+
+
+@pytest.mark.parametrize("sfen", [
+    "P3k4/9/9/9/9/9/9/9/4K4 b - 1",  # black pawn on rank 1
+    "4k4/9/9/9/9/9/9/9/p3K4 b - 1",  # white pawn on rank 9
+    "L3k4/9/9/9/9/9/9/9/4K4 b - 1",  # black lance on rank 1
+    "4k4/9/9/9/9/9/9/9/l3K4 b - 1",  # white lance on rank 9
+    "N3k4/9/9/9/9/9/9/9/4K4 b - 1",  # black knight on rank 1
+    "4k4/9/9/9/9/9/9/n8/4K4 b - 1",  # white knight on rank 8
+])
+def test_initial_sfen_rejects_unpromoted_dead_rank_pieces(sfen):
+    artifact = _artifact()
+    artifact["records"][0]["initial_sfen"] = sfen
+    assert "initial_dead_rank_piece" in _codes(artifact)
+
+
+@pytest.mark.parametrize("sfen", [
+    "4k4/9/9/9/9/9/9/P8/P3K4 b - 1",
+    "4k3p/8p/9/9/9/9/9/9/4K4 b - 1",
+])
+def test_initial_sfen_rejects_nifu_for_both_colors(sfen):
+    artifact = _artifact()
+    artifact["records"][0]["initial_sfen"] = sfen
+    assert "initial_nifu" in _codes(artifact)
+
+
+def test_promoted_pawn_does_not_count_as_nifu():
+    artifact = _artifact()
+    record = artifact["records"][0]
+    initial = "4k4/9/9/9/9/9/P8/+P8/4K4 b - 1"
+    record["initial_sfen"] = initial
+    record["nodes"] = [_node("n1", None, "9g9f", initial)]
+    record["coverage"] = {"covered_through_ply": 1, "covered_through_move": "9g9f", "omitted_after": None}
+    assert validate_wikipedia_opening_artifact(artifact) == ()
 
 
 def test_orphan_cycle_and_root_failures_are_rejected():

@@ -74,15 +74,14 @@ def validate_wikipedia_opening_artifact(artifact: Any) -> tuple[ValidationDiagno
         return tuple(sorted(errors))
 
     review = artifact["review"]
-    if review["review_status"] == "reviewed":
-        for engine, result in review["legality_checks"].items():
-            if result == "failed":
-                _diag(
-                    errors,
-                    "review_legality_failed",
-                    f"/review/legality_checks/{engine}",
-                    f"reviewed artifact records a failed {engine} legality check",
-                )
+    for engine, result in review["legality_checks"].items():
+        if result == "failed":
+            _diag(
+                errors,
+                "review_legality_failed",
+                f"/review/legality_checks/{engine}",
+                f"artifact records a failed {engine} legality check",
+            )
 
     record_keys: dict[str, int] = {}
     line_keys: dict[str, int] = {}
@@ -226,10 +225,29 @@ def _validate_record(record: dict[str, Any], base: str, errors: list[ValidationD
 def _validate_initial_inventory(board, base, errors) -> None:
     counts: dict[int, int] = defaultdict(int)
     king_counts = {shogi.BLACK: 0, shogi.WHITE: 0}
+    unpromoted_pawns: dict[tuple[int, int], int] = defaultdict(int)
     for square in range(81):
         piece = board.piece_at(square)
         if piece is None:
             continue
+        rank = square // 9
+        file_index = square % 9
+        dead_rank = (
+            piece.color == shogi.BLACK
+            and (
+                piece.piece_type in (shogi.PAWN, shogi.LANCE) and rank == 0
+                or piece.piece_type == shogi.KNIGHT and rank <= 1
+            )
+            or piece.color == shogi.WHITE
+            and (
+                piece.piece_type in (shogi.PAWN, shogi.LANCE) and rank == 8
+                or piece.piece_type == shogi.KNIGHT and rank >= 7
+            )
+        )
+        if dead_rank:
+            _diag(errors, "initial_dead_rank_piece", f"{base}/initial_sfen", f"unpromoted piece at {shogi.SQUARE_NAMES[square]} has no legal forward move")
+        if piece.piece_type == shogi.PAWN:
+            unpromoted_pawns[(piece.color, file_index)] += 1
         piece_type = _UNPROMOTED_TYPE.get(piece.piece_type, piece.piece_type)
         counts[piece_type] += 1
         if piece_type == shogi.KING:
@@ -240,6 +258,9 @@ def _validate_initial_inventory(board, base, errors) -> None:
     for color, label in ((shogi.BLACK, "black"), (shogi.WHITE, "white")):
         if king_counts[color] != 1:
             _diag(errors, "initial_king_count", f"{base}/initial_sfen", f"expected exactly one {label} king, found {king_counts[color]}")
+    for (color, file_index), count in sorted(unpromoted_pawns.items()):
+        if count > 1:
+            _diag(errors, "initial_nifu", f"{base}/initial_sfen", f"color {color} has {count} unpromoted pawns on file index {file_index}")
     for piece_type, limit in _INVENTORY_LIMIT.items():
         if counts[piece_type] > limit:
             _diag(errors, "initial_piece_inventory", f"{base}/initial_sfen", f"piece type {piece_type} count {counts[piece_type]} exceeds inventory limit {limit}")
