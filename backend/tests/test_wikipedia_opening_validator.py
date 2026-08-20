@@ -8,12 +8,13 @@ from app.wikipedia_opening_validator import SCHEMA_PATH, validate_wikipedia_open
 
 
 def _node(key, parent, usi, from_sfen, *, order=0, main=True, provenance="A", segment=None,
-          source_section="Main line"):
+          source_section="Main line", evidence_note=None):
     board = shogi.Board(from_sfen)
     board.push_usi(usi)
     node = {"key": key, "parent_key": parent, "usi": usi, "sort_order": order,
             "is_main": main, "from_sfen": from_sfen, "to_sfen": board.sfen(),
-            "provenance": provenance, "source_section": source_section}
+            "provenance": provenance, "source_section": source_section,
+            "evidence_note": evidence_note or f"Evidence for {key}"}
     if segment is not None:
         node["segment_key"] = segment
     return node
@@ -27,7 +28,8 @@ def _artifact(*, branched=False, mixed=False):
     nodes = [n1, n2, n3]
     if branched:
         nodes.append(_node("branch", "n2", "6g6f", n2["to_sfen"], order=1, main=False,
-                           source_section="Alternative line"))
+                           source_section="Alternative line",
+                           evidence_note="Alternative line explicitly gives 6g6f"))
     record = {
         "record_type": "move_line",
         "record_key": "wikipedia.test", "line_key": "test-line",
@@ -71,6 +73,8 @@ def test_main_and_branch_can_carry_distinct_source_sections():
     nodes = artifact["records"][0]["nodes"]
     assert nodes[2]["source_section"] == "Main line"
     assert nodes[3]["source_section"] == "Alternative line"
+    assert nodes[2]["evidence_note"] == "Evidence for n3"
+    assert nodes[3]["evidence_note"] == "Alternative line explicitly gives 6g6f"
     assert validate_wikipedia_opening_artifact(artifact) == ()
 
 
@@ -80,6 +84,15 @@ def test_node_source_section_is_required_and_nonempty():
     assert _codes(artifact) == ["schema"]
     artifact = _artifact()
     artifact["records"][0]["nodes"][1]["source_section"] = ""
+    assert _codes(artifact) == ["schema"]
+
+
+def test_node_evidence_note_is_required_and_nonempty():
+    artifact = _artifact()
+    del artifact["records"][0]["nodes"][1]["evidence_note"]
+    assert _codes(artifact) == ["schema"]
+    artifact = _artifact()
+    artifact["records"][0]["nodes"][1]["evidence_note"] = ""
     assert _codes(artifact) == ["schema"]
 
 

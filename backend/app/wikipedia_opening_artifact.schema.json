@@ -35,8 +35,8 @@
     },
     "node": {
       "type": "object", "additionalProperties": false,
-      "required": ["key", "parent_key", "usi", "sort_order", "is_main", "from_sfen", "to_sfen", "provenance", "source_section"],
-      "properties": {"key": {"$ref": "#/$defs/key"}, "parent_key": {"anyOf": [{"$ref": "#/$defs/key"}, {"type": "null"}]}, "usi": {"$ref": "#/$defs/usi"}, "sort_order": {"type": "integer", "minimum": 0}, "is_main": {"type": "boolean"}, "from_sfen": {"$ref": "#/$defs/sfen"}, "to_sfen": {"$ref": "#/$defs/sfen"}, "provenance": {"enum": ["A", "B"]}, "source_section": {"type": "string", "minLength": 1}, "segment_key": {"anyOf": [{"$ref": "#/$defs/key"}, {"type": "null"}]}, "evidence_note": {"type": "string"}}
+      "required": ["key", "parent_key", "usi", "sort_order", "is_main", "from_sfen", "to_sfen", "provenance", "source_section", "evidence_note"],
+      "properties": {"key": {"$ref": "#/$defs/key"}, "parent_key": {"anyOf": [{"$ref": "#/$defs/key"}, {"type": "null"}]}, "usi": {"$ref": "#/$defs/usi"}, "sort_order": {"type": "integer", "minimum": 0}, "is_main": {"type": "boolean"}, "from_sfen": {"$ref": "#/$defs/sfen"}, "to_sfen": {"$ref": "#/$defs/sfen"}, "provenance": {"enum": ["A", "B"]}, "source_section": {"type": "string", "minLength": 1}, "segment_key": {"anyOf": [{"$ref": "#/$defs/key"}, {"type": "null"}]}, "evidence_note": {"type": "string", "minLength": 1}}
     },
     "segment": {
       "type": "object", "additionalProperties": false,

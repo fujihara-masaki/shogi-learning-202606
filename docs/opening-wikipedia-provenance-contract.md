@@ -2,7 +2,9 @@
 
 ## 1. 目的と適用範囲
 
-本書は、Wikipedia/Wikibooks に由来すると主張する **catalog provenance** と **move-line provenance** の境界、および後者の監査交換形式を固定する。canonical 形式は [`opening-wikipedia-provenance-audit.json`](opening-wikipedia-provenance-audit.json)、その構文契約は [`opening-wikipedia-provenance-audit.schema.json`](opening-wikipedia-provenance-audit.schema.json)（JSON Schema draft-07）である。schema version `1.0.0` の破壊的変更は version を上げる。
+本書は、Wikipedia/Wikibooks に由来すると主張する **catalog provenance** と **move-line provenance** の境界、およびD0時点の監査交換形式を固定した履歴文書である。[`opening-wikipedia-provenance-audit.json`](opening-wikipedia-provenance-audit.json)、その構文契約である [`opening-wikipedia-provenance-audit.schema.json`](opening-wikipedia-provenance-audit.schema.json)（JSON Schema draft-07）、および対応fixtureは、当時のseed棚卸しを保存する **legacy audit format** として維持する。
+
+PR-D1再分割後、今後LLM/人間レビューが生成してD1b/D1cへ渡すcanonical structured artifactの契約は [`../backend/app/wikipedia_opening_artifact.schema.json`](../backend/app/wikipedia_opening_artifact.schema.json) である。legacy audit formatと新形式を同時にcanonicalとは呼ばない。旧artifactから新canonicalへの移行と差分比較はD1cの責務であり、D1b validatorはlegacy artifactを暗黙変換しない。
 
 これは監査契約であり、DB の `coverage_status`、migration、API、画面、または `SAMPLE_OPENING_LINES` を変更する契約ではない。現行の自由文 `coverage_status` は artifact の `legacy_coverage_status` に原文のまま写し、正規化 `coverage` と同一視しない。
 

@@ -430,6 +430,7 @@ follow-up:                         現計画完了 → visual branch tree検討
 ### PR-D1b: Structured Wikipedia opening validator
 
 - **目的**: LLMが生成したstructured artifactを、Wikipedia本文の再解釈なしに決定論的に検証する正規validatorを実装する。
+- **artifact契約**: D1bで導入する `backend/app/wikipedia_opening_artifact.schema.json` を、今後LLM/人間レビューが生成しD1b/D1cへ渡すcanonical structured artifactのschemaとする。D0で作成した `docs/opening-wikipedia-provenance-audit.schema.json` と既存audit JSON/fixturesは、当時のseed棚卸しを保存するlegacy audit formatであり、新schemaと同時にcanonicalとは呼ばない。legacy auditから新canonical artifactへの移行・差分比較はPR-D1cで扱い、D1bでは旧artifactのimport adapterやseed比較を実装しない。
 - **検査範囲**: JSON Schema、USI構文、全着手の合法手再生、initial SFEN、direct-parent tree（root/orphan/親子SFENを含む）、cycle、同一parent配下のsibling USI / `sort_order`一意性、semantic mainのexactly-one規則、coverage boundary、A/B/C/M provenance、mixed segment境界とnode/segment metadata。
 - **責務境界**: Wikipedia本文の意味理解・棋譜抽出・A/B/C/M判定はChatGPT等のLLM/人間レビュー側が担う。プログラムはartifactのschema、将棋合法性、tree、coverage、metadata整合だけを検証する。`source_note` / `evidence_note`の「収録」「未収録」等をPythonで自然言語解析して正しさを判定しない。
 - **表示metadata**: `source_note`は可能な範囲でcoverage/provenance/終端等の構造化metadataから生成し、自由文を正規データの代用にしない。
