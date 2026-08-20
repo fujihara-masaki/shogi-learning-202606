@@ -2,6 +2,7 @@ from copy import deepcopy
 import json
 
 import jsonschema
+import pytest
 import shogi
 
 from app.wikipedia_opening_validator import SCHEMA_PATH, validate_wikipedia_opening_artifact
@@ -34,7 +35,7 @@ def _artifact(*, branched=False, mixed=False):
         "record_type": "move_line",
         "record_key": "wikipedia.test", "line_key": "test-line",
         "source": {"url": "https://ja.wikipedia.org/wiki/Test", "title": "Test", "section": "Opening"},
-        "license": "CC BY-SA 4.0", "retrieved_date": "2026-08-20", "revision": "12345",
+        "license": "CC BY-SA 4.0", "retrieved_date": "2026-08-20", "revision": 12345,
         "provenance": "A", "initial_sfen": start,
         "coverage": {"covered_through_ply": 3, "covered_through_move": "2g2f", "omitted_after": None},
         "source_note": "この表示文は判定されない", "nodes": nodes,
@@ -55,6 +56,19 @@ def _artifact(*, branched=False, mixed=False):
 
 def _codes(artifact):
     return [error.code for error in validate_wikipedia_opening_artifact(artifact)]
+
+
+def _catalog_record():
+    move_record = _artifact()["records"][0]
+    catalog = {key: move_record[key] for key in (
+        "record_key", "line_key", "source", "license", "retrieved_date", "revision"
+    )}
+    catalog.update(
+        record_type="catalog_name_only",
+        provenance="C",
+        evidence_note="名称が出典記事の一覧に掲載されている",
+    )
+    return catalog
 
 
 def test_valid_linear_branch_and_mixed_artifacts_pass():
@@ -106,13 +120,36 @@ def test_multiple_root_siblings_are_a_valid_initial_position_choice_set():
 
 def test_catalog_c_is_name_only_and_cannot_contain_nodes():
     move_record = _artifact()["records"][0]
-    catalog = {key: move_record[key] for key in ("record_key", "line_key", "source", "license", "retrieved_date", "revision")}
-    catalog.update(record_type="catalog_name_only", provenance="C")
+    catalog = _catalog_record()
     assert validate_wikipedia_opening_artifact({"artifact_version": 1, "records": [catalog]}) == ()
     catalog["nodes"] = move_record["nodes"]
     assert _codes({"artifact_version": 1, "records": [catalog]}) == ["schema"]
     move_record["provenance"] = "C"
     assert _codes({"artifact_version": 1, "records": [move_record]}) == ["schema"]
+
+
+@pytest.mark.parametrize("revision", [0, -1, "unknown", "12345"])
+@pytest.mark.parametrize("record_factory", [lambda: _artifact()["records"][0], _catalog_record])
+def test_revision_must_be_a_positive_canonical_integer(record_factory, revision):
+    record = record_factory()
+    record["revision"] = revision
+    assert _codes({"artifact_version": 1, "records": [record]}) == ["schema"]
+
+
+def test_positive_integer_revision_is_valid_for_move_line_and_catalog():
+    assert validate_wikipedia_opening_artifact(_artifact()) == ()
+    assert validate_wikipedia_opening_artifact(
+        {"artifact_version": 1, "records": [_catalog_record()]}
+    ) == ()
+
+
+def test_catalog_evidence_note_is_required_and_nonempty():
+    catalog = _catalog_record()
+    del catalog["evidence_note"]
+    assert _codes({"artifact_version": 1, "records": [catalog]}) == ["schema"]
+    catalog = _catalog_record()
+    catalog["evidence_note"] = ""
+    assert _codes({"artifact_version": 1, "records": [catalog]}) == ["schema"]
 
 
 def test_schema_and_provenance_enum_violations_are_stable():
