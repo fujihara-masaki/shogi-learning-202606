@@ -162,6 +162,19 @@ def test_pending_and_reviewed_audit_metadata_are_structured():
     assert _codes(_document(_artifact()["records"][0], review=reviewed)) == ["schema"]
 
 
+@pytest.mark.parametrize("failed_engine", ["backend_python_shogi", "frontend_tsshogi"])
+def test_reviewed_failed_legality_result_is_a_semantic_failure(failed_engine):
+    review = {"review_status": "reviewed", "reviewed_by": "reviewer@example.com",
+              "reviewed_on": "2026-08-20", "legality_checks": {
+                  "backend_python_shogi": "passed", "frontend_tsshogi": "passed"}}
+    review["legality_checks"][failed_engine] = "failed"
+    diagnostics = validate_wikipedia_opening_artifact(
+        _document(_artifact()["records"][0], review=review)
+    )
+    assert [diagnostic.code for diagnostic in diagnostics] == ["review_legality_failed"]
+    assert diagnostics[0].path == f"/review/legality_checks/{failed_engine}"
+
+
 def test_stored_legality_result_never_skips_backend_replay():
     artifact = _artifact()
     artifact["review"]["legality_checks"]["backend_python_shogi"] = "passed"

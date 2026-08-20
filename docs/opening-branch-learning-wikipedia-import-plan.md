@@ -539,7 +539,7 @@ git diff --check
 #### PR-D1b
 
 - [ ] JSON Schema違反、invalid USI、illegal move、initial SFEN不整合を決定論的なerrorで拒否する。
-- [ ] direct-parent treeのorphan/cycle/複数root/親子SFEN不整合を拒否する。
+- [ ] initial positionをimplicit rootとし、`parent_key: null` nodeをそのchildrenであるroot sibling集合として扱う。root siblingは1件以上を許し、他のsibling集合と同じUSI/`sort_order`一意性・semantic main exactly-oneを課す。orphan、cycle、root sibling集合欠落、root siblingのinitial SFEN不整合、親子SFEN不整合を拒否する。
 - [ ] 同一parent配下のsibling USIと`sort_order`重複、semantic mainの0件/複数件を拒否する。
 - [ ] coverage boundary、A/B/C/M provenance、mixed segmentの境界・必須metadataを検証する。
 - [ ] `source_note` / `evidence_note`の日本語自然言語解析に依存するtestまたは正規判定を持たない。

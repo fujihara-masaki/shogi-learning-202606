@@ -73,6 +73,17 @@ def validate_wikipedia_opening_artifact(artifact: Any) -> tuple[ValidationDiagno
     if errors:
         return tuple(sorted(errors))
 
+    review = artifact["review"]
+    if review["review_status"] == "reviewed":
+        for engine, result in review["legality_checks"].items():
+            if result == "failed":
+                _diag(
+                    errors,
+                    "review_legality_failed",
+                    f"/review/legality_checks/{engine}",
+                    f"reviewed artifact records a failed {engine} legality check",
+                )
+
     record_keys: dict[str, int] = {}
     line_keys: dict[str, int] = {}
     for index, record in enumerate(artifact["records"]):
