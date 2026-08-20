@@ -25,11 +25,12 @@ def _artifact(*, branched=False, mixed=False):
     if branched:
         nodes.append(_node("branch", "n2", "6g6f", n2["to_sfen"], order=1, main=False))
     record = {
+        "record_type": "move_line",
         "record_key": "wikipedia.test", "line_key": "test-line",
         "source": {"url": "https://ja.wikipedia.org/wiki/Test", "title": "Test", "section": "Opening"},
         "license": "CC BY-SA 4.0", "retrieved_date": "2026-08-20", "revision": "12345",
         "provenance": "A", "initial_sfen": start,
-        "coverage": {"covered_through_ply": 3, "covered_through_move": "2g2f", "omitted_after": False},
+        "coverage": {"covered_through_ply": 3, "covered_through_move": "2g2f", "omitted_after": None},
         "source_note": "この表示文は判定されない", "nodes": nodes,
     }
     if mixed:
@@ -54,6 +55,25 @@ def test_valid_linear_branch_and_mixed_artifacts_pass():
     assert validate_wikipedia_opening_artifact(_artifact()) == ()
     assert validate_wikipedia_opening_artifact(_artifact(branched=True)) == ()
     assert validate_wikipedia_opening_artifact(_artifact(mixed=True)) == ()
+
+
+def test_multiple_root_siblings_are_a_valid_initial_position_choice_set():
+    artifact = _artifact()
+    record = artifact["records"][0]
+    alternative = _node("root-alt", None, "2g2f", record["initial_sfen"], order=1, main=False)
+    record["nodes"].append(alternative)
+    assert validate_wikipedia_opening_artifact(artifact) == ()
+
+
+def test_catalog_c_is_name_only_and_cannot_contain_nodes():
+    move_record = _artifact()["records"][0]
+    catalog = {key: move_record[key] for key in ("record_key", "line_key", "source", "license", "retrieved_date", "revision")}
+    catalog.update(record_type="catalog_name_only", provenance="C")
+    assert validate_wikipedia_opening_artifact({"artifact_version": 1, "records": [catalog]}) == ()
+    catalog["nodes"] = move_record["nodes"]
+    assert _codes({"artifact_version": 1, "records": [catalog]}) == ["schema"]
+    move_record["provenance"] = "C"
+    assert _codes({"artifact_version": 1, "records": [move_record]}) == ["schema"]
 
 
 def test_schema_and_provenance_enum_violations_are_stable():
@@ -121,8 +141,12 @@ def test_coverage_boundaries_and_omission_metadata_are_rejected():
     artifact["records"][0]["coverage"]["covered_through_move"] = "3c3d"
     assert {"coverage_ply", "coverage_move"} <= set(_codes(artifact))
     artifact = _artifact()
+    artifact["records"][0]["coverage"]["omitted_after"] = {"usi": "8c8d"}
+    assert validate_wikipedia_opening_artifact(artifact) == ()
+    artifact["records"][0]["coverage"]["omitted_after"] = {"usi": "7g7f"}
+    assert "illegal_omitted_move" in _codes(artifact)
     artifact["records"][0]["coverage"]["omitted_after"] = True
-    assert "omission_reason_required" in _codes(artifact)
+    assert _codes(artifact) == ["schema"]
 
 
 def test_invalid_mixed_segments_are_rejected():
@@ -135,6 +159,31 @@ def test_invalid_mixed_segments_are_rejected():
     artifact = _artifact(mixed=True)
     del artifact["records"][0]["segments"][0]["evidence_note"]
     assert _codes(artifact) == ["schema"]
+
+
+def test_mixed_requires_both_a_and_b_and_forbids_c():
+    artifact = _artifact(mixed=True)
+    for segment in artifact["records"][0]["segments"]:
+        segment["provenance"] = "B"
+    for node in artifact["records"][0]["nodes"]:
+        node["provenance"] = "B"
+    assert "mixed_provenance_set" in _codes(artifact)
+    artifact = _artifact(mixed=True)
+    for segment in artifact["records"][0]["segments"]:
+        segment["provenance"] = "A"
+    for node in artifact["records"][0]["nodes"]:
+        node["provenance"] = "A"
+    assert "mixed_provenance_set" in _codes(artifact)
+    artifact = _artifact(mixed=True)
+    artifact["records"][0]["segments"][0]["provenance"] = "C"
+    assert _codes(artifact) == ["schema"]
+
+
+def test_segment_with_multiple_structural_ends_is_rejected():
+    artifact = _artifact(branched=True, mixed=True)
+    # The B segment branches to n3 and branch, so a singular end_node_key cannot
+    # truthfully describe it. Split it into linear segments instead.
+    assert "segment_end" in _codes(artifact)
 
 
 def test_stable_record_and_node_keys_are_unique():

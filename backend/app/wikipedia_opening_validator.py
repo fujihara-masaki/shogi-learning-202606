@@ -56,7 +56,8 @@ def validate_wikipedia_opening_artifact(artifact: Any) -> tuple[ValidationDiagno
                 _diag(errors, code, f"{base}/{field}", f"{value!r} is already used at /records/{seen[value]}/{field}")
             else:
                 seen[value] = index
-        _validate_record(record, base, errors)
+        if record["record_type"] == "move_line":
+            _validate_record(record, base, errors)
     return tuple(sorted(errors))
 
 
@@ -75,7 +76,7 @@ def _validate_schema_value(value, rule, root, path, errors) -> None:
             _validate_schema_value(value, choice, root, path, trial)
             trials.append(trial)
         if all(trials):
-            _diag(errors, "schema", _pointer(path), "value does not match any allowed schema")
+            errors.extend(min(trials, key=lambda trial: (len(trial), trial)))
         return
     expected = rule.get("type")
     types = expected if isinstance(expected, list) else [expected] if expected else []
@@ -136,9 +137,8 @@ def _validate_record(record: dict[str, Any], base: str, errors: list[ValidationD
         if parent is not None and parent not in by_key:
             _diag(errors, "orphan_parent", f"{base}/nodes/{index}/parent_key", f"parent {parent!r} does not exist")
 
-    roots = children[None]
-    if len(roots) != 1:
-        _diag(errors, "root_count", f"{base}/nodes", f"expected exactly one root, found {len(roots)}")
+    if not children[None]:
+        _diag(errors, "root_count", f"{base}/nodes", "expected at least one root sibling")
 
     # Parent chains make cycle diagnostics independent of input ordering.
     for index, node in enumerate(nodes):
@@ -237,8 +237,15 @@ def _validate_coverage(record, base, by_key, children, depths, errors) -> None:
         _diag(errors, "coverage_ply", f"{base}/coverage/covered_through_ply", f"expected terminal semantic-main ply {expected_ply}")
     if coverage["covered_through_move"] != main["usi"]:
         _diag(errors, "coverage_move", f"{base}/coverage/covered_through_move", f"expected terminal semantic-main move {main['usi']!r}")
-    if coverage["omitted_after"] and coverage.get("omission_reason") is None:
-        _diag(errors, "omission_reason_required", f"{base}/coverage/omission_reason", "omitted_after=true requires omission_reason")
+    omitted = coverage["omitted_after"]
+    if omitted is not None:
+        try:
+            board = shogi.Board(main["to_sfen"])
+            move = shogi.Move.from_usi(omitted["usi"])
+            if move not in board.legal_moves:
+                _diag(errors, "illegal_omitted_move", f"{base}/coverage/omitted_after/usi", "omitted continuation is not legal after the coverage boundary")
+        except (ValueError, IndexError):
+            _diag(errors, "illegal_omitted_move", f"{base}/coverage/omitted_after/usi", "omitted continuation cannot be replayed")
 
 
 def _validate_provenance(record, base, by_key, children, errors) -> None:
@@ -254,6 +261,9 @@ def _validate_provenance(record, base, by_key, children, errors) -> None:
     if not segments:
         _diag(errors, "mixed_segments_required", f"{base}/segments", "mixed provenance requires segments")
         return
+    segment_provenances = {segment["provenance"] for segment in segments}
+    if segment_provenances != {"A", "B"}:
+        _diag(errors, "mixed_provenance_set", f"{base}/segments", "mixed provenance requires at least one A segment and one B segment")
     segment_by_key: dict[str, tuple[int, dict[str, Any]]] = {}
     for index, segment in enumerate(segments):
         key = segment["key"]
@@ -276,5 +286,5 @@ def _validate_provenance(record, base, by_key, children, errors) -> None:
         ends = [node for node in group if not children[node["key"]] or any(child.get("segment_key") != key for _, child in children[node["key"]])]
         if len(starts) != 1 or starts[0]["key"] != segment["start_node_key"]:
             _diag(errors, "segment_start", f"{base}/segments/{index}/start_node_key", "segment must have one matching structural start")
-        if not ends or segment["end_node_key"] not in {node["key"] for node in ends}:
-            _diag(errors, "segment_end", f"{base}/segments/{index}/end_node_key", "end_node_key must be a structural segment boundary")
+        if len(ends) != 1 or ends[0]["key"] != segment["end_node_key"]:
+            _diag(errors, "segment_end", f"{base}/segments/{index}/end_node_key", "segment must have one matching structural end")
