@@ -123,6 +123,20 @@ def test_legacy_diff_reports_changes_and_unknowns_without_inference():
     assert report["unverifiable"] == ["revision", "verified_section", "review"]
 
 
+def test_legacy_needs_review_is_not_treated_as_verified():
+    record = artifact()["records"][0]
+    legacy = {
+        "records": [{
+            "line_name": record["line_name"],
+            "source": {"revision_id": 123, "source_section": "Opening"},
+            "verification": {"status": "needs_review"},
+            "nodes": [],
+        }]
+    }
+    report = compare_canonical_to_legacy(record, legacy)
+    assert report["unverifiable"] == ["review"]
+
+
 def test_static_seed_does_not_overwrite_claimed_canonical_line_or_duplicate_after_rename(
     client, monkeypatch
 ):
@@ -221,5 +235,23 @@ def test_source_host_projects_to_runtime_source_type_and_is_compared(
         report = compare_canonical_to_runtime(conn, record)
         assert report["status"] == "changed"
         assert report["metadata_changed"] == ["source_type"]
+    finally:
+        conn.close()
+
+
+def test_runtime_comparison_includes_persisted_source_license(client):
+    conn = get_connection()
+    try:
+        data = artifact()
+        record = data["records"][0]
+        line_id = apply_wikipedia_opening_artifact(conn, data)[0]
+        assert compare_canonical_to_runtime(conn, record)["status"] == "unchanged"
+
+        conn.execute(
+            "UPDATE opening_lines SET source_license='incorrect' WHERE id=?", (line_id,)
+        )
+        report = compare_canonical_to_runtime(conn, record)
+        assert report["status"] == "changed"
+        assert report["metadata_changed"] == ["source_license"]
     finally:
         conn.close()

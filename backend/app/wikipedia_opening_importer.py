@@ -191,7 +191,7 @@ def compare_canonical_to_runtime(conn, record: dict[str, Any]) -> dict[str, Any]
     metadata_fields = [
         ("name", "line_name"), ("initial_sfen", "initial_sfen"), ("source_url", None),
         ("source_title", None), ("source_section", None), ("source_type", None),
-        ("license", "license"),
+        ("license", "license"), ("source_license", "license"),
         ("source_note", "source_note"), ("source_retrieved_at", "retrieved_date"),
     ]
     expected = {
@@ -223,7 +223,15 @@ def compare_canonical_to_legacy(record: dict[str, Any], legacy: dict[str, Any]) 
         fields = [field for field in ("usi", "parent_key", "sort_order", "is_main", "variation_group") if prior.get(field) != node[field]]
         node_changes.append({"key": node["key"], "status": "changed" if fields else "unchanged", "fields": fields})
     node_changes.extend({"key": key, "status": "removed"} for key in sorted(old_nodes.keys() - {n["key"] for n in record["nodes"]}))
-    unavailable = [field for field, value in (("revision", old.get("source", {}).get("revision_id")), ("verified_section", old.get("source", {}).get("source_section")), ("review", old.get("verification", {}).get("status"))) if value in (None, "unavailable")]
+    unavailable = [
+        field
+        for field, value in (
+            ("revision", old.get("source", {}).get("revision_id")),
+            ("verified_section", old.get("source", {}).get("source_section")),
+            ("review", old.get("verification", {}).get("status")),
+        )
+        if value in (None, "unavailable") or (field == "review" and value != "verified")
+    ]
     legacy_source = old.get("source", {})
     metadata = []
     for name, prior, current in (
