@@ -47,11 +47,13 @@ def _artifact(*, branched=False, mixed=False):
         "source": {"url": "https://ja.wikipedia.org/wiki/Test", "title": "Test", "section": "Opening"},
         "license": "CC BY-SA 4.0", "retrieved_date": "2026-08-20", "revision": 12345,
         "provenance": "A", "initial_sfen": start,
+        "coverage_status": "complete_for_cited_sequence",
         "coverage": {"covered_through_ply": 3, "covered_through_move": "2g2f", "omitted_after": None},
         "source_note": "この表示文は判定されない", "nodes": nodes,
     }
     if mixed:
         record["provenance"] = "M"
+        record["coverage_status"] = "mixed"
         for node in nodes:
             if node["key"] == "n1":
                 node.update(provenance="A", segment_key="explicit")
@@ -77,6 +79,7 @@ def _catalog_record():
         record_type="catalog_name_only",
         catalog_name="升田式石田流",
         provenance="C",
+        coverage_status="name_only",
         evidence_note="名称が出典記事の一覧に掲載されている",
     )
     return catalog
@@ -102,6 +105,85 @@ def test_line_name_preserves_unicode_and_is_required_nonempty():
 def test_artifact_schema_is_valid_draft_2020_12():
     schema = json.loads(SCHEMA_PATH.read_text(encoding="utf-8"))
     jsonschema.Draft202012Validator.check_schema(schema)
+
+
+def test_json_pointer_uses_empty_string_for_document_root():
+    diagnostics = validate_wikipedia_opening_artifact([])
+    assert diagnostics[0].code == "schema"
+    assert diagnostics[0].path == ""
+
+    artifact = _artifact()
+    del artifact["records"]
+    diagnostics = validate_wikipedia_opening_artifact(artifact)
+    assert diagnostics[0].code == "schema"
+    assert diagnostics[0].path == ""
+
+    artifact = _artifact()
+    artifact["records"][0]["line_name"] = ""
+    diagnostics = validate_wikipedia_opening_artifact(artifact)
+    assert diagnostics[0].code == "schema"
+    assert diagnostics[0].path == "/records/0/line_name"
+
+
+def test_coverage_status_positive_provenance_combinations():
+    assert validate_wikipedia_opening_artifact(_artifact()) == ()
+
+    partial = _artifact()
+    partial["records"][0]["coverage_status"] = "partial_explicit_sequence"
+    partial["records"][0]["coverage"]["omitted_after"] = {"usi": "8c8d"}
+    assert validate_wikipedia_opening_artifact(partial) == ()
+
+    diagram = _artifact()
+    diagram_record = diagram["records"][0]
+    diagram_record["provenance"] = "B"
+    diagram_record["coverage_status"] = "diagram_reconstruction"
+    for node in diagram_record["nodes"]:
+        node["provenance"] = "B"
+    assert validate_wikipedia_opening_artifact(diagram) == ()
+
+    assert validate_wikipedia_opening_artifact(_document(_catalog_record())) == ()
+    assert validate_wikipedia_opening_artifact(_artifact(mixed=True)) == ()
+
+
+@pytest.mark.parametrize(
+    ("provenance", "status"),
+    [
+        ("A", "diagram_reconstruction"),
+        ("B", "complete_for_cited_sequence"),
+        ("B", "partial_explicit_sequence"),
+        ("M", "complete_for_cited_sequence"),
+    ],
+)
+def test_move_line_coverage_status_must_match_provenance(provenance, status):
+    artifact = _artifact(mixed=provenance == "M")
+    record = artifact["records"][0]
+    record["provenance"] = provenance
+    record["coverage_status"] = status
+    if provenance == "B":
+        for node in record["nodes"]:
+            node["provenance"] = "B"
+    assert "coverage_status_provenance" in _codes(artifact)
+
+
+def test_catalog_coverage_status_must_be_name_only():
+    catalog = _catalog_record()
+    catalog["coverage_status"] = "mixed"
+    assert _codes(_document(catalog)) == ["coverage_status_provenance"]
+
+
+@pytest.mark.parametrize(
+    ("status", "omitted_after"),
+    [
+        ("complete_for_cited_sequence", {"usi": "8c8d"}),
+        ("partial_explicit_sequence", None),
+    ],
+)
+def test_a_coverage_status_must_match_structured_boundary(status, omitted_after):
+    artifact = _artifact()
+    record = artifact["records"][0]
+    record["coverage_status"] = status
+    record["coverage"]["omitted_after"] = omitted_after
+    assert "coverage_status_boundary" in _codes(artifact)
 
 
 def test_main_and_branch_can_carry_distinct_source_sections():
@@ -386,6 +468,7 @@ def test_coverage_boundaries_and_omission_metadata_are_rejected():
     artifact["records"][0]["coverage"]["covered_through_move"] = "3c3d"
     assert {"coverage_ply", "coverage_move"} <= set(_codes(artifact))
     artifact = _artifact()
+    artifact["records"][0]["coverage_status"] = "partial_explicit_sequence"
     artifact["records"][0]["coverage"]["omitted_after"] = {"usi": "8c8d"}
     assert validate_wikipedia_opening_artifact(artifact) == ()
     artifact["records"][0]["coverage"]["omitted_after"] = {"usi": "7g7f"}

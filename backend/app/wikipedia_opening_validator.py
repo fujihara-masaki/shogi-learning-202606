@@ -47,6 +47,8 @@ class ValidationDiagnostic:
 
 
 def _pointer(parts: list[Any]) -> str:
+    if not parts:
+        return ""
     return "/" + "/".join(str(part).replace("~", "~0").replace("/", "~1") for part in parts)
 
 
@@ -98,6 +100,8 @@ def validate_wikipedia_opening_artifact(artifact: Any) -> tuple[ValidationDiagno
                 seen[value] = index
         if record["record_type"] == "move_line":
             _validate_record(record, base, errors)
+        else:
+            _validate_coverage_status(record, base, errors)
     return tuple(sorted(errors))
 
 
@@ -123,6 +127,7 @@ def _schema_error_leaves(error):
 
 
 def _validate_record(record: dict[str, Any], base: str, errors: list[ValidationDiagnostic]) -> None:
+    _validate_coverage_status(record, base, errors)
     nodes = record["nodes"]
     by_key: dict[str, tuple[int, dict[str, Any]]] = {}
     for index, node in enumerate(nodes):
@@ -229,6 +234,25 @@ def _validate_record(record: dict[str, Any], base: str, errors: list[ValidationD
 
     _validate_coverage(record, base, by_key, children, depths, errors)
     _validate_provenance(record, base, by_key, children, errors)
+
+
+def _validate_coverage_status(record, base, errors) -> None:
+    provenance = record["provenance"]
+    status = record["coverage_status"]
+    allowed = {
+        "A": {"complete_for_cited_sequence", "partial_explicit_sequence"},
+        "B": {"diagram_reconstruction"},
+        "C": {"name_only"},
+        "M": {"mixed"},
+    }
+    if status not in allowed[provenance]:
+        _diag(errors, "coverage_status_provenance", f"{base}/coverage_status", f"coverage status {status!r} is inconsistent with provenance {provenance!r}")
+    if provenance == "A":
+        omitted = record["coverage"]["omitted_after"]
+        if status == "complete_for_cited_sequence" and omitted is not None:
+            _diag(errors, "coverage_status_boundary", f"{base}/coverage/omitted_after", "complete cited sequence cannot have an omitted continuation")
+        elif status == "partial_explicit_sequence" and omitted is None:
+            _diag(errors, "coverage_status_boundary", f"{base}/coverage/omitted_after", "partial explicit sequence requires an omitted continuation")
 
 
 def _validate_initial_inventory(board, base, errors) -> None:
