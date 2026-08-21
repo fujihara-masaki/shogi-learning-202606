@@ -77,6 +77,13 @@ def validate_wikipedia_opening_artifact(artifact: Any) -> tuple[ValidationDiagno
         return tuple(sorted(errors))
 
     review = artifact["review"]
+    if review["review_status"] == "pending":
+        _diag(
+            errors,
+            "review_pending",
+            "/review/review_status",
+            "artifact review is still pending",
+        )
     for engine, result in review["legality_checks"].items():
         if result == "failed":
             _diag(

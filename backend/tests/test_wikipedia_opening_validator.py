@@ -25,11 +25,25 @@ def _node(key, parent, usi, from_sfen, *, order=0, main=True, provenance="A", se
 def _document(*records, review=None):
     return {
         "artifact_version": 1,
-        "review": review or {"review_status": "pending", "legality_checks": {
-            "backend_python_shogi": "passed", "frontend_tsshogi": "passed"
-        }},
+        "review": review or {
+            "review_status": "reviewed",
+            "reviewed_by": "reviewer@example.com",
+            "reviewed_on": "2026-08-20",
+            "legality_checks": {
+                "backend_python_shogi": "passed", "frontend_tsshogi": "passed"
+            },
+        },
         "records": list(records),
     }
+
+
+def _pending_review(**legality_overrides):
+    legality_checks = {
+        "backend_python_shogi": "passed",
+        "frontend_tsshogi": "passed",
+    }
+    legality_checks.update(legality_overrides)
+    return {"review_status": "pending", "legality_checks": legality_checks}
 
 
 def _artifact(*, branched=False, mixed=False):
@@ -102,7 +116,30 @@ def test_line_name_preserves_unicode_and_is_required_nonempty():
     assert _codes(artifact) == ["schema"]
     artifact = _artifact()
     artifact["records"][0]["line_name"] = ""
-    assert _codes(artifact) == ["schema"]
+    assert set(_codes(artifact)) == {"schema"}
+
+
+@pytest.mark.parametrize("invalid_value", ["", " ", "   ", "\t\n"])
+@pytest.mark.parametrize(
+    "field_kind", ["line_name", "catalog_name", "variation_group", "source_title"]
+)
+def test_required_display_metadata_contains_non_whitespace(
+    invalid_value, field_kind
+):
+    if field_kind == "catalog_name":
+        record = _catalog_record()
+        record["catalog_name"] = invalid_value
+        artifact = _document(record)
+    else:
+        artifact = _artifact()
+        record = artifact["records"][0]
+        if field_kind == "line_name":
+            record["line_name"] = invalid_value
+        elif field_kind == "variation_group":
+            record["nodes"][0]["variation_group"] = invalid_value
+        else:
+            record["source"]["title"] = invalid_value
+    assert set(_codes(artifact)) == {"schema"}
 
 
 def test_artifact_schema_is_valid_draft_2020_12():
@@ -273,7 +310,7 @@ def test_variation_group_is_required_nonempty_unicode_display_metadata():
 
     artifact = _artifact()
     artifact["records"][0]["nodes"][0]["variation_group"] = ""
-    assert _codes(artifact) == ["schema"]
+    assert set(_codes(artifact)) == {"schema"}
 
 
 def test_variation_group_may_be_shared_by_multiple_nodes():
@@ -377,11 +414,16 @@ def test_catalog_name_preserves_unicode_and_is_required_nonempty():
     assert _codes(_document(catalog)) == ["schema"]
     catalog = _catalog_record()
     catalog["catalog_name"] = ""
-    assert _codes(_document(catalog)) == ["schema"]
+    assert set(_codes(_document(catalog))) == {"schema"}
 
 
 def test_pending_and_reviewed_audit_metadata_are_structured():
-    assert validate_wikipedia_opening_artifact(_artifact()) == ()
+    pending = _document(
+        _artifact()["records"][0], review=_pending_review()
+    )
+    diagnostics = validate_wikipedia_opening_artifact(pending)
+    assert [diagnostic.code for diagnostic in diagnostics] == ["review_pending"]
+    assert diagnostics[0].path == "/review/review_status"
     reviewed = {"review_status": "reviewed", "reviewed_by": "reviewer@example.com",
                 "reviewed_on": "2026-08-20", "legality_checks": {
                     "backend_python_shogi": "passed", "frontend_tsshogi": "passed"}}
@@ -392,32 +434,45 @@ def test_pending_and_reviewed_audit_metadata_are_structured():
     assert _codes(_document(_artifact()["records"][0], review=reviewed)) == ["schema"]
 
 
+@pytest.mark.parametrize("invalid_reviewer", ["", " ", "   ", "\t\n"])
+def test_reviewed_by_contains_non_whitespace(invalid_reviewer):
+    artifact = _artifact()
+    artifact["review"]["reviewed_by"] = invalid_reviewer
+    assert set(_codes(artifact)) == {"schema"}
+
+
 @pytest.mark.parametrize("pending_engine", [
     "backend_python_shogi", "frontend_tsshogi"
 ])
 def test_pending_legality_result_is_not_gate_success(pending_engine):
-    artifact = _artifact()
-    artifact["review"]["legality_checks"][pending_engine] = "pending"
+    artifact = _document(
+        _artifact()["records"][0],
+        review=_pending_review(**{pending_engine: "pending"}),
+    )
     diagnostics = validate_wikipedia_opening_artifact(artifact)
     assert [diagnostic.code for diagnostic in diagnostics] == [
-        "review_legality_pending"
+        "review_legality_pending", "review_pending"
     ]
-    assert diagnostics[0].path == f"/review/legality_checks/{pending_engine}"
+    assert [diagnostic.path for diagnostic in diagnostics] == [
+        f"/review/legality_checks/{pending_engine}", "/review/review_status"
+    ]
 
 
 def test_both_pending_legality_results_have_deterministic_engine_diagnostics():
-    artifact = _artifact()
-    artifact["review"]["legality_checks"] = {
-        "backend_python_shogi": "pending",
-        "frontend_tsshogi": "pending",
-    }
+    artifact = _document(
+        _artifact()["records"][0],
+        review=_pending_review(
+            backend_python_shogi="pending", frontend_tsshogi="pending"
+        ),
+    )
     diagnostics = validate_wikipedia_opening_artifact(artifact)
     assert [diagnostic.code for diagnostic in diagnostics] == [
-        "review_legality_pending", "review_legality_pending"
+        "review_legality_pending", "review_legality_pending", "review_pending"
     ]
     assert [diagnostic.path for diagnostic in diagnostics] == [
         "/review/legality_checks/backend_python_shogi",
         "/review/legality_checks/frontend_tsshogi",
+        "/review/review_status",
     ]
     assert diagnostics == validate_wikipedia_opening_artifact(deepcopy(artifact))
 
@@ -437,11 +492,17 @@ def test_reviewed_failed_legality_result_is_a_semantic_failure(failed_engine):
 
 @pytest.mark.parametrize("failed_engine", ["backend_python_shogi", "frontend_tsshogi"])
 def test_pending_failed_legality_result_is_a_semantic_failure(failed_engine):
-    artifact = _artifact()
-    artifact["review"]["legality_checks"][failed_engine] = "failed"
+    artifact = _document(
+        _artifact()["records"][0],
+        review=_pending_review(**{failed_engine: "failed"}),
+    )
     diagnostics = validate_wikipedia_opening_artifact(artifact)
-    assert [diagnostic.code for diagnostic in diagnostics] == ["review_legality_failed"]
-    assert diagnostics[0].path == f"/review/legality_checks/{failed_engine}"
+    assert [diagnostic.code for diagnostic in diagnostics] == [
+        "review_legality_failed", "review_pending"
+    ]
+    assert [diagnostic.path for diagnostic in diagnostics] == [
+        f"/review/legality_checks/{failed_engine}", "/review/review_status"
+    ]
 
 
 def test_stored_legality_result_never_skips_backend_replay():
