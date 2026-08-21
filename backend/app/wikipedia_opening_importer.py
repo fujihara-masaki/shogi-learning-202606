@@ -278,6 +278,9 @@ def compare_canonical_to_legacy(record: dict[str, Any], legacy: dict[str, Any]) 
     ]
     legacy_source = old.get("source", {})
     metadata = []
+    revision_id = legacy_source.get("revision_id")
+    if revision_id not in (None, "unavailable") and revision_id != record["revision"]:
+        metadata.append("revision")
     for name, prior, current in (
         ("line_name", old.get("line_name"), record["line_name"]),
         ("source_title", legacy_source.get("source_title"), record["source"]["title"]),

@@ -129,13 +129,65 @@ def test_legacy_needs_review_is_not_treated_as_verified():
     legacy = {
         "records": [{
             "line_name": record["line_name"],
-            "source": {"revision_id": 123, "source_section": "Opening"},
+            "source": {
+                "revision_id": record["revision"],
+                "source_title": record["source"]["title"],
+                "source_section": record["source"]["section"],
+                "source_license": record["license"],
+            },
             "verification": {"status": "needs_review"},
-            "nodes": [],
+            "nodes": [{
+                "move_key": node["key"],
+                "parent_key": node["parent_key"],
+                "usi": node["usi"],
+                "sort_order": node["sort_order"],
+                "is_main": node["is_main"],
+                "variation_group": node["variation_group"],
+            } for node in record["nodes"]],
         }]
     }
     report = compare_canonical_to_legacy(record, legacy)
     assert report["unverifiable"] == ["review"]
+    assert report["metadata_changed"] == []
+
+
+@pytest.mark.parametrize(
+    ("revision_id", "status", "metadata_changed", "revision_unverifiable"),
+    [
+        (1, "unchanged", [], False),
+        (999, "changed", ["revision"], False),
+        (None, "unchanged", [], True),
+        ("unavailable", "unchanged", [], True),
+    ],
+)
+def test_legacy_revision_is_compared_only_when_known(
+    revision_id, status, metadata_changed, revision_unverifiable
+):
+    record = artifact()["records"][0]
+    legacy = {
+        "records": [{
+            "line_name": record["line_name"],
+            "source": {
+                "revision_id": revision_id,
+                "source_title": record["source"]["title"],
+                "source_section": record["source"]["section"],
+                "source_license": record["license"],
+            },
+            "verification": {"status": "verified"},
+            "nodes": [{
+                "move_key": node["key"],
+                "parent_key": node["parent_key"],
+                "usi": node["usi"],
+                "sort_order": node["sort_order"],
+                "is_main": node["is_main"],
+                "variation_group": node["variation_group"],
+            } for node in record["nodes"]],
+        }]
+    }
+    report = compare_canonical_to_legacy(record, legacy)
+    assert report["status"] == status
+    assert report["metadata_changed"] == metadata_changed
+    assert ("revision" in report["unverifiable"]) is revision_unverifiable
 
 
 def test_static_seed_does_not_overwrite_claimed_canonical_line_or_duplicate_after_rename(
