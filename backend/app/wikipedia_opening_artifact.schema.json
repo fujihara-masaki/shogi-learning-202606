@@ -36,18 +36,18 @@
       "properties": {
         "record_type": {"const": "catalog_name_only"}, "record_key": {"$ref": "#/$defs/key"}, "line_key": {"$ref": "#/$defs/key"}, "catalog_name": {"type": "string", "minLength": 1}, "source": {"$ref": "#/$defs/source"},
         "license": {"enum": ["CC BY-SA 4.0", "CC BY-SA 3.0"]}, "retrieved_date": {"type": "string", "format": "date", "pattern": "^\\d{4}-\\d{2}-\\d{2}$"}, "revision": {"$ref": "#/$defs/revision"},
-        "provenance": {"const": "C"}, "coverage_status": {"enum": ["complete_for_cited_sequence", "partial_explicit_sequence", "diagram_reconstruction", "name_only", "mixed"]}, "source_note": {"type": "string"}, "evidence_note": {"type": "string", "minLength": 1}
+        "provenance": {"const": "C"}, "coverage_status": {"enum": ["complete_for_cited_sequence", "partial_explicit_sequence", "diagram_reconstruction", "name_only", "mixed"]}, "source_note": {"type": "string"}, "evidence_note": {"type": "string", "minLength": 1, "pattern": "\\S"}
       }
     },
     "node": {
       "type": "object", "additionalProperties": false,
       "required": ["key", "parent_key", "usi", "sort_order", "is_main", "variation_group", "from_sfen", "to_sfen", "provenance", "source_section", "evidence_note"],
-      "properties": {"key": {"$ref": "#/$defs/key"}, "parent_key": {"anyOf": [{"$ref": "#/$defs/key"}, {"type": "null"}]}, "usi": {"$ref": "#/$defs/usi"}, "sort_order": {"type": "integer", "minimum": 0}, "is_main": {"type": "boolean"}, "variation_group": {"type": "string", "minLength": 1}, "from_sfen": {"$ref": "#/$defs/sfen"}, "to_sfen": {"$ref": "#/$defs/sfen"}, "provenance": {"enum": ["A", "B"]}, "source_section": {"type": "string", "minLength": 1}, "segment_key": {"anyOf": [{"$ref": "#/$defs/key"}, {"type": "null"}]}, "evidence_note": {"type": "string", "minLength": 1}}
+      "properties": {"key": {"$ref": "#/$defs/key"}, "parent_key": {"anyOf": [{"$ref": "#/$defs/key"}, {"type": "null"}]}, "usi": {"$ref": "#/$defs/usi"}, "sort_order": {"type": "integer", "minimum": 0}, "is_main": {"type": "boolean"}, "variation_group": {"type": "string", "minLength": 1}, "from_sfen": {"$ref": "#/$defs/sfen"}, "to_sfen": {"$ref": "#/$defs/sfen"}, "provenance": {"enum": ["A", "B"]}, "source_section": {"type": "string", "minLength": 1}, "segment_key": {"anyOf": [{"$ref": "#/$defs/key"}, {"type": "null"}]}, "evidence_note": {"type": "string", "minLength": 1, "pattern": "\\S"}}
     },
     "segment": {
       "type": "object", "additionalProperties": false,
       "required": ["key", "provenance", "start_node_key", "end_node_key", "source_section", "evidence_note"],
-      "properties": {"key": {"$ref": "#/$defs/key"}, "provenance": {"enum": ["A", "B"]}, "start_node_key": {"$ref": "#/$defs/key"}, "end_node_key": {"$ref": "#/$defs/key"}, "source_section": {"type": "string", "minLength": 1}, "evidence_note": {"type": "string", "minLength": 1}}
+      "properties": {"key": {"$ref": "#/$defs/key"}, "provenance": {"enum": ["A", "B"]}, "start_node_key": {"$ref": "#/$defs/key"}, "end_node_key": {"$ref": "#/$defs/key"}, "source_section": {"type": "string", "minLength": 1}, "evidence_note": {"type": "string", "minLength": 1, "pattern": "\\S"}}
     }
   }
 }

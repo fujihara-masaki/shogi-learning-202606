@@ -12,7 +12,7 @@ from dataclasses import dataclass
 import json
 from pathlib import Path
 from typing import Any
-from urllib.parse import urlsplit
+from urllib.parse import parse_qs, urlsplit
 
 import jsonschema
 import shogi
@@ -106,6 +106,13 @@ def validate_wikipedia_opening_artifact(artifact: Any) -> tuple[ValidationDiagno
                 f"{base}/source/url",
                 "source URL must use HTTPS on wikipedia.org or wikibooks.org",
             )
+        elif not _source_revision_matches(record["source"]["url"], record["revision"]):
+            _diag(
+                errors,
+                "source_revision",
+                f"{base}/source/url",
+                "source URL oldid must be one positive decimal integer matching revision",
+            )
         if record["record_type"] == "move_line":
             _validate_record(record, base, errors)
         else:
@@ -129,6 +136,15 @@ def _is_allowed_source_url(url: str) -> bool:
     except ValueError:
         return False
     return parsed.scheme == "https" and host is not None and _is_allowed_wikimedia_host(host)
+
+
+def _source_revision_matches(url: str, revision: int) -> bool:
+    oldids = parse_qs(urlsplit(url).query, keep_blank_values=True).get("oldid")
+    if oldids is None:
+        return True
+    if len(oldids) != 1 or not oldids[0].isascii() or not oldids[0].isdigit():
+        return False
+    return int(oldids[0]) > 0 and int(oldids[0]) == revision
 
 
 def _schema_error_leaves(error):

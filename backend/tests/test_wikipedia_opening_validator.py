@@ -121,6 +121,33 @@ def test_https_wikipedia_and_wikibooks_source_urls_pass(url):
     assert validate_wikipedia_opening_artifact(artifact) == ()
 
 
+@pytest.mark.parametrize("url", [
+    "https://ja.wikipedia.org/wiki/Test",
+    "https://ja.wikipedia.org/w/index.php?oldid=12345",
+    "https://ja.wikipedia.org/w/index.php?title=Test&oldid=12345&diff=prev",
+])
+def test_source_oldid_is_optional_or_matches_revision(url):
+    artifact = _artifact()
+    artifact["records"][0]["source"]["url"] = url
+    assert validate_wikipedia_opening_artifact(artifact) == ()
+
+
+@pytest.mark.parametrize("query", [
+    "oldid=54321",
+    "oldid=",
+    "oldid=abc",
+    "oldid=12345&oldid=12345",
+])
+def test_source_oldid_must_be_unambiguous_positive_decimal_matching_revision(query):
+    artifact = _artifact()
+    artifact["records"][0]["source"]["url"] = (
+        f"https://ja.wikipedia.org/w/index.php?{query}"
+    )
+    diagnostics = validate_wikipedia_opening_artifact(artifact)
+    assert [diagnostic.code for diagnostic in diagnostics] == ["source_revision"]
+    assert diagnostics[0].path == "/records/0/source/url"
+
+
 def test_malformed_source_url_is_a_schema_error():
     artifact = _artifact()
     artifact["records"][0]["source"]["url"] = "not-a-url"
@@ -270,6 +297,24 @@ def test_node_evidence_note_is_required_and_nonempty():
     assert _codes(artifact) == ["schema"]
     artifact = _artifact()
     artifact["records"][0]["nodes"][1]["evidence_note"] = ""
+    assert set(_codes(artifact)) == {"schema"}
+
+
+@pytest.mark.parametrize("whitespace", [" ", "   ", "\t\n"])
+@pytest.mark.parametrize("evidence_kind", ["node", "segment", "catalog"])
+def test_mandatory_evidence_requires_a_non_whitespace_character(
+    whitespace, evidence_kind
+):
+    if evidence_kind == "catalog":
+        catalog = _catalog_record()
+        catalog["evidence_note"] = whitespace
+        artifact = _document(catalog)
+    else:
+        artifact = _artifact(mixed=evidence_kind == "segment")
+        if evidence_kind == "node":
+            artifact["records"][0]["nodes"][0]["evidence_note"] = whitespace
+        else:
+            artifact["records"][0]["segments"][0]["evidence_note"] = whitespace
     assert _codes(artifact) == ["schema"]
 
 
@@ -365,7 +410,7 @@ def test_catalog_evidence_note_is_required_and_nonempty():
     assert _codes(_document(catalog)) == ["schema"]
     catalog = _catalog_record()
     catalog["evidence_note"] = ""
-    assert _codes(_document(catalog)) == ["schema"]
+    assert set(_codes(_document(catalog))) == {"schema"}
 
 
 def test_schema_and_provenance_enum_violations_are_stable():
