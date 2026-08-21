@@ -11,6 +11,7 @@ from __future__ import annotations
 from collections import defaultdict
 import json
 from typing import Any
+from urllib.parse import urlsplit
 
 from .seed import (
     static_opening_seed_key_for_name,
@@ -22,6 +23,18 @@ from .wikipedia_opening_validator import validate_wikipedia_opening_artifact
 
 class ArtifactImportError(ValueError):
     """The artifact did not pass the canonical D1b gate."""
+
+
+def _source_type(source_url: str) -> str:
+    """Project the already-D1b-approved Wikimedia host to runtime metadata."""
+    host = (urlsplit(source_url).hostname or "").lower()
+    if host == "wikibooks.org" or host.endswith(".wikibooks.org"):
+        return "wikibooks"
+    if host == "wikipedia.org" or host.endswith(".wikipedia.org"):
+        return "wikipedia"
+    # This is unreachable after the D1b gate.  Keep failure explicit if that
+    # contract ever changes rather than silently writing misleading metadata.
+    raise ValueError(f"unsupported canonical source host: {host!r}")
 
 
 def _move_records(artifact: dict[str, Any]) -> list[dict[str, Any]]:
@@ -75,6 +88,7 @@ def apply_wikipedia_opening_artifact(conn, artifact: dict[str, Any]) -> list[int
         savepoint = f"wikipedia_line_{ordinal}"
         conn.execute(f"SAVEPOINT {savepoint}")
         try:
+            source_type = _source_type(record["source"]["url"])
             line = conn.execute(
                 "SELECT * FROM opening_lines WHERE line_key=?", (record["line_key"],)
             ).fetchone()
@@ -98,10 +112,10 @@ def apply_wikipedia_opening_artifact(conn, artifact: dict[str, Any]) -> list[int
                        (line_key, name, opening_type, initial_sfen, moves, comments,
                         source_url, source_title, license, source_note, source_type,
                         source_section, source_license, source_retrieved_at)
-                       VALUES (?, ?, '', ?, '[]', '[]', ?, ?, ?, ?, 'wikipedia', ?, ?, ?)""",
+                       VALUES (?, ?, '', ?, '[]', '[]', ?, ?, ?, ?, ?, ?, ?, ?)""",
                     (record["line_key"], record["line_name"], record["initial_sfen"],
                      record["source"]["url"], record["source"]["title"], record["license"],
-                     record["source_note"], record["source"]["section"], record["license"],
+                     record["source_note"], source_type, record["source"]["section"], record["license"],
                      record["retrieved_date"]),
                 ).lastrowid)
             else:
@@ -110,12 +124,12 @@ def apply_wikipedia_opening_artifact(conn, artifact: dict[str, Any]) -> list[int
             main_moves, main_sfens = _main_projection(nodes)
             conn.execute(
                 """UPDATE opening_lines SET name=?, initial_sfen=?, moves=?,
-                   source_url=?, source_title=?, license=?, source_note=?, source_type='wikipedia',
+                   source_url=?, source_title=?, license=?, source_note=?, source_type=?,
                    source_section=?, source_license=?, source_retrieved_at=?, updated_at=datetime('now')
                    WHERE id=?""",
                 (record["line_name"], record["initial_sfen"], json.dumps(main_moves),
                  record["source"]["url"], record["source"]["title"], record["license"],
-                 record["source_note"], record["source"]["section"], record["license"],
+                 record["source_note"], source_type, record["source"]["section"], record["license"],
                  record["retrieved_date"], line_id),
             )
             upsert_opening_move_nodes(conn, line_id, nodes)
@@ -176,10 +190,16 @@ def compare_canonical_to_runtime(conn, record: dict[str, Any]) -> dict[str, Any]
             changes.append({"key": key, "status": "changed" if fields else "unchanged", "fields": fields})
     metadata_fields = [
         ("name", "line_name"), ("initial_sfen", "initial_sfen"), ("source_url", None),
-        ("source_title", None), ("source_section", None), ("license", "license"),
+        ("source_title", None), ("source_section", None), ("source_type", None),
+        ("license", "license"),
         ("source_note", "source_note"), ("source_retrieved_at", "retrieved_date"),
     ]
-    expected = {"source_url": record["source"]["url"], "source_title": record["source"]["title"], "source_section": record["source"]["section"]}
+    expected = {
+        "source_url": record["source"]["url"],
+        "source_title": record["source"]["title"],
+        "source_section": record["source"]["section"],
+        "source_type": _source_type(record["source"]["url"]),
+    }
     metadata = [
         db_name for db_name, artifact_name in metadata_fields
         if line[db_name] != (expected[db_name] if artifact_name is None else record[artifact_name])

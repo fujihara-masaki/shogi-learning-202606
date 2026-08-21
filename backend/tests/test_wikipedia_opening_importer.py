@@ -191,3 +191,35 @@ def test_ordered_nodes_handles_more_than_one_thousand_deep_nodes_iteratively():
     assert len(ordered) == 1501
     assert ordered[0]["key"] == "n0" and ordered[0]["ply"] == 1
     assert ordered[-1]["key"] == "n1500" and ordered[-1]["ply"] == 1501
+
+
+@pytest.mark.parametrize(
+    ("url", "expected_type"),
+    [
+        ("https://ja.wikipedia.org/wiki/Test", "wikipedia"),
+        ("https://ja.wikibooks.org/wiki/Test", "wikibooks"),
+    ],
+)
+def test_source_host_projects_to_runtime_source_type_and_is_compared(
+    client, url, expected_type
+):
+    conn = get_connection()
+    try:
+        data = artifact()
+        record = data["records"][0]
+        record["source"]["url"] = url
+        line_id = apply_wikipedia_opening_artifact(conn, data)[0]
+        line = conn.execute(
+            "SELECT source_url, source_type FROM opening_lines WHERE id=?", (line_id,)
+        ).fetchone()
+        assert dict(line) == {"source_url": url, "source_type": expected_type}
+        assert compare_canonical_to_runtime(conn, record)["status"] == "unchanged"
+
+        conn.execute(
+            "UPDATE opening_lines SET source_type='incorrect' WHERE id=?", (line_id,)
+        )
+        report = compare_canonical_to_runtime(conn, record)
+        assert report["status"] == "changed"
+        assert report["metadata_changed"] == ["source_type"]
+    finally:
+        conn.close()
