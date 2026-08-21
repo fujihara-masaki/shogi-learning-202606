@@ -296,19 +296,68 @@ def _validate_record(record: dict[str, Any], base: str, errors: list[ValidationD
         if expected_from is not None and node["from_sfen"] != expected_from and parent_key is None:
             _diag(errors, "root_sfen", f"{base}/nodes/{index}/from_sfen", "root from_sfen differs from initial_sfen")
         try:
-            board = shogi.Board(node["from_sfen"])
-            move = shogi.Move.from_usi(node["usi"])
-            if move not in board.legal_moves:
-                _diag(errors, "illegal_move", f"{base}/nodes/{index}/usi", f"{node['usi']!r} is not legal from from_sfen")
-                return
-            board.push(move)
-            if board.sfen() != node["to_sfen"]:
-                _diag(errors, "to_sfen_mismatch", f"{base}/nodes/{index}/to_sfen", "to_sfen does not equal the replayed position")
+            shogi.Board(node["from_sfen"])
         except (ValueError, IndexError):
             _diag(errors, "invalid_node_sfen", f"{base}/nodes/{index}/from_sfen", "node SFEN cannot be loaded")
 
+    if initial is not None:
+        _validate_move_replay(initial, base, children, errors)
+
     _validate_coverage(record, base, by_key, children, depths, errors)
     _validate_provenance(record, base, by_key, children, errors)
+
+
+def _validate_move_replay(initial, base, children, errors) -> None:
+    """Replay every branch once while preserving its root-to-node history."""
+    board = shogi.Board(initial.sfen())
+    stack: list[tuple[str, int | None, dict[str, Any] | None]] = [
+        ("enter", index, node) for index, node in reversed(children[None])
+    ]
+    while stack:
+        action, index, node = stack.pop()
+        if action == "exit":
+            board.pop()
+            continue
+        assert index is not None and node is not None
+        if board.is_game_over():
+            _diag(
+                errors,
+                "move_after_game_end",
+                f"{base}/nodes/{index}/usi",
+                "move appears after python-shogi reports the branch game is over",
+            )
+            stack.extend(
+                ("ended", child_index, child)
+                for child_index, child in reversed(children[node["key"]])
+            )
+            continue
+        if action == "ended":
+            _diag(
+                errors,
+                "move_after_game_end",
+                f"{base}/nodes/{index}/usi",
+                "move appears after python-shogi reports the branch game is over",
+            )
+            stack.extend(
+                ("ended", child_index, child)
+                for child_index, child in reversed(children[node["key"]])
+            )
+            continue
+        try:
+            move = shogi.Move.from_usi(node["usi"])
+            if move not in board.legal_moves:
+                _diag(errors, "illegal_move", f"{base}/nodes/{index}/usi", f"{node['usi']!r} is not legal in its branch history")
+                continue
+            board.push(move)
+            if board.sfen() != node["to_sfen"]:
+                _diag(errors, "to_sfen_mismatch", f"{base}/nodes/{index}/to_sfen", "to_sfen does not equal the replayed position")
+            stack.append(("exit", None, None))
+            stack.extend(
+                ("enter", child_index, child)
+                for child_index, child in reversed(children[node["key"]])
+            )
+        except (ValueError, IndexError):
+            _diag(errors, "invalid_node_sfen", f"{base}/nodes/{index}/from_sfen", "node move cannot be replayed")
 
 
 def _validate_coverage_status(record, base, errors) -> None:

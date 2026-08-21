@@ -82,6 +82,33 @@ def _artifact(*, branched=False, mixed=False):
     return _document(record)
 
 
+def _repetition_artifact(*, extra_move=False):
+    initial = "4k4/9/9/9/9/9/9/4G4/4K4 b - 1"
+    usis = ["5h4h", "5a4a", "4h5h", "4a5a"] * 3
+    if extra_move:
+        usis.append("5h4h")
+    nodes = []
+    current = initial
+    for index, usi in enumerate(usis):
+        node = _node(
+            f"rep-{index + 1}",
+            None if index == 0 else f"rep-{index}",
+            usi,
+            current,
+        )
+        nodes.append(node)
+        current = node["to_sfen"]
+    record = _artifact()["records"][0]
+    record["initial_sfen"] = initial
+    record["nodes"] = nodes
+    record["coverage"] = {
+        "covered_through_ply": len(nodes),
+        "covered_through_move": nodes[-1]["usi"],
+        "omitted_after": None,
+    }
+    return _document(record)
+
+
 def _codes(artifact):
     return [error.code for error in validate_wikipedia_opening_artifact(artifact)]
 
@@ -662,6 +689,58 @@ def test_deep_parent_chain_does_not_use_python_recursion():
     first = validate_wikipedia_opening_artifact(artifact)
     assert first
     assert first == validate_wikipedia_opening_artifact(deepcopy(artifact))
+
+
+def test_fourfold_repetition_ending_move_is_valid():
+    artifact = _repetition_artifact()
+    assert validate_wikipedia_opening_artifact(artifact) == ()
+
+
+def test_move_after_fourfold_repetition_is_rejected_stably():
+    artifact = _repetition_artifact(extra_move=True)
+    diagnostics = validate_wikipedia_opening_artifact(artifact)
+    after_end = [
+        diagnostic for diagnostic in diagnostics
+        if diagnostic.code == "move_after_game_end"
+    ]
+    assert len(after_end) == 1
+    assert after_end[0].path == "/records/0/nodes/12/usi"
+    assert diagnostics == validate_wikipedia_opening_artifact(deepcopy(artifact))
+
+
+def test_repetition_history_does_not_leak_between_branches():
+    artifact = _repetition_artifact()
+    record = artifact["records"][0]
+    first = record["nodes"][0]
+    record["nodes"].append(
+        _node(
+            "branch-safe",
+            first["key"],
+            "5a6a",
+            first["to_sfen"],
+            order=1,
+            main=False,
+            variation_group="別分岐",
+        )
+    )
+    assert validate_wikipedia_opening_artifact(artifact) == ()
+
+
+def test_repetition_history_does_not_leak_between_virtual_root_siblings():
+    artifact = _repetition_artifact()
+    record = artifact["records"][0]
+    record["nodes"].append(
+        _node(
+            "root-safe",
+            None,
+            "5h6h",
+            record["initial_sfen"],
+            order=1,
+            main=False,
+            variation_group="別初手",
+        )
+    )
+    assert validate_wikipedia_opening_artifact(artifact) == ()
 
 
 def test_orphan_cycle_and_root_failures_are_rejected():
