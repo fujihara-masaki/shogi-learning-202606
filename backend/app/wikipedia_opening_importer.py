@@ -12,7 +12,11 @@ from collections import defaultdict
 import json
 from typing import Any
 
-from .seed import upsert_opening_move_nodes, validate_opening_move_tree
+from .seed import (
+    static_opening_seed_key_for_name,
+    upsert_opening_move_nodes,
+    validate_opening_move_tree,
+)
 from .wikipedia_opening_validator import validate_wikipedia_opening_artifact
 
 
@@ -29,18 +33,19 @@ def _move_records(artifact: dict[str, Any]) -> list[dict[str, Any]]:
 
 
 def _ordered_nodes(record: dict[str, Any]) -> list[dict[str, Any]]:
-    by_key = {node["key"]: node for node in record["nodes"]}
+    children: dict[str | None, list[str]] = defaultdict(list)
+    for node in record["nodes"]:
+        children[node["parent_key"]].append(node["key"])
     depth: dict[str, int] = {}
-
-    def node_depth(key: str) -> int:
-        if key not in depth:
-            parent = by_key[key]["parent_key"]
-            depth[key] = 1 if parent is None else node_depth(parent) + 1
-        return depth[key]
+    pending = [(key, 1) for key in children[None]]
+    while pending:
+        key, current_depth = pending.pop()
+        depth[key] = current_depth
+        pending.extend((child, current_depth + 1) for child in children[key])
 
     return [
-        {**node, "ply": node_depth(node["key"]), "comment": ""}
-        for node in sorted(record["nodes"], key=lambda node: (node_depth(node["key"]), node["sort_order"], node["key"]))
+        {**node, "ply": depth[node["key"]]}
+        for node in sorted(record["nodes"], key=lambda node: (depth[node["key"]], node["sort_order"], node["key"]))
     ]
 
 
@@ -82,9 +87,10 @@ def apply_wikipedia_opening_artifact(conn, artifact: dict[str, Any]) -> list[int
                 ).fetchall()
                 if len(candidates) == 1:
                     line = candidates[0]
+                    seed_key = static_opening_seed_key_for_name(line["name"])
                     conn.execute(
-                        "UPDATE opening_lines SET line_key=? WHERE id=?",
-                        (record["line_key"], line["id"]),
+                        "UPDATE opening_lines SET line_key=?, seed_key=? WHERE id=?",
+                        (record["line_key"], seed_key, line["id"]),
                     )
             if line is None:
                 line_id = int(conn.execute(
@@ -103,7 +109,7 @@ def apply_wikipedia_opening_artifact(conn, artifact: dict[str, Any]) -> list[int
             nodes = _ordered_nodes(record)
             main_moves, main_sfens = _main_projection(nodes)
             conn.execute(
-                """UPDATE opening_lines SET name=?, initial_sfen=?, moves=?, comments='[]',
+                """UPDATE opening_lines SET name=?, initial_sfen=?, moves=?,
                    source_url=?, source_title=?, license=?, source_note=?, source_type='wikipedia',
                    source_section=?, source_license=?, source_retrieved_at=?, updated_at=datetime('now')
                    WHERE id=?""",
@@ -113,6 +119,24 @@ def apply_wikipedia_opening_artifact(conn, artifact: dict[str, Any]) -> list[int
                  record["retrieved_date"], line_id),
             )
             upsert_opening_move_nodes(conn, line_id, nodes)
+            persisted = conn.execute(
+                "SELECT move_key, comment FROM opening_line_moves WHERE line_id=?",
+                (line_id,),
+            ).fetchall()
+            comments_by_key = {row["move_key"]: row["comment"] for row in persisted}
+            main_comments = []
+            parent_key = None
+            children: dict[str | None, list[dict[str, Any]]] = defaultdict(list)
+            for node in nodes:
+                children[node["parent_key"]].append(node)
+            while parent_key in children:
+                main = next(node for node in children[parent_key] if node["is_main"])
+                main_comments.append(comments_by_key[main["key"]])
+                parent_key = main["key"]
+            conn.execute(
+                "UPDATE opening_lines SET comments=? WHERE id=?",
+                (json.dumps(main_comments, ensure_ascii=False), line_id),
+            )
             conn.execute("DELETE FROM opening_positions WHERE line_id=?", (line_id,))
             conn.execute("INSERT INTO opening_positions(line_id, ply, sfen) VALUES (?, 0, ?)", (line_id, record["initial_sfen"]))
             for ply, sfen in enumerate(main_sfens, 1):

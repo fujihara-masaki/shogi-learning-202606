@@ -794,14 +794,15 @@ def upsert_opening_move_nodes(conn, line_id: int, move_nodes: list[dict]) -> dic
     order out of range avoids transient sibling uniqueness failures.  Obsolete
     parents are deleted only after retained children have been reparented.
     """
-    existing_ids = {
-        node["key"]: int(row["id"])
+    existing_rows = {
+        node["key"]: row
         for node in move_nodes
         if (row := conn.execute(
-            "SELECT id FROM opening_line_moves WHERE line_id=? AND move_key=?",
+            "SELECT id, comment FROM opening_line_moves WHERE line_id=? AND move_key=?",
             (line_id, node["key"]),
         ).fetchone()) is not None
     }
+    existing_ids = {key: int(row["id"]) for key, row in existing_rows.items()}
     claimed_ids = set(existing_ids.values())
     for node in move_nodes:
         if node["key"] in existing_ids:
@@ -833,7 +834,9 @@ def upsert_opening_move_nodes(conn, line_id: int, move_nodes: list[dict]) -> dic
         parent_id = id_by_key.get(node["parent_key"])
         values = (
             node["ply"], node["usi"], node["from_sfen"], node["to_sfen"],
-            node.get("comment", ""), node["variation_group"], parent_id,
+            (node["comment"] if "comment" in node else
+             existing_rows[node["key"]]["comment"] if node["key"] in existing_rows else ""),
+            node["variation_group"], parent_id,
             node["sort_order"], node["key"], int(node["is_main"]),
         )
         current_id = existing_ids.get(node["key"])
@@ -866,11 +869,23 @@ def upsert_opening_move_nodes(conn, line_id: int, move_nodes: list[dict]) -> dic
     return id_by_key
 
 
+def _static_opening_seed_key(opening: dict) -> str:
+    """Stable ownership identity for a bundled SAMPLE_OPENING_LINES entry."""
+    return f"sample:{opening['name']}"
+
+
+def static_opening_seed_key_for_name(name: str) -> str:
+    """Return a seed owner only when the bundled name identifies one entry."""
+    matches = [_static_opening_seed_key(item) for item in SAMPLE_OPENING_LINES if item["name"] == name]
+    return matches[0] if len(matches) == 1 else ""
+
+
 def seed_openings_if_empty(conn) -> None:
     import shogi
 
     seeded_line_ids = []
     for opening in SAMPLE_OPENING_LINES:
+        seed_key = _static_opening_seed_key(opening)
         opening.setdefault("comments", [f"{opening['name']}の代表手順 {i}手目です。" for i in range(1, len(opening.get("moves", [])) + 1)])
         metadata = _opening_source_metadata(opening)
         initial_sfen = opening.get("initial_sfen", shogi.STARTING_SFEN)
@@ -886,14 +901,36 @@ def seed_openings_if_empty(conn) -> None:
         type_id = type_row["id"] if type_row else None
         line_row = conn.execute(
             """
-            SELECT id
+            SELECT id, line_key
             FROM opening_lines
-            WHERE source_id IS NULL AND name = ?
+            WHERE seed_key = ?
             ORDER BY id
             LIMIT 1
             """,
-            (opening["name"],),
+            (seed_key,),
         ).fetchone()
+        if line_row is None:
+            # Backfill ownership for databases created before seed_key.  A
+            # unique canonical row with the old bundled name receives the
+            # static alias too, making the decision persistent rather than
+            # relying on name matching on every startup.
+            candidates = conn.execute(
+                """SELECT id, line_key FROM opening_lines
+                   WHERE seed_key='' AND source_id IS NULL AND name=?
+                   ORDER BY id""",
+                (opening["name"],),
+            ).fetchall()
+            if len(candidates) == 1:
+                line_row = candidates[0]
+                conn.execute(
+                    "UPDATE opening_lines SET seed_key=? WHERE id=?",
+                    (seed_key, line_row["id"]),
+                )
+        # A canonical claim keeps seed_key solely as the old static ownership
+        # alias.  Static seeding must neither overwrite it nor create a second
+        # line under the pre-rename SAMPLE name.
+        if line_row is not None and line_row["line_key"]:
+            continue
         if line_row:
             line_id = int(line_row["id"])
             conn.execute(
@@ -927,12 +964,13 @@ def seed_openings_if_empty(conn) -> None:
         else:
             cur = conn.execute(
                 """
-                INSERT INTO opening_lines(opening_type_id, name, opening_type, initial_sfen, moves, comments, tags,
+                INSERT INTO opening_lines(seed_key, opening_type_id, name, opening_type, initial_sfen, moves, comments, tags,
                                           source_url, source_title, license, source_note, coverage_status,
                                           source_type, source_section, source_license, source_retrieved_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
+                    seed_key,
                     type_id,
                     opening["name"],
                     opening["opening_type"],

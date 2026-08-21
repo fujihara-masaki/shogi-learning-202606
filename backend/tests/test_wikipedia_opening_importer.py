@@ -7,7 +7,7 @@ import shogi
 from app.database import get_connection
 from app.wikipedia_opening_importer import (
     ArtifactImportError, apply_wikipedia_opening_artifact,
-    compare_canonical_to_legacy, compare_canonical_to_runtime,
+    compare_canonical_to_legacy, compare_canonical_to_runtime, _ordered_nodes,
 )
 
 
@@ -121,3 +121,73 @@ def test_legacy_diff_reports_changes_and_unknowns_without_inference():
     assert by_key["a"] == {"key": "a", "status": "changed", "fields": ["sort_order"]}
     assert by_key["old"]["status"] == "removed" and by_key["b"]["status"] == "added"
     assert report["unverifiable"] == ["revision", "verified_section", "review"]
+
+
+def test_static_seed_does_not_overwrite_claimed_canonical_line_or_duplicate_after_rename(
+    client, monkeypatch
+):
+    from app import seed
+
+    bundled = {
+        "name": "Test line", "opening_type": "test", "description": "bundled",
+        "tag": "bundled", "moves": ["7g7f", "3c3d", "2g2f"],
+        "comments": ["keep a", "keep b", "keep c"],
+    }
+    monkeypatch.setattr(seed, "SAMPLE_OPENING_LINES", [bundled])
+    conn = get_connection()
+    try:
+        seed.seed_openings_if_empty(conn)
+        conn.commit()
+        line_count = conn.execute("SELECT COUNT(*) AS n FROM opening_lines").fetchone()["n"]
+        original = conn.execute("SELECT * FROM opening_lines WHERE name='Test line'").fetchone()
+        data = artifact(True)
+        key_map = {"a": "main-1", "b": "main-2", "c": "main-3", "d": "branch"}
+        for item in data["records"][0]["nodes"]:
+            item["key"] = key_map[item["key"]]
+            if item["parent_key"] is not None:
+                item["parent_key"] = key_map[item["parent_key"]]
+        line_id = apply_wikipedia_opening_artifact(conn, data)[0]
+        assert line_id == original["id"]
+        conn.commit()
+        canonical_rows = rows(conn, line_id)
+        canonical_ids = {
+            key: (row["id"], row["parent_move_id"])
+            for key, row in canonical_rows.items()
+        }
+        # Canonical has no comment field: comments on retained stable keys stay
+        # runtime-owned rather than being silently erased.
+        assert [canonical_rows[key]["comment"] for key in ("main-1", "main-2", "main-3")] == [
+            "keep a", "keep b", "keep c"
+        ]
+
+        renamed = deepcopy(data)
+        renamed["records"][0]["line_name"] = "Canonical renamed line"
+        apply_wikipedia_opening_artifact(conn, renamed)
+        conn.commit()
+        seed.seed_openings_if_empty(conn)
+
+        assert conn.execute("SELECT COUNT(*) AS n FROM opening_lines").fetchone()["n"] == line_count
+        assert conn.execute("SELECT 1 FROM opening_lines WHERE name='Test line'").fetchone() is None
+        line = conn.execute("SELECT * FROM opening_lines WHERE id=?", (line_id,)).fetchone()
+        assert line["name"] == "Canonical renamed line"
+        assert line["line_key"] == "stable-line"
+        assert line["seed_key"] == "sample:Test line"
+        after = rows(conn, line_id)
+        assert set(after) == set(canonical_rows)
+        assert {key: (row["id"], row["parent_move_id"]) for key, row in after.items()} == canonical_ids
+    finally:
+        conn.close()
+
+
+def test_ordered_nodes_handles_more_than_one_thousand_deep_nodes_iteratively():
+    nodes = []
+    for index in range(1501):
+        nodes.append({
+            "key": f"n{index}",
+            "parent_key": None if index == 0 else f"n{index - 1}",
+            "sort_order": 0,
+        })
+    ordered = _ordered_nodes({"nodes": list(reversed(nodes))})
+    assert len(ordered) == 1501
+    assert ordered[0]["key"] == "n0" and ordered[0]["ply"] == 1
+    assert ordered[-1]["key"] == "n1500" and ordered[-1]["ply"] == 1501
