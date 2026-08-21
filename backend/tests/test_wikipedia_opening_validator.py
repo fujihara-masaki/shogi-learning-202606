@@ -26,7 +26,7 @@ def _document(*records, review=None):
     return {
         "artifact_version": 1,
         "review": review or {"review_status": "pending", "legality_checks": {
-            "backend_python_shogi": "pending", "frontend_tsshogi": "pending"
+            "backend_python_shogi": "passed", "frontend_tsshogi": "passed"
         }},
         "records": list(records),
     }
@@ -82,6 +82,7 @@ def _catalog_record():
         catalog_name="升田式石田流",
         provenance="C",
         coverage_status="name_only",
+        source_note="名称一覧を確認した記録",
         evidence_note="名称が出典記事の一覧に掲載されている",
     )
     return catalog
@@ -288,7 +289,39 @@ def test_node_source_section_is_required_and_nonempty():
     assert _codes(artifact) == ["schema"]
     artifact = _artifact()
     artifact["records"][0]["nodes"][1]["source_section"] = ""
+    assert set(_codes(artifact)) == {"schema"}
+
+
+@pytest.mark.parametrize("whitespace", [" ", "   ", "\t\n"])
+@pytest.mark.parametrize("section_kind", ["record", "node", "segment"])
+def test_mandatory_source_sections_require_non_whitespace(
+    whitespace, section_kind
+):
+    artifact = _artifact(mixed=section_kind == "segment")
+    if section_kind == "record":
+        artifact["records"][0]["source"]["section"] = whitespace
+    elif section_kind == "node":
+        artifact["records"][0]["nodes"][0]["source_section"] = whitespace
+    else:
+        artifact["records"][0]["segments"][0]["source_section"] = whitespace
     assert _codes(artifact) == ["schema"]
+
+
+@pytest.mark.parametrize("record_kind", ["move_line", "catalog_name_only"])
+@pytest.mark.parametrize("invalid_note", [None, "", " ", "   ", "\t\n"])
+def test_source_note_is_required_and_contains_non_whitespace(
+    record_kind, invalid_note
+):
+    record = (
+        _artifact()["records"][0]
+        if record_kind == "move_line"
+        else _catalog_record()
+    )
+    if invalid_note is None:
+        del record["source_note"]
+    else:
+        record["source_note"] = invalid_note
+    assert set(_codes(_document(record))) == {"schema"}
 
 
 def test_node_evidence_note_is_required_and_nonempty():
@@ -357,6 +390,36 @@ def test_pending_and_reviewed_audit_metadata_are_structured():
     ) == ()
     del reviewed["reviewed_by"]
     assert _codes(_document(_artifact()["records"][0], review=reviewed)) == ["schema"]
+
+
+@pytest.mark.parametrize("pending_engine", [
+    "backend_python_shogi", "frontend_tsshogi"
+])
+def test_pending_legality_result_is_not_gate_success(pending_engine):
+    artifact = _artifact()
+    artifact["review"]["legality_checks"][pending_engine] = "pending"
+    diagnostics = validate_wikipedia_opening_artifact(artifact)
+    assert [diagnostic.code for diagnostic in diagnostics] == [
+        "review_legality_pending"
+    ]
+    assert diagnostics[0].path == f"/review/legality_checks/{pending_engine}"
+
+
+def test_both_pending_legality_results_have_deterministic_engine_diagnostics():
+    artifact = _artifact()
+    artifact["review"]["legality_checks"] = {
+        "backend_python_shogi": "pending",
+        "frontend_tsshogi": "pending",
+    }
+    diagnostics = validate_wikipedia_opening_artifact(artifact)
+    assert [diagnostic.code for diagnostic in diagnostics] == [
+        "review_legality_pending", "review_legality_pending"
+    ]
+    assert [diagnostic.path for diagnostic in diagnostics] == [
+        "/review/legality_checks/backend_python_shogi",
+        "/review/legality_checks/frontend_tsshogi",
+    ]
+    assert diagnostics == validate_wikipedia_opening_artifact(deepcopy(artifact))
 
 
 @pytest.mark.parametrize("failed_engine", ["backend_python_shogi", "frontend_tsshogi"])

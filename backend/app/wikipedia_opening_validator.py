@@ -85,6 +85,13 @@ def validate_wikipedia_opening_artifact(artifact: Any) -> tuple[ValidationDiagno
                 f"/review/legality_checks/{engine}",
                 f"artifact records a failed {engine} legality check",
             )
+        elif result == "pending":
+            _diag(
+                errors,
+                "review_legality_pending",
+                f"/review/legality_checks/{engine}",
+                f"artifact has not completed the {engine} legality check",
+            )
 
     record_keys: dict[str, int] = {}
     line_keys: dict[str, int] = {}
