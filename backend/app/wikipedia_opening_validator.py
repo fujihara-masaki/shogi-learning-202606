@@ -158,7 +158,8 @@ def _source_revision_matches(url: str, revision: int) -> bool:
         return True
     if len(oldids) != 1 or not oldids[0].isascii() or not oldids[0].isdigit():
         return False
-    return int(oldids[0]) > 0 and int(oldids[0]) == revision
+    normalized = oldids[0].lstrip("0") or "0"
+    return normalized != "0" and normalized == str(revision)
 
 
 def _schema_error_leaves(error):
@@ -300,16 +301,20 @@ def _validate_record(record: dict[str, Any], base: str, errors: list[ValidationD
         except (ValueError, IndexError):
             _diag(errors, "invalid_node_sfen", f"{base}/nodes/{index}/from_sfen", "node SFEN cannot be loaded")
 
+    terminal_node_keys: set[str] = set()
     if initial is not None:
-        _validate_move_replay(initial, base, children, errors)
+        terminal_node_keys = _validate_move_replay(initial, base, children, errors)
 
-    _validate_coverage(record, base, by_key, children, depths, errors)
+    _validate_coverage(
+        record, base, by_key, children, depths, terminal_node_keys, errors
+    )
     _validate_provenance(record, base, by_key, children, errors)
 
 
-def _validate_move_replay(initial, base, children, errors) -> None:
+def _validate_move_replay(initial, base, children, errors) -> set[str]:
     """Replay every branch once while preserving its root-to-node history."""
     board = shogi.Board(initial.sfen())
+    terminal_node_keys: set[str] = set()
     stack: list[tuple[str, int | None, dict[str, Any] | None]] = [
         ("enter", index, node) for index, node in reversed(children[None])
     ]
@@ -349,6 +354,8 @@ def _validate_move_replay(initial, base, children, errors) -> None:
                 _diag(errors, "illegal_move", f"{base}/nodes/{index}/usi", f"{node['usi']!r} is not legal in its branch history")
                 continue
             board.push(move)
+            if board.is_game_over():
+                terminal_node_keys.add(node["key"])
             if board.sfen() != node["to_sfen"]:
                 _diag(errors, "to_sfen_mismatch", f"{base}/nodes/{index}/to_sfen", "to_sfen does not equal the replayed position")
             stack.append(("exit", None, None))
@@ -358,6 +365,7 @@ def _validate_move_replay(initial, base, children, errors) -> None:
             )
         except (ValueError, IndexError):
             _diag(errors, "invalid_node_sfen", f"{base}/nodes/{index}/from_sfen", "node move cannot be replayed")
+    return terminal_node_keys
 
 
 def _validate_coverage_status(record, base, errors) -> None:
@@ -426,7 +434,9 @@ def _validate_initial_inventory(board, base, errors) -> None:
             _diag(errors, "initial_piece_inventory", f"{base}/initial_sfen", f"piece type {piece_type} count {counts[piece_type]} exceeds inventory limit {limit}")
 
 
-def _validate_coverage(record, base, by_key, children, depths, errors) -> None:
+def _validate_coverage(
+    record, base, by_key, children, depths, terminal_node_keys, errors
+) -> None:
     coverage = record["coverage"]
     main = next((node for _, node in children[None] if node["is_main"]), None)
     seen: set[str] = set()
@@ -445,6 +455,14 @@ def _validate_coverage(record, base, by_key, children, depths, errors) -> None:
         _diag(errors, "coverage_move", f"{base}/coverage/covered_through_move", f"expected terminal semantic-main move {main['usi']!r}")
     omitted = coverage["omitted_after"]
     if omitted is not None:
+        if main["key"] in terminal_node_keys:
+            _diag(
+                errors,
+                "omitted_after_game_end",
+                f"{base}/coverage/omitted_after/usi",
+                "omitted continuation appears after the semantic-main game ended",
+            )
+            return
         try:
             board = shogi.Board(main["to_sfen"])
             move = shogi.Move.from_usi(omitted["usi"])

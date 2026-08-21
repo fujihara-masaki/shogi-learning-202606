@@ -189,6 +189,7 @@ def test_https_wikipedia_and_wikibooks_source_urls_pass(url):
 @pytest.mark.parametrize("url", [
     "https://ja.wikipedia.org/wiki/Test",
     "https://ja.wikipedia.org/w/index.php?oldid=12345",
+    "https://ja.wikipedia.org/w/index.php?oldid=00012345",
     "https://ja.wikipedia.org/w/index.php?title=Test&oldid=12345&diff=prev",
 ])
 def test_source_oldid_is_optional_or_matches_revision(url):
@@ -201,6 +202,7 @@ def test_source_oldid_is_optional_or_matches_revision(url):
     "oldid=54321",
     "oldid=",
     "oldid=abc",
+    "oldid=%EF%BC%91%EF%BC%92%EF%BC%93%EF%BC%94%EF%BC%95",
     "oldid=12345&oldid=12345",
 ])
 def test_source_oldid_must_be_unambiguous_positive_decimal_matching_revision(query):
@@ -211,6 +213,16 @@ def test_source_oldid_must_be_unambiguous_positive_decimal_matching_revision(que
     diagnostics = validate_wikipedia_opening_artifact(artifact)
     assert [diagnostic.code for diagnostic in diagnostics] == ["source_revision"]
     assert diagnostics[0].path == "/records/0/source/url"
+
+
+def test_huge_oldid_is_rejected_without_integer_conversion_failure():
+    artifact = _artifact()
+    artifact["records"][0]["source"]["url"] = (
+        "https://ja.wikipedia.org/w/index.php?oldid=" + "9" * 10000
+    )
+    first = validate_wikipedia_opening_artifact(artifact)
+    assert [diagnostic.code for diagnostic in first] == ["source_revision"]
+    assert first == validate_wikipedia_opening_artifact(deepcopy(artifact))
 
 
 def test_malformed_source_url_is_a_schema_error():
@@ -708,6 +720,34 @@ def test_move_after_fourfold_repetition_is_rejected_stably():
     assert diagnostics == validate_wikipedia_opening_artifact(deepcopy(artifact))
 
 
+def test_omitted_move_after_fourfold_repetition_is_rejected_stably():
+    artifact = _repetition_artifact()
+    record = artifact["records"][0]
+    record["coverage_status"] = "partial_explicit_sequence"
+    record["coverage"]["omitted_after"] = {"usi": "5h4h"}
+    first = validate_wikipedia_opening_artifact(artifact)
+    omitted = [
+        diagnostic for diagnostic in first
+        if diagnostic.code == "omitted_after_game_end"
+    ]
+    assert len(omitted) == 1
+    assert omitted[0].path == "/records/0/coverage/omitted_after/usi"
+    assert first == validate_wikipedia_opening_artifact(deepcopy(artifact))
+
+
+def test_omitted_move_that_completes_fourfold_repetition_is_valid():
+    artifact = _repetition_artifact()
+    record = artifact["records"][0]
+    record["nodes"].pop()
+    record["coverage_status"] = "partial_explicit_sequence"
+    record["coverage"] = {
+        "covered_through_ply": 11,
+        "covered_through_move": "4h5h",
+        "omitted_after": {"usi": "4a5a"},
+    }
+    assert validate_wikipedia_opening_artifact(artifact) == ()
+
+
 def test_repetition_history_does_not_leak_between_branches():
     artifact = _repetition_artifact()
     record = artifact["records"][0]
@@ -726,6 +766,31 @@ def test_repetition_history_does_not_leak_between_branches():
     assert validate_wikipedia_opening_artifact(artifact) == ()
 
 
+def test_branch_repetition_state_does_not_leak_into_main_omitted_move():
+    artifact = _repetition_artifact()
+    record = artifact["records"][0]
+    first = record["nodes"][0]
+    record["nodes"][1]["is_main"] = False
+    record["nodes"].append(
+        _node(
+            "main-safe",
+            first["key"],
+            "5a6a",
+            first["to_sfen"],
+            order=1,
+            main=True,
+            variation_group="本線",
+        )
+    )
+    record["coverage_status"] = "partial_explicit_sequence"
+    record["coverage"] = {
+        "covered_through_ply": 2,
+        "covered_through_move": "5a6a",
+        "omitted_after": {"usi": "4h5h"},
+    }
+    assert validate_wikipedia_opening_artifact(artifact) == ()
+
+
 def test_repetition_history_does_not_leak_between_virtual_root_siblings():
     artifact = _repetition_artifact()
     record = artifact["records"][0]
@@ -740,6 +805,30 @@ def test_repetition_history_does_not_leak_between_virtual_root_siblings():
             variation_group="別初手",
         )
     )
+    assert validate_wikipedia_opening_artifact(artifact) == ()
+
+
+def test_virtual_root_repetition_state_does_not_leak_into_main_omitted_move():
+    artifact = _repetition_artifact()
+    record = artifact["records"][0]
+    record["nodes"][0]["is_main"] = False
+    record["nodes"].append(
+        _node(
+            "root-main-safe",
+            None,
+            "5h6h",
+            record["initial_sfen"],
+            order=1,
+            main=True,
+            variation_group="本線初手",
+        )
+    )
+    record["coverage_status"] = "partial_explicit_sequence"
+    record["coverage"] = {
+        "covered_through_ply": 1,
+        "covered_through_move": "5h6h",
+        "omitted_after": {"usi": "5a4a"},
+    }
     assert validate_wikipedia_opening_artifact(artifact) == ()
 
 
