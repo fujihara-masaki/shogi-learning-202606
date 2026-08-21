@@ -9,11 +9,12 @@ from app.wikipedia_opening_validator import SCHEMA_PATH, validate_wikipedia_open
 
 
 def _node(key, parent, usi, from_sfen, *, order=0, main=True, provenance="A", segment=None,
-          source_section="Main line", evidence_note=None):
+          source_section="Main line", evidence_note=None, variation_group="main"):
     board = shogi.Board(from_sfen)
     board.push_usi(usi)
     node = {"key": key, "parent_key": parent, "usi": usi, "sort_order": order,
             "is_main": main, "from_sfen": from_sfen, "to_sfen": board.sfen(),
+            "variation_group": variation_group,
             "provenance": provenance, "source_section": source_section,
             "evidence_note": evidence_note or f"Evidence for {key}"}
     if segment is not None:
@@ -40,7 +41,8 @@ def _artifact(*, branched=False, mixed=False):
     if branched:
         nodes.append(_node("branch", "n2", "6g6f", n2["to_sfen"], order=1, main=False,
                            source_section="Alternative line",
-                           evidence_note="Alternative line explicitly gives 6g6f"))
+                           evidence_note="Alternative line explicitly gives 6g6f",
+                           variation_group="早石田の変化"))
     record = {
         "record_type": "move_line",
         "record_key": "wikipedia.test", "line_key": "test-line", "line_name": "升田式石田流",
@@ -193,6 +195,28 @@ def test_main_and_branch_can_carry_distinct_source_sections():
     assert nodes[3]["source_section"] == "Alternative line"
     assert nodes[2]["evidence_note"] == "Evidence for n3"
     assert nodes[3]["evidence_note"] == "Alternative line explicitly gives 6g6f"
+    assert validate_wikipedia_opening_artifact(artifact) == ()
+
+
+def test_variation_group_is_required_nonempty_unicode_display_metadata():
+    artifact = _artifact(branched=True)
+    nodes = artifact["records"][0]["nodes"]
+    assert nodes[0]["variation_group"] == "main"
+    assert nodes[3]["variation_group"] == "早石田の変化"
+    assert validate_wikipedia_opening_artifact(artifact) == ()
+
+    del nodes[0]["variation_group"]
+    assert _codes(artifact) == ["schema"]
+
+    artifact = _artifact()
+    artifact["records"][0]["nodes"][0]["variation_group"] = ""
+    assert _codes(artifact) == ["schema"]
+
+
+def test_variation_group_may_be_shared_by_multiple_nodes():
+    artifact = _artifact()
+    for node in artifact["records"][0]["nodes"]:
+        node["variation_group"] = "共通の変化"
     assert validate_wikipedia_opening_artifact(artifact) == ()
 
 
@@ -444,6 +468,8 @@ def test_orphan_cycle_and_root_failures_are_rejected():
     nodes = artifact["records"][0]["nodes"]
     nodes[0]["parent_key"] = "n3"
     assert {"cycle", "root_count"} <= set(_codes(artifact))
+    first = validate_wikipedia_opening_artifact(artifact)
+    assert first == validate_wikipedia_opening_artifact(deepcopy(artifact))
 
 
 def test_sibling_uniqueness_and_semantic_main_are_rejected():

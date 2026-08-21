@@ -146,16 +146,35 @@ def _validate_record(record: dict[str, Any], base: str, errors: list[ValidationD
     if not children[None]:
         _diag(errors, "root_count", f"{base}/nodes", "expected at least one root sibling")
 
-    # Parent chains make cycle diagnostics independent of input ordering.
-    for index, node in enumerate(nodes):
-        chain: set[str] = set()
-        current = node
-        while current["parent_key"] in by_key:
-            if current["key"] in chain:
-                _diag(errors, "cycle", f"{base}/nodes/{index}/parent_key", f"cycle contains {current['key']!r}")
+    # Resolve each parent chain once.  ``cycle_reachable`` memoizes both
+    # acyclic chains and chains which eventually enter a cycle.
+    cycle_reachable: dict[str, str | None] = {}
+    for key in sorted(by_key):
+        if key in cycle_reachable:
+            continue
+        chain: list[str] = []
+        positions: dict[str, int] = {}
+        current = key
+        while current in by_key and current not in cycle_reachable and current not in positions:
+            positions[current] = len(chain)
+            chain.append(current)
+            parent = by_key[current][1]["parent_key"]
+            if parent is None:
+                current = ""
                 break
-            chain.add(current["key"])
-            current = by_key[current["parent_key"]][1]
+            current = parent
+        if current in positions:
+            cycle_start = positions[current]
+            outcome = min(chain[cycle_start:])
+        else:
+            outcome = cycle_reachable.get(current)
+        for chain_key in reversed(chain):
+            cycle_reachable[chain_key] = outcome
+
+    for index, node in enumerate(nodes):
+        cycle_key = cycle_reachable.get(node["key"])
+        if cycle_key is not None:
+            _diag(errors, "cycle", f"{base}/nodes/{index}/parent_key", f"cycle contains {cycle_key!r}")
 
     for parent, siblings in children.items():
         usis: dict[str, int] = {}
