@@ -109,6 +109,41 @@ def test_artifact_schema_is_valid_draft_2020_12():
     jsonschema.Draft202012Validator.check_schema(schema)
 
 
+@pytest.mark.parametrize("url", [
+    "https://ja.wikipedia.org/wiki/Test",
+    "https://en.wikipedia.org/wiki/Test",
+    "https://ja.wikibooks.org/wiki/Test",
+    "https://ja.wikipedia.org/wiki/Test?oldid=12345#Section",
+])
+def test_https_wikipedia_and_wikibooks_source_urls_pass(url):
+    artifact = _artifact()
+    artifact["records"][0]["source"]["url"] = url
+    assert validate_wikipedia_opening_artifact(artifact) == ()
+
+
+def test_malformed_source_url_is_a_schema_error():
+    artifact = _artifact()
+    artifact["records"][0]["source"]["url"] = "not-a-url"
+    diagnostics = validate_wikipedia_opening_artifact(artifact)
+    assert [diagnostic.code for diagnostic in diagnostics] == ["schema"]
+    assert diagnostics[0].path == "/records/0/source/url"
+
+
+@pytest.mark.parametrize("url", [
+    "javascript:alert",
+    "http://ja.wikipedia.org/wiki/Test",
+    "https://example.com/wiki/Test",
+    "https://evilwikipedia.org/wiki/Test",
+    "https:///wiki/Test",
+])
+def test_uri_outside_https_wikimedia_contract_is_rejected(url):
+    artifact = _artifact()
+    artifact["records"][0]["source"]["url"] = url
+    diagnostics = validate_wikipedia_opening_artifact(artifact)
+    assert [diagnostic.code for diagnostic in diagnostics] == ["source_url"]
+    assert diagnostics[0].path == "/records/0/source/url"
+
+
 def test_json_pointer_uses_empty_string_for_document_root():
     diagnostics = validate_wikipedia_opening_artifact([])
     assert diagnostics[0].code == "schema"
