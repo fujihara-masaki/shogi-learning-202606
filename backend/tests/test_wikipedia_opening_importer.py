@@ -1,4 +1,5 @@
 from copy import deepcopy
+import json
 import sqlite3
 
 import pytest
@@ -253,5 +254,96 @@ def test_runtime_comparison_includes_persisted_source_license(client):
         report = compare_canonical_to_runtime(conn, record)
         assert report["status"] == "changed"
         assert report["metadata_changed"] == ["source_license"]
+    finally:
+        conn.close()
+
+
+def test_legacy_move_claim_preserves_main_and_branch_comments(client):
+    conn = get_connection()
+    try:
+        data = artifact(True)
+        line_id = apply_wikipedia_opening_artifact(conn, data)[0]
+        before = rows(conn, line_id)
+        comments = {"a": "legacy main a", "b": "legacy main b", "c": "legacy main c", "d": "legacy branch d"}
+        for key, row in before.items():
+            conn.execute(
+                "UPDATE opening_line_moves SET move_key=?, comment=? WHERE id=?",
+                (f"legacy-{row['id']}", comments[key], row["id"]),
+            )
+
+        apply_wikipedia_opening_artifact(conn, data)
+        after = rows(conn, line_id)
+        assert {key: row["id"] for key, row in after.items()} == {
+            key: row["id"] for key, row in before.items()
+        }
+        assert {key: row["move_key"] for key, row in after.items()} == {
+            key: key for key in comments
+        }
+        assert {key: row["comment"] for key, row in after.items()} == comments
+        line_comments = json.loads(conn.execute(
+            "SELECT comments FROM opening_lines WHERE id=?", (line_id,)
+        ).fetchone()["comments"])
+        assert line_comments == [comments["a"], comments["b"], comments["c"]]
+    finally:
+        conn.close()
+
+
+@pytest.mark.parametrize(
+    ("corrupt", "report_section", "detail"),
+    [
+        ("node_ply", "nodes", "ply"),
+        ("position_sfen", "positions", None),
+        ("position_missing", "positions", None),
+        ("position_ply", "positions", None),
+        ("position_extra", "positions", None),
+        ("line_moves", "moves", None),
+    ],
+)
+def test_runtime_comparison_detects_complete_persisted_projection(
+    client, corrupt, report_section, detail
+):
+    conn = get_connection()
+    try:
+        data = artifact()
+        record = data["records"][0]
+        line_id = apply_wikipedia_opening_artifact(conn, data)[0]
+        assert compare_canonical_to_runtime(conn, record)["status"] == "unchanged"
+
+        if corrupt == "node_ply":
+            conn.execute(
+                "UPDATE opening_line_moves SET ply=99 WHERE line_id=? AND move_key='b'",
+                (line_id,),
+            )
+        elif corrupt == "position_sfen":
+            conn.execute(
+                "UPDATE opening_positions SET sfen='wrong' WHERE line_id=? AND ply=1",
+                (line_id,),
+            )
+        elif corrupt == "position_missing":
+            conn.execute(
+                "DELETE FROM opening_positions WHERE line_id=? AND ply=1", (line_id,)
+            )
+        elif corrupt == "position_ply":
+            conn.execute(
+                "UPDATE opening_positions SET ply=99 WHERE line_id=? AND ply=1", (line_id,)
+            )
+        elif corrupt == "position_extra":
+            conn.execute(
+                "INSERT INTO opening_positions(line_id, ply, sfen) VALUES (?, 99, 'extra')",
+                (line_id,),
+            )
+        else:
+            conn.execute(
+                "UPDATE opening_lines SET moves='[]' WHERE id=?", (line_id,)
+            )
+
+        report = compare_canonical_to_runtime(conn, record)
+        assert report["status"] == "changed"
+        if report_section == "nodes":
+            changed = next(node for node in report["nodes"] if node["key"] == "b")
+            assert detail in changed["fields"]
+        else:
+            assert report[report_section]["status"] == "changed"
+            assert report[report_section]["actual"] != report[report_section]["expected"]
     finally:
         conn.close()

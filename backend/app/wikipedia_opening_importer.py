@@ -172,7 +172,9 @@ def compare_canonical_to_runtime(conn, record: dict[str, Any]) -> dict[str, Any]
         return {"line_key": record["line_key"], "status": "added", "nodes": []}
     rows = conn.execute("SELECT * FROM opening_line_moves WHERE line_id=?", (line["id"],)).fetchall()
     db = {row["move_key"]: row for row in rows}
-    canonical = {node["key"]: node for node in record["nodes"]}
+    ordered_nodes = _ordered_nodes(record)
+    canonical = {node["key"]: node for node in ordered_nodes}
+    main_moves, main_sfens = _main_projection(ordered_nodes)
     changes = []
     for key in sorted(canonical.keys() | db.keys()):
         if key not in db:
@@ -182,7 +184,7 @@ def compare_canonical_to_runtime(conn, record: dict[str, Any]) -> dict[str, Any]
         else:
             parent = db[key]["parent_move_id"]
             db_parent = next((row["move_key"] for row in rows if row["id"] == parent), None)
-            fields = [name for name in ("usi", "is_main", "variation_group", "from_sfen", "to_sfen") if db[key][name] != canonical[key][name]]
+            fields = [name for name in ("ply", "usi", "is_main", "variation_group", "from_sfen", "to_sfen") if db[key][name] != canonical[key][name]]
             if db_parent != canonical[key]["parent_key"]:
                 fields.append("parent")
             if db[key]["sort_order"] != canonical[key]["sort_order"]:
@@ -204,7 +206,49 @@ def compare_canonical_to_runtime(conn, record: dict[str, Any]) -> dict[str, Any]
         db_name for db_name, artifact_name in metadata_fields
         if line[db_name] != (expected[db_name] if artifact_name is None else record[artifact_name])
     ]
-    return {"line_key": record["line_key"], "status": "changed" if metadata or any(n["status"] != "unchanged" for n in changes) else "unchanged", "metadata_changed": metadata, "nodes": changes, "canonical_only": ["revision", "provenance", "coverage_status", "coverage", "evidence_note", "segments"]}
+    try:
+        persisted_moves = json.loads(line["moves"])
+    except (json.JSONDecodeError, TypeError):
+        persisted_moves = line["moves"]
+    moves_diff = {
+        "status": "unchanged" if persisted_moves == main_moves else "changed",
+        "expected": main_moves,
+        "actual": persisted_moves,
+    }
+    expected_positions = [
+        {"ply": ply, "sfen": sfen}
+        for ply, sfen in enumerate([record["initial_sfen"], *main_sfens])
+    ]
+    actual_positions = [
+        {"ply": row["ply"], "sfen": row["sfen"]}
+        for row in conn.execute(
+            "SELECT ply, sfen FROM opening_positions WHERE line_id=? ORDER BY ply, id",
+            (line["id"],),
+        ).fetchall()
+    ]
+    positions_diff = {
+        "status": "unchanged" if actual_positions == expected_positions else "changed",
+        "expected": expected_positions,
+        "actual": actual_positions,
+    }
+    changed = (
+        metadata
+        or any(node["status"] != "unchanged" for node in changes)
+        or moves_diff["status"] == "changed"
+        or positions_diff["status"] == "changed"
+    )
+    return {
+        "line_key": record["line_key"],
+        "status": "changed" if changed else "unchanged",
+        "metadata_changed": metadata,
+        "nodes": changes,
+        "moves": moves_diff,
+        "positions": positions_diff,
+        "canonical_only": [
+            "revision", "provenance", "coverage_status", "coverage",
+            "evidence_note", "segments",
+        ],
+    }
 
 
 def compare_canonical_to_legacy(record: dict[str, Any], legacy: dict[str, Any]) -> dict[str, Any]:
