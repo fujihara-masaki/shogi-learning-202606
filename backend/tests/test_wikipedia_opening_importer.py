@@ -133,6 +133,8 @@ def test_legacy_needs_review_is_not_treated_as_verified():
                 "revision_id": record["revision"],
                 "source_title": record["source"]["title"],
                 "source_section": record["source"]["section"],
+                "source_type": "wikipedia",
+                "retrieved_at": record["retrieved_date"],
                 "source_license": record["license"],
             },
             "verification": {"status": "needs_review"},
@@ -171,6 +173,8 @@ def test_legacy_revision_is_compared_only_when_known(
                 "revision_id": revision_id,
                 "source_title": record["source"]["title"],
                 "source_section": record["source"]["section"],
+                "source_type": "wikipedia",
+                "retrieved_at": record["retrieved_date"],
                 "source_license": record["license"],
             },
             "verification": {"status": "verified"},
@@ -188,6 +192,54 @@ def test_legacy_revision_is_compared_only_when_known(
     assert report["status"] == status
     assert report["metadata_changed"] == metadata_changed
     assert ("revision" in report["unverifiable"]) is revision_unverifiable
+
+
+@pytest.mark.parametrize(
+    ("source_type", "retrieved_at", "review", "metadata_changed"),
+    [
+        ("wikipedia", "2026-08-20", "verified", []),
+        ("wikibooks", "2026-08-20", "verified", ["source_type"]),
+        ("wikipedia", "2026-08-19", "verified", ["retrieved_at"]),
+        (
+            "wikibooks", "2026-08-19", "verified",
+            ["source_type", "retrieved_at"],
+        ),
+        (
+            "wikibooks", "2026-08-19", "needs_review",
+            ["source_type", "retrieved_at"],
+        ),
+    ],
+)
+def test_legacy_source_type_and_retrieved_at_are_compared_when_known(
+    source_type, retrieved_at, review, metadata_changed
+):
+    record = artifact()["records"][0]
+    legacy = {
+        "records": [{
+            "line_name": record["line_name"],
+            "source": {
+                "revision_id": record["revision"],
+                "source_title": record["source"]["title"],
+                "source_section": record["source"]["section"],
+                "source_type": source_type,
+                "retrieved_at": retrieved_at,
+                "source_license": record["license"],
+            },
+            "verification": {"status": review},
+            "nodes": [{
+                "move_key": node["key"],
+                "parent_key": node["parent_key"],
+                "usi": node["usi"],
+                "sort_order": node["sort_order"],
+                "is_main": node["is_main"],
+                "variation_group": node["variation_group"],
+            } for node in record["nodes"]],
+        }]
+    }
+    report = compare_canonical_to_legacy(record, legacy)
+    assert report["status"] == ("changed" if metadata_changed else "unchanged")
+    assert report["metadata_changed"] == metadata_changed
+    assert report["unverifiable"] == (["review"] if review == "needs_review" else [])
 
 
 def test_static_seed_does_not_overwrite_claimed_canonical_line_or_duplicate_after_rename(

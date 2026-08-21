@@ -285,6 +285,8 @@ def compare_canonical_to_legacy(record: dict[str, Any], legacy: dict[str, Any]) 
         ("line_name", old.get("line_name"), record["line_name"]),
         ("source_title", legacy_source.get("source_title"), record["source"]["title"]),
         ("source_section", legacy_source.get("source_section"), record["source"]["section"]),
+        ("source_type", legacy_source.get("source_type"), _source_type(record["source"]["url"])),
+        ("retrieved_at", legacy_source.get("retrieved_at"), record["retrieved_date"]),
         ("license", legacy_source.get("source_license"), record["license"]),
     ):
         if prior is not None and prior != current:
