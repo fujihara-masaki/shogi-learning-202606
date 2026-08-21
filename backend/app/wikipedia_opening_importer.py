@@ -1,0 +1,194 @@
+"""D1c projection of reviewed canonical Wikipedia artifacts into runtime seeds.
+
+The D1b validator is deliberately the sole artifact gate.  Revision, node
+provenance/evidence, segments, normalized coverage status and coverage boundary
+remain in the canonical artifact as audit data because the runtime schema has
+no lossless columns for them.  In particular, normalized ``coverage_status``
+is never written to the legacy free-text column of the same name.
+"""
+from __future__ import annotations
+
+from collections import defaultdict
+import json
+from typing import Any
+
+from .seed import upsert_opening_move_nodes, validate_opening_move_tree
+from .wikipedia_opening_validator import validate_wikipedia_opening_artifact
+
+
+class ArtifactImportError(ValueError):
+    """The artifact did not pass the canonical D1b gate."""
+
+
+def _move_records(artifact: dict[str, Any]) -> list[dict[str, Any]]:
+    diagnostics = validate_wikipedia_opening_artifact(artifact)
+    if diagnostics:
+        details = "; ".join(f"{item.path or '/'} [{item.code}] {item.message}" for item in diagnostics)
+        raise ArtifactImportError(details)
+    return [record for record in artifact["records"] if record["record_type"] == "move_line"]
+
+
+def _ordered_nodes(record: dict[str, Any]) -> list[dict[str, Any]]:
+    by_key = {node["key"]: node for node in record["nodes"]}
+    depth: dict[str, int] = {}
+
+    def node_depth(key: str) -> int:
+        if key not in depth:
+            parent = by_key[key]["parent_key"]
+            depth[key] = 1 if parent is None else node_depth(parent) + 1
+        return depth[key]
+
+    return [
+        {**node, "ply": node_depth(node["key"]), "comment": ""}
+        for node in sorted(record["nodes"], key=lambda node: (node_depth(node["key"]), node["sort_order"], node["key"]))
+    ]
+
+
+def _main_projection(nodes: list[dict[str, Any]]) -> tuple[list[str], list[str]]:
+    children: dict[str | None, list[dict[str, Any]]] = defaultdict(list)
+    for node in nodes:
+        children[node["parent_key"]].append(node)
+    moves, sfens = [], []
+    parent = None
+    while parent in children:
+        node = next(item for item in children[parent] if item["is_main"])
+        moves.append(node["usi"])
+        sfens.append(node["to_sfen"])
+        parent = node["key"]
+    return moves, sfens
+
+
+def apply_wikipedia_opening_artifact(conn, artifact: dict[str, Any]) -> list[int]:
+    """Validate the complete artifact, then atomically apply each move line.
+
+    ``catalog_name_only`` records are intentionally ignored: they cannot create
+    move seeds and catalog synchronization is outside D1c.
+    """
+    records = _move_records(artifact)  # no write may precede this call
+    applied = []
+    for ordinal, record in enumerate(records):
+        savepoint = f"wikipedia_line_{ordinal}"
+        conn.execute(f"SAVEPOINT {savepoint}")
+        try:
+            line = conn.execute(
+                "SELECT * FROM opening_lines WHERE line_key=?", (record["line_key"],)
+            ).fetchone()
+            if line is None:
+                # One-time backwards-compatible claim.  Rename matching is
+                # never used after line_key has been persisted.
+                candidates = conn.execute(
+                    "SELECT * FROM opening_lines WHERE line_key='' AND source_id IS NULL AND name=? ORDER BY id",
+                    (record["line_name"],),
+                ).fetchall()
+                if len(candidates) == 1:
+                    line = candidates[0]
+                    conn.execute(
+                        "UPDATE opening_lines SET line_key=? WHERE id=?",
+                        (record["line_key"], line["id"]),
+                    )
+            if line is None:
+                line_id = int(conn.execute(
+                    """INSERT INTO opening_lines
+                       (line_key, name, opening_type, initial_sfen, moves, comments,
+                        source_url, source_title, license, source_note, source_type,
+                        source_section, source_license, source_retrieved_at)
+                       VALUES (?, ?, '', ?, '[]', '[]', ?, ?, ?, ?, 'wikipedia', ?, ?, ?)""",
+                    (record["line_key"], record["line_name"], record["initial_sfen"],
+                     record["source"]["url"], record["source"]["title"], record["license"],
+                     record["source_note"], record["source"]["section"], record["license"],
+                     record["retrieved_date"]),
+                ).lastrowid)
+            else:
+                line_id = int(line["id"])
+            nodes = _ordered_nodes(record)
+            main_moves, main_sfens = _main_projection(nodes)
+            conn.execute(
+                """UPDATE opening_lines SET name=?, initial_sfen=?, moves=?, comments='[]',
+                   source_url=?, source_title=?, license=?, source_note=?, source_type='wikipedia',
+                   source_section=?, source_license=?, source_retrieved_at=?, updated_at=datetime('now')
+                   WHERE id=?""",
+                (record["line_name"], record["initial_sfen"], json.dumps(main_moves),
+                 record["source"]["url"], record["source"]["title"], record["license"],
+                 record["source_note"], record["source"]["section"], record["license"],
+                 record["retrieved_date"], line_id),
+            )
+            upsert_opening_move_nodes(conn, line_id, nodes)
+            conn.execute("DELETE FROM opening_positions WHERE line_id=?", (line_id,))
+            conn.execute("INSERT INTO opening_positions(line_id, ply, sfen) VALUES (?, 0, ?)", (line_id, record["initial_sfen"]))
+            for ply, sfen in enumerate(main_sfens, 1):
+                conn.execute("INSERT INTO opening_positions(line_id, ply, sfen) VALUES (?, ?, ?)", (line_id, ply, sfen))
+            validate_opening_move_tree(conn, [line_id])
+            conn.execute(f"RELEASE SAVEPOINT {savepoint}")
+            applied.append(line_id)
+        except Exception:
+            conn.execute(f"ROLLBACK TO SAVEPOINT {savepoint}")
+            conn.execute(f"RELEASE SAVEPOINT {savepoint}")
+            raise
+    return applied
+
+
+def compare_canonical_to_runtime(conn, record: dict[str, Any]) -> dict[str, Any]:
+    """Return a deterministic projection diff without conflating coverage fields."""
+    line = conn.execute("SELECT * FROM opening_lines WHERE line_key=?", (record["line_key"],)).fetchone()
+    if line is None:
+        return {"line_key": record["line_key"], "status": "added", "nodes": []}
+    rows = conn.execute("SELECT * FROM opening_line_moves WHERE line_id=?", (line["id"],)).fetchall()
+    db = {row["move_key"]: row for row in rows}
+    canonical = {node["key"]: node for node in record["nodes"]}
+    changes = []
+    for key in sorted(canonical.keys() | db.keys()):
+        if key not in db:
+            changes.append({"key": key, "status": "added"})
+        elif key not in canonical:
+            changes.append({"key": key, "status": "removed"})
+        else:
+            parent = db[key]["parent_move_id"]
+            db_parent = next((row["move_key"] for row in rows if row["id"] == parent), None)
+            fields = [name for name in ("usi", "is_main", "variation_group", "from_sfen", "to_sfen") if db[key][name] != canonical[key][name]]
+            if db_parent != canonical[key]["parent_key"]:
+                fields.append("parent")
+            if db[key]["sort_order"] != canonical[key]["sort_order"]:
+                fields.append("sort_order")
+            changes.append({"key": key, "status": "changed" if fields else "unchanged", "fields": fields})
+    metadata_fields = [
+        ("name", "line_name"), ("initial_sfen", "initial_sfen"), ("source_url", None),
+        ("source_title", None), ("source_section", None), ("license", "license"),
+        ("source_note", "source_note"), ("source_retrieved_at", "retrieved_date"),
+    ]
+    expected = {"source_url": record["source"]["url"], "source_title": record["source"]["title"], "source_section": record["source"]["section"]}
+    metadata = [
+        db_name for db_name, artifact_name in metadata_fields
+        if line[db_name] != (expected[db_name] if artifact_name is None else record[artifact_name])
+    ]
+    return {"line_key": record["line_key"], "status": "changed" if metadata or any(n["status"] != "unchanged" for n in changes) else "unchanged", "metadata_changed": metadata, "nodes": changes, "canonical_only": ["revision", "provenance", "coverage_status", "coverage", "evidence_note", "segments"]}
+
+
+def compare_canonical_to_legacy(record: dict[str, Any], legacy: dict[str, Any]) -> dict[str, Any]:
+    """Compare known legacy snapshot values; report missing facts, never infer them."""
+    candidates = [item for item in legacy.get("records", []) if item.get("line_name") == record["line_name"]]
+    if not candidates:
+        return {"line_key": record["line_key"], "status": "added", "unverifiable": []}
+    old = candidates[0]
+    old_nodes = {node["move_key"]: node for node in old.get("nodes", [])}
+    node_changes = []
+    for node in record["nodes"]:
+        prior = old_nodes.get(node["key"])
+        if prior is None:
+            node_changes.append({"key": node["key"], "status": "added"})
+            continue
+        fields = [field for field in ("usi", "parent_key", "sort_order", "is_main", "variation_group") if prior.get(field) != node[field]]
+        node_changes.append({"key": node["key"], "status": "changed" if fields else "unchanged", "fields": fields})
+    node_changes.extend({"key": key, "status": "removed"} for key in sorted(old_nodes.keys() - {n["key"] for n in record["nodes"]}))
+    unavailable = [field for field, value in (("revision", old.get("source", {}).get("revision_id")), ("verified_section", old.get("source", {}).get("source_section")), ("review", old.get("verification", {}).get("status"))) if value in (None, "unavailable")]
+    legacy_source = old.get("source", {})
+    metadata = []
+    for name, prior, current in (
+        ("line_name", old.get("line_name"), record["line_name"]),
+        ("source_title", legacy_source.get("source_title"), record["source"]["title"]),
+        ("source_section", legacy_source.get("source_section"), record["source"]["section"]),
+        ("license", legacy_source.get("source_license"), record["license"]),
+    ):
+        if prior is not None and prior != current:
+            metadata.append(name)
+    changed = metadata or any(item["status"] != "unchanged" for item in node_changes)
+    return {"line_key": record["line_key"], "status": "changed" if changed else "unchanged", "metadata_changed": metadata, "nodes": node_changes, "unverifiable": unavailable}
