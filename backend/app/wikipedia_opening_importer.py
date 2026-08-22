@@ -282,7 +282,17 @@ def compare_canonical_to_legacy(record: dict[str, Any], legacy: dict[str, Any]) 
             "unverifiable": ["legacy_record_match"],
         }
     old = candidates[0]
-    old_nodes = {node["move_key"]: node for node in old.get("nodes", [])}
+    legacy_nodes = old.get("nodes", [])
+    move_key_counts = Counter(node.get("move_key") for node in legacy_nodes)
+    if None in move_key_counts or any(count > 1 for count in move_key_counts.values()):
+        return {
+            "line_key": record["line_key"],
+            "status": "ambiguous",
+            "metadata_changed": [],
+            "nodes": [],
+            "unverifiable": ["legacy_move_key"],
+        }
+    old_nodes = {node["move_key"]: node for node in legacy_nodes}
     node_changes = []
     for node in record["nodes"]:
         prior = old_nodes.get(node["key"])

@@ -415,6 +415,60 @@ def test_legacy_name_match_zero_one_and_multiple_canonical_keys():
         assert report["unverifiable"] == ["legacy_record_match"]
 
 
+@pytest.mark.parametrize("identical_payload", [False, True])
+def test_duplicate_legacy_move_keys_are_ambiguous_and_order_independent(
+    identical_payload
+):
+    record = artifact()["records"][0]
+    legacy = matching_legacy(record)
+    duplicate_a = deepcopy(legacy["records"][0]["nodes"][0])
+    duplicate_b = deepcopy(duplicate_a)
+    if not identical_payload:
+        duplicate_b.update(
+            usi="2g2f",
+            parent_key="different-parent",
+            provenance={
+                "provenance_class": "diagram_reconstruction",
+                "source_section": "Different section",
+                "evidence_note": "Different evidence",
+                "review_status": "needs_review",
+            },
+        )
+
+    reports = []
+    for nodes in ([duplicate_a, duplicate_b], [duplicate_b, duplicate_a]):
+        snapshot = deepcopy(legacy)
+        snapshot["records"][0]["nodes"] = nodes
+        reports.append(compare_canonical_to_legacy(record, snapshot))
+
+    assert reports[0] == reports[1]
+    assert reports[0] == {
+        "line_key": record["line_key"],
+        "status": "ambiguous",
+        "metadata_changed": [],
+        "nodes": [],
+        "unverifiable": ["legacy_move_key"],
+    }
+
+
+def test_multiple_duplicate_legacy_move_keys_and_missing_key_are_not_guessed():
+    record = artifact()["records"][0]
+    base = matching_legacy(record)
+    node_a = deepcopy(base["records"][0]["nodes"][0])
+    node_b = deepcopy(base["records"][0]["nodes"][1])
+    for nodes in (
+        [node_a, deepcopy(node_a), node_b, deepcopy(node_b)],
+        [{"usi": "7g7f"}],
+    ):
+        legacy = deepcopy(base)
+        legacy["records"][0]["nodes"] = nodes
+        report = compare_canonical_to_legacy(record, legacy)
+        assert report["status"] == "ambiguous"
+        assert report["metadata_changed"] == []
+        assert report["nodes"] == []
+        assert report["unverifiable"] == ["legacy_move_key"]
+
+
 @pytest.mark.parametrize(
     (
         "provenance_class", "legacy_section", "legacy_evidence", "review_status",
