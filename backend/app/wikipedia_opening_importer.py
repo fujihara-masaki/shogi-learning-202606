@@ -11,7 +11,7 @@ from __future__ import annotations
 from collections import defaultdict
 import json
 from typing import Any
-from urllib.parse import urlsplit
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from .seed import (
     static_opening_seed_key_for_name,
@@ -35,6 +35,21 @@ def _source_type(source_url: str) -> str:
     # This is unreachable after the D1b gate.  Keep failure explicit if that
     # contract ever changes rather than silently writing misleading metadata.
     raise ValueError(f"unsupported canonical source host: {host!r}")
+
+
+def _article_identity(source_url: str) -> str:
+    """Normalize article identity while ignoring only revision and fragment."""
+    parsed = urlsplit(source_url)
+    host = (parsed.hostname or "").lower()
+    netloc = host
+    if parsed.port is not None:
+        netloc = f"{netloc}:{parsed.port}"
+    query = urlencode(sorted(
+        (key, value)
+        for key, value in parse_qsl(parsed.query, keep_blank_values=True)
+        if key != "oldid"
+    ))
+    return urlunsplit((parsed.scheme.lower(), netloc, parsed.path, query, ""))
 
 
 def _move_records(artifact: dict[str, Any]) -> list[dict[str, Any]]:
@@ -277,10 +292,15 @@ def compare_canonical_to_legacy(record: dict[str, Any], legacy: dict[str, Any]) 
         if value in (None, "unavailable") or (field == "review" and value != "verified")
     ]
     legacy_source = old.get("source", {})
+    canonical_url = legacy_source.get("canonical_url")
+    if canonical_url is None:
+        unavailable.append("canonical_url")
     metadata = []
     revision_id = legacy_source.get("revision_id")
     if revision_id not in (None, "unavailable") and revision_id != record["revision"]:
         metadata.append("revision")
+    if canonical_url is not None and _article_identity(canonical_url) != _article_identity(record["source"]["url"]):
+        metadata.append("canonical_url")
     for name, prior, current in (
         ("line_name", old.get("line_name"), record["line_name"]),
         ("source_title", legacy_source.get("source_title"), record["source"]["title"]),
@@ -291,5 +311,8 @@ def compare_canonical_to_legacy(record: dict[str, Any], legacy: dict[str, Any]) 
     ):
         if prior is not None and prior != current:
             metadata.append(name)
+    legacy_coverage = old.get("coverage")
+    if legacy_coverage is not None and legacy_coverage != record["coverage_status"]:
+        metadata.append("coverage_status")
     changed = metadata or any(item["status"] != "unchanged" for item in node_changes)
     return {"line_key": record["line_key"], "status": "changed" if changed else "unchanged", "metadata_changed": metadata, "nodes": node_changes, "unverifiable": unavailable}

@@ -37,6 +37,37 @@ def artifact(branched=False):
     return {"artifact_version": 1, "review": {"review_status": "reviewed", "reviewed_by": "reviewer", "reviewed_on": "2026-08-20", "legality_checks": {"backend_python_shogi": "passed", "frontend_tsshogi": "passed"}}, "records": [record]}
 
 
+def matching_legacy(record, **overrides):
+    source = {
+        "revision_id": record["revision"],
+        "source_title": record["source"]["title"],
+        "source_section": record["source"]["section"],
+        "source_type": "wikipedia",
+        "retrieved_at": record["retrieved_date"],
+        "source_license": record["license"],
+        "canonical_url": record["source"]["url"],
+        "requested_url": record["source"]["url"],
+    }
+    source.update(overrides.pop("source", {}))
+    legacy_record = {
+        "line_name": record["line_name"],
+        "source": source,
+        "coverage": record["coverage_status"],
+        "legacy_coverage_status": "legacy display text",
+        "verification": {"status": "verified"},
+        "nodes": [{
+            "move_key": node["key"],
+            "parent_key": node["parent_key"],
+            "usi": node["usi"],
+            "sort_order": node["sort_order"],
+            "is_main": node["is_main"],
+            "variation_group": node["variation_group"],
+        } for node in record["nodes"]],
+    }
+    legacy_record.update(overrides)
+    return {"records": [legacy_record]}
+
+
 def rows(conn, line_id):
     result = conn.execute("SELECT * FROM opening_line_moves WHERE line_id=?", (line_id,)).fetchall()
     return {row["move_key"]: row for row in result}
@@ -121,7 +152,7 @@ def test_legacy_diff_reports_changes_and_unknowns_without_inference():
     by_key = {item["key"]: item for item in report["nodes"]}
     assert by_key["a"] == {"key": "a", "status": "changed", "fields": ["sort_order"]}
     assert by_key["old"]["status"] == "removed" and by_key["b"]["status"] == "added"
-    assert report["unverifiable"] == ["revision", "verified_section", "review"]
+    assert report["unverifiable"] == ["revision", "verified_section", "review", "canonical_url"]
 
 
 def test_legacy_needs_review_is_not_treated_as_verified():
@@ -136,6 +167,7 @@ def test_legacy_needs_review_is_not_treated_as_verified():
                 "source_type": "wikipedia",
                 "retrieved_at": record["retrieved_date"],
                 "source_license": record["license"],
+                "canonical_url": record["source"]["url"],
             },
             "verification": {"status": "needs_review"},
             "nodes": [{
@@ -176,6 +208,7 @@ def test_legacy_revision_is_compared_only_when_known(
                 "source_type": "wikipedia",
                 "retrieved_at": record["retrieved_date"],
                 "source_license": record["license"],
+                "canonical_url": record["source"]["url"],
             },
             "verification": {"status": "verified"},
             "nodes": [{
@@ -224,6 +257,7 @@ def test_legacy_source_type_and_retrieved_at_are_compared_when_known(
                 "source_type": source_type,
                 "retrieved_at": retrieved_at,
                 "source_license": record["license"],
+                "canonical_url": record["source"]["url"],
             },
             "verification": {"status": review},
             "nodes": [{
@@ -236,6 +270,97 @@ def test_legacy_source_type_and_retrieved_at_are_compared_when_known(
             } for node in record["nodes"]],
         }]
     }
+    report = compare_canonical_to_legacy(record, legacy)
+    assert report["status"] == ("changed" if metadata_changed else "unchanged")
+    assert report["metadata_changed"] == metadata_changed
+    assert report["unverifiable"] == (["review"] if review == "needs_review" else [])
+
+
+@pytest.mark.parametrize(
+    ("canonical_source_url", "legacy_canonical_url", "review", "changed", "unverifiable"),
+    [
+        (
+            "https://ja.wikipedia.org/wiki/Test",
+            "https://ja.wikipedia.org/wiki/Test",
+            "verified", False, [],
+        ),
+        (
+            "https://ja.wikipedia.org/wiki/Test?oldid=1",
+            "https://ja.wikipedia.org/wiki/Test",
+            "verified", False, [],
+        ),
+        (
+            "https://ja.wikipedia.org/wiki/Test",
+            "https://ja.wikipedia.org/wiki/Test#History",
+            "verified", False, [],
+        ),
+        (
+            "https://ja.wikipedia.org/wiki/Test",
+            "https://ja.wikipedia.org/wiki/Other",
+            "verified", True, [],
+        ),
+        (
+            "https://ja.wikipedia.org/wiki/Test",
+            "https://ja.wikibooks.org/wiki/Test",
+            "verified", True, [],
+        ),
+        (
+            "https://ja.wikipedia.org/wiki/Test",
+            None,
+            "unavailable", False, ["review", "canonical_url"],
+        ),
+        (
+            "https://ja.wikipedia.org/wiki/Test",
+            "https://ja.wikipedia.org/wiki/Test",
+            "needs_review", False, ["review"],
+        ),
+    ],
+)
+def test_legacy_canonical_url_compares_normalized_article_identity(
+    canonical_source_url, legacy_canonical_url, review, changed, unverifiable
+):
+    record = artifact()["records"][0]
+    record["source"]["url"] = canonical_source_url
+    legacy = matching_legacy(
+        record,
+        source={
+            "canonical_url": legacy_canonical_url,
+            # A redirect/request URL is deliberately not part of the diff.
+            "requested_url": "https://ja.wikipedia.org/wiki/Redirect_name",
+        },
+        verification={"status": review},
+    )
+    report = compare_canonical_to_legacy(record, legacy)
+    assert report["status"] == ("changed" if changed else "unchanged")
+    assert ("canonical_url" in report["metadata_changed"]) is changed
+    assert report["unverifiable"] == unverifiable
+    assert "requested_url" not in report["metadata_changed"]
+
+
+@pytest.mark.parametrize(
+    ("legacy_coverage", "legacy_text", "review", "metadata_changed"),
+    [
+        ("complete_for_cited_sequence", "different text", "verified", []),
+        (
+            "partial_explicit_sequence", "legacy display text", "verified",
+            ["coverage_status"],
+        ),
+        (
+            "partial_explicit_sequence", "legacy display text", "needs_review",
+            ["coverage_status"],
+        ),
+    ],
+)
+def test_legacy_normalized_coverage_is_compared_without_free_text(
+    legacy_coverage, legacy_text, review, metadata_changed
+):
+    record = artifact()["records"][0]
+    legacy = matching_legacy(
+        record,
+        coverage=legacy_coverage,
+        legacy_coverage_status=legacy_text,
+        verification={"status": review},
+    )
     report = compare_canonical_to_legacy(record, legacy)
     assert report["status"] == ("changed" if metadata_changed else "unchanged")
     assert report["metadata_changed"] == metadata_changed
