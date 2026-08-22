@@ -365,5 +365,21 @@ def compare_canonical_to_legacy(record: dict[str, Any], legacy: dict[str, Any]) 
     legacy_coverage = old.get("coverage")
     if legacy_coverage is not None and legacy_coverage != record["coverage_status"]:
         metadata.append("coverage_status")
+    legacy_boundary = old.get("coverage_boundary")
+    if not isinstance(legacy_boundary, dict):
+        unavailable.append("coverage_boundary")
+    else:
+        canonical_boundary = record["coverage"]
+        canonical_omitted = canonical_boundary["omitted_after"]
+        canonical_omitted_usi = (
+            None if canonical_omitted is None else canonical_omitted["usi"]
+        )
+        for field, canonical_value in (
+            ("covered_through_ply", canonical_boundary["covered_through_ply"]),
+            ("covered_through_move", canonical_boundary["covered_through_move"]),
+            ("omitted_after", canonical_omitted_usi),
+        ):
+            if legacy_boundary.get(field) != canonical_value:
+                metadata.append(f"coverage_boundary.{field}")
     changed = metadata or any(item["status"] != "unchanged" for item in node_changes)
     return {"line_key": record["line_key"], "status": "changed" if changed else "unchanged", "metadata_changed": metadata, "nodes": node_changes, "unverifiable": unavailable}

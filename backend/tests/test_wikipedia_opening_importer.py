@@ -53,6 +53,14 @@ def matching_legacy(record, **overrides):
         "line_name": record["line_name"],
         "source": source,
         "coverage": record["coverage_status"],
+        "coverage_boundary": {
+            "covered_through_ply": record["coverage"]["covered_through_ply"],
+            "covered_through_move": record["coverage"]["covered_through_move"],
+            "omitted_after": (
+                None if record["coverage"]["omitted_after"] is None
+                else record["coverage"]["omitted_after"]["usi"]
+            ),
+        },
         "legacy_coverage_status": "legacy display text",
         "verification": {"status": "verified"},
         "nodes": [{
@@ -152,7 +160,10 @@ def test_legacy_diff_reports_changes_and_unknowns_without_inference():
     by_key = {item["key"]: item for item in report["nodes"]}
     assert by_key["a"] == {"key": "a", "status": "changed", "fields": ["sort_order"]}
     assert by_key["old"]["status"] == "removed" and by_key["b"]["status"] == "added"
-    assert report["unverifiable"] == ["revision", "verified_section", "review", "canonical_url"]
+    assert report["unverifiable"] == [
+        "revision", "verified_section", "review", "canonical_url",
+        "coverage_boundary",
+    ]
 
 
 def test_legacy_needs_review_is_not_treated_as_verified():
@@ -170,6 +181,11 @@ def test_legacy_needs_review_is_not_treated_as_verified():
                 "canonical_url": record["source"]["url"],
             },
             "verification": {"status": "needs_review"},
+            "coverage_boundary": {
+                "covered_through_ply": record["coverage"]["covered_through_ply"],
+                "covered_through_move": record["coverage"]["covered_through_move"],
+                "omitted_after": None,
+            },
             "nodes": [{
                 "move_key": node["key"],
                 "parent_key": node["parent_key"],
@@ -211,6 +227,11 @@ def test_legacy_revision_is_compared_only_when_known(
                 "canonical_url": record["source"]["url"],
             },
             "verification": {"status": "verified"},
+            "coverage_boundary": {
+                "covered_through_ply": record["coverage"]["covered_through_ply"],
+                "covered_through_move": record["coverage"]["covered_through_move"],
+                "omitted_after": None,
+            },
             "nodes": [{
                 "move_key": node["key"],
                 "parent_key": node["parent_key"],
@@ -260,6 +281,11 @@ def test_legacy_source_type_and_retrieved_at_are_compared_when_known(
                 "canonical_url": record["source"]["url"],
             },
             "verification": {"status": review},
+            "coverage_boundary": {
+                "covered_through_ply": record["coverage"]["covered_through_ply"],
+                "covered_through_move": record["coverage"]["covered_through_move"],
+                "omitted_after": None,
+            },
             "nodes": [{
                 "move_key": node["key"],
                 "parent_key": node["parent_key"],
@@ -365,6 +391,77 @@ def test_legacy_normalized_coverage_is_compared_without_free_text(
     assert report["status"] == ("changed" if metadata_changed else "unchanged")
     assert report["metadata_changed"] == metadata_changed
     assert report["unverifiable"] == (["review"] if review == "needs_review" else [])
+
+
+@pytest.mark.parametrize(
+    ("legacy_boundary", "canonical_omitted", "expected_fields"),
+    [
+        (
+            {"covered_through_ply": 3, "covered_through_move": "2g2f", "omitted_after": None},
+            None, [],
+        ),
+        (
+            {"covered_through_ply": 2, "covered_through_move": "2g2f", "omitted_after": None},
+            None, ["coverage_boundary.covered_through_ply"],
+        ),
+        (
+            {"covered_through_ply": 3, "covered_through_move": "6g6f", "omitted_after": None},
+            None, ["coverage_boundary.covered_through_move"],
+        ),
+        (
+            {"covered_through_ply": 3, "covered_through_move": "2g2f", "omitted_after": "7g7f"},
+            {"usi": "6g6f", "note": "opaque canonical note"},
+            ["coverage_boundary.omitted_after"],
+        ),
+        (
+            {"covered_through_ply": 3, "covered_through_move": "2g2f", "omitted_after": None},
+            {"usi": "6g6f"}, ["coverage_boundary.omitted_after"],
+        ),
+        (
+            {"covered_through_ply": 3, "covered_through_move": "2g2f", "omitted_after": "6g6f"},
+            None, ["coverage_boundary.omitted_after"],
+        ),
+        (
+            {"covered_through_ply": 1, "covered_through_move": "7g7f", "omitted_after": "7g7f"},
+            {"usi": "6g6f"},
+            [
+                "coverage_boundary.covered_through_ply",
+                "coverage_boundary.covered_through_move",
+                "coverage_boundary.omitted_after",
+            ],
+        ),
+    ],
+)
+def test_legacy_coverage_boundary_fields_are_compared_in_stable_order(
+    legacy_boundary, canonical_omitted, expected_fields
+):
+    record = artifact()["records"][0]
+    record["coverage"]["omitted_after"] = canonical_omitted
+    legacy = matching_legacy(record, coverage_boundary=legacy_boundary)
+    report = compare_canonical_to_legacy(record, legacy)
+    assert report["status"] == ("changed" if expected_fields else "unchanged")
+    assert report["metadata_changed"] == expected_fields
+
+
+def test_canonical_omitted_note_is_not_part_of_legacy_boundary_identity():
+    record = artifact()["records"][0]
+    record["coverage"]["omitted_after"] = {"usi": "6g6f", "note": "first note"}
+    legacy = matching_legacy(record)
+    first = compare_canonical_to_legacy(record, legacy)
+    record["coverage"]["omitted_after"]["note"] = "different note"
+    second = compare_canonical_to_legacy(record, legacy)
+    assert first == second
+    assert first["status"] == "unchanged"
+
+
+def test_missing_legacy_coverage_boundary_is_unverifiable_not_inferred():
+    record = artifact()["records"][0]
+    legacy = matching_legacy(record)
+    del legacy["records"][0]["coverage_boundary"]
+    report = compare_canonical_to_legacy(record, legacy)
+    assert report["status"] == "unchanged"
+    assert report["metadata_changed"] == []
+    assert report["unverifiable"] == ["coverage_boundary"]
 
 
 def test_legacy_name_match_ambiguity_is_order_independent_and_not_guessed():
