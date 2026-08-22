@@ -415,6 +415,88 @@ def test_legacy_name_match_zero_one_and_multiple_canonical_keys():
         assert report["unverifiable"] == ["legacy_record_match"]
 
 
+@pytest.mark.parametrize(
+    (
+        "provenance_class", "legacy_section", "legacy_evidence", "review_status",
+        "canonical_provenance", "expected_fields", "expected_unverifiable",
+    ),
+    [
+        (
+            "explicit_sequence", "節", "evidence a", "verified", "A", [], [],
+        ),
+        (
+            "explicit_sequence", "節", "evidence a", "verified", "B",
+            ["provenance"], [],
+        ),
+        (
+            "explicit_sequence", "different", "evidence a", "verified", "A",
+            ["source_section"], [],
+        ),
+        (
+            "explicit_sequence", "節", "different evidence", "verified", "A",
+            ["evidence_note"], [],
+        ),
+        (
+            "explicit_sequence", "different", "different evidence", "verified", "B",
+            ["provenance", "source_section", "evidence_note"], [],
+        ),
+        (
+            "explicit_sequence", "節", "evidence a", "needs_review", "A", [],
+            ["review"],
+        ),
+        (
+            "explicit_sequence", "節", "evidence a", "unavailable", "B",
+            ["provenance"], ["review"],
+        ),
+        (
+            None, "節", "evidence a", "verified", "A", [], ["provenance"],
+        ),
+        (
+            "explicit_sequence", None, "evidence a", "verified", "A", [],
+            ["source_section"],
+        ),
+    ],
+)
+def test_legacy_node_provenance_comparison_is_explicit_and_deterministic(
+    provenance_class, legacy_section, legacy_evidence, review_status,
+    canonical_provenance, expected_fields, expected_unverifiable,
+):
+    record = artifact()["records"][0]
+    record["nodes"][0]["provenance"] = canonical_provenance
+    legacy = matching_legacy(record)
+    legacy["records"][0]["nodes"][0]["provenance"] = {
+        "provenance_class": provenance_class,
+        "source_section": legacy_section,
+        "evidence_note": legacy_evidence,
+        "review_status": review_status,
+    }
+    report = compare_canonical_to_legacy(record, legacy)
+    result = next(item for item in report["nodes"] if item["key"] == "a")
+    assert result["status"] == ("changed" if expected_fields else "unchanged")
+    assert result["fields"] == expected_fields
+    if expected_unverifiable:
+        assert result["unverifiable"] == expected_unverifiable
+    else:
+        assert "unverifiable" not in result
+
+
+def test_mixed_boundary_change_is_detected_without_structural_change():
+    record = artifact()["records"][0]
+    record["provenance"] = "M"
+    record["coverage_status"] = "mixed"
+    record["nodes"][1]["provenance"] = "B"
+    legacy = matching_legacy(record)
+    legacy["records"][0]["nodes"][1]["provenance"] = {
+        "provenance_class": "explicit_sequence",
+        "source_section": record["nodes"][1]["source_section"],
+        "evidence_note": record["nodes"][1]["evidence_note"],
+        "review_status": "verified",
+    }
+    report = compare_canonical_to_legacy(record, legacy)
+    changed = next(item for item in report["nodes"] if item["key"] == "b")
+    assert changed == {"key": "b", "status": "changed", "fields": ["provenance"]}
+
+
 def test_static_seed_does_not_overwrite_claimed_canonical_line_or_duplicate_after_rename(
     client, monkeypatch
 ):

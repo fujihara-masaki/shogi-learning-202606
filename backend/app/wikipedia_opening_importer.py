@@ -290,7 +290,38 @@ def compare_canonical_to_legacy(record: dict[str, Any], legacy: dict[str, Any]) 
             node_changes.append({"key": node["key"], "status": "added"})
             continue
         fields = [field for field in ("usi", "parent_key", "sort_order", "is_main", "variation_group") if prior.get(field) != node[field]]
-        node_changes.append({"key": node["key"], "status": "changed" if fields else "unchanged", "fields": fields})
+        unverifiable = []
+        legacy_provenance = prior.get("provenance")
+        if isinstance(legacy_provenance, dict):
+            if legacy_provenance.get("review_status") != "verified":
+                unverifiable.append("review")
+            provenance_class = legacy_provenance.get("provenance_class")
+            mapped_provenance = {
+                "explicit_sequence": "A",
+                "diagram_reconstruction": "B",
+            }.get(provenance_class)
+            if provenance_class is None:
+                unverifiable.append("provenance")
+            elif mapped_provenance is not None and mapped_provenance != node["provenance"]:
+                fields.append("provenance")
+            source_section = legacy_provenance.get("source_section")
+            if source_section is None:
+                unverifiable.append("source_section")
+            elif source_section != node["source_section"]:
+                fields.append("source_section")
+            if (
+                "evidence_note" in legacy_provenance
+                and legacy_provenance["evidence_note"] != node["evidence_note"]
+            ):
+                fields.append("evidence_note")
+        result = {
+            "key": node["key"],
+            "status": "changed" if fields else "unchanged",
+            "fields": fields,
+        }
+        if unverifiable:
+            result["unverifiable"] = unverifiable
+        node_changes.append(result)
     node_changes.extend({"key": key, "status": "removed"} for key in sorted(old_nodes.keys() - {n["key"] for n in record["nodes"]}))
     unavailable = [
         field
