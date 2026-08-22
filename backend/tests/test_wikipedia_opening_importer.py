@@ -437,6 +437,105 @@ def test_ordered_nodes_handles_more_than_one_thousand_deep_nodes_iteratively():
     assert ordered[-1]["key"] == "n1500" and ordered[-1]["ply"] == 1501
 
 
+@pytest.mark.parametrize("record_order", [("line-a", "line-b"), ("line-b", "line-a")])
+def test_duplicate_canonical_display_names_never_claim_legacy_row_by_order(
+    client, record_order
+):
+    conn = get_connection()
+    try:
+        legacy_line_id = int(conn.execute(
+            """INSERT INTO opening_lines
+               (name, opening_type, initial_sfen, moves, comments)
+               VALUES ('Same name', 'legacy', ?, '[]', '["legacy line comment"]')""",
+            (shogi.STARTING_SFEN,),
+        ).lastrowid)
+        first = artifact()["records"][0]["nodes"][0]
+        legacy_move_id = int(conn.execute(
+            """INSERT INTO opening_line_moves
+               (line_id, ply, usi, from_sfen, to_sfen, comment, variation_group,
+                parent_move_id, sort_order, move_key, is_main)
+               VALUES (?, 1, ?, ?, ?, 'legacy move comment', 'main', NULL, 0, 'pending', 1)""",
+            (legacy_line_id, first["usi"], first["from_sfen"], first["to_sfen"]),
+        ).lastrowid)
+        conn.execute(
+            "UPDATE opening_line_moves SET move_key=? WHERE id=?",
+            (f"legacy-{legacy_move_id}", legacy_move_id),
+        )
+        legacy_before = dict(conn.execute(
+            "SELECT * FROM opening_lines WHERE id=?", (legacy_line_id,)
+        ).fetchone())
+        legacy_move_before = dict(conn.execute(
+            "SELECT * FROM opening_line_moves WHERE id=?", (legacy_move_id,)
+        ).fetchone())
+
+        records = []
+        for line_key in record_order:
+            record = deepcopy(artifact()["records"][0])
+            record["record_key"] = f"record-{line_key}"
+            record["line_key"] = line_key
+            record["line_name"] = "Same name"
+            records.append(record)
+        data = artifact()
+        data["records"] = records
+        applied = apply_wikipedia_opening_artifact(conn, data)
+
+        assert dict(conn.execute(
+            "SELECT * FROM opening_lines WHERE id=?", (legacy_line_id,)
+        ).fetchone()) == legacy_before
+        assert dict(conn.execute(
+            "SELECT * FROM opening_line_moves WHERE id=?", (legacy_move_id,)
+        ).fetchone()) == legacy_move_before
+        canonical = conn.execute(
+            "SELECT id, line_key FROM opening_lines WHERE line_key IN ('line-a', 'line-b')"
+        ).fetchall()
+        assert {row["line_key"] for row in canonical} == {"line-a", "line-b"}
+        assert set(applied) == {row["id"] for row in canonical}
+        assert legacy_line_id not in applied
+        canonical_comments = conn.execute(
+            """SELECT comment FROM opening_line_moves
+               WHERE line_id IN (?, ?) ORDER BY line_id, id""",
+            tuple(row["id"] for row in canonical),
+        ).fetchall()
+        assert canonical_comments
+        assert all(row["comment"] != "legacy move comment" for row in canonical_comments)
+    finally:
+        conn.close()
+
+
+def test_single_canonical_display_name_still_claims_legacy_line_and_comments(client):
+    conn = get_connection()
+    try:
+        record = artifact()["records"][0]
+        line_id = int(conn.execute(
+            """INSERT INTO opening_lines
+               (name, opening_type, initial_sfen, moves, comments)
+               VALUES (?, 'legacy', ?, '[]', '["legacy comment"]')""",
+            (record["line_name"], record["initial_sfen"]),
+        ).lastrowid)
+        root = record["nodes"][0]
+        move_id = int(conn.execute(
+            """INSERT INTO opening_line_moves
+               (line_id, ply, usi, from_sfen, to_sfen, comment, variation_group,
+                parent_move_id, sort_order, move_key, is_main)
+               VALUES (?, 1, ?, ?, ?, 'retained comment', 'main', NULL, 0, 'pending', 1)""",
+            (line_id, root["usi"], root["from_sfen"], root["to_sfen"]),
+        ).lastrowid)
+        conn.execute(
+            "UPDATE opening_line_moves SET move_key=? WHERE id=?",
+            (f"legacy-{move_id}", move_id),
+        )
+
+        assert apply_wikipedia_opening_artifact(conn, artifact()) == [line_id]
+        claimed = conn.execute(
+            "SELECT id, move_key, comment FROM opening_line_moves WHERE id=?", (move_id,)
+        ).fetchone()
+        assert dict(claimed) == {
+            "id": move_id, "move_key": "a", "comment": "retained comment",
+        }
+    finally:
+        conn.close()
+
+
 @pytest.mark.parametrize(
     ("url", "expected_type"),
     [

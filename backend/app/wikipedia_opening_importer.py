@@ -8,7 +8,7 @@ is never written to the legacy free-text column of the same name.
 """
 from __future__ import annotations
 
-from collections import defaultdict
+from collections import Counter, defaultdict
 import json
 from typing import Any
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
@@ -98,6 +98,7 @@ def apply_wikipedia_opening_artifact(conn, artifact: dict[str, Any]) -> list[int
     move seeds and catalog synchronization is outside D1c.
     """
     records = _move_records(artifact)  # no write may precede this call
+    name_counts = Counter(record["line_name"] for record in records)
     applied = []
     for ordinal, record in enumerate(records):
         savepoint = f"wikipedia_line_{ordinal}"
@@ -107,9 +108,10 @@ def apply_wikipedia_opening_artifact(conn, artifact: dict[str, Any]) -> list[int
             line = conn.execute(
                 "SELECT * FROM opening_lines WHERE line_key=?", (record["line_key"],)
             ).fetchone()
-            if line is None:
+            if line is None and name_counts[record["line_name"]] == 1:
                 # One-time backwards-compatible claim.  Rename matching is
-                # never used after line_key has been persisted.
+                # never used after line_key has been persisted.  Ambiguous
+                # display names are never guessed from artifact record order.
                 candidates = conn.execute(
                     "SELECT * FROM opening_lines WHERE line_key='' AND source_id IS NULL AND name=? ORDER BY id",
                     (record["line_name"],),
