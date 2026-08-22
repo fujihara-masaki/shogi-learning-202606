@@ -367,6 +367,54 @@ def test_legacy_normalized_coverage_is_compared_without_free_text(
     assert report["unverifiable"] == (["review"] if review == "needs_review" else [])
 
 
+def test_legacy_name_match_ambiguity_is_order_independent_and_not_guessed():
+    record = artifact()["records"][0]
+    first = matching_legacy(record)["records"][0]
+    first["record_id"] = "legacy-a"
+    first["source"]["revision_id"] = 999
+    first["nodes"][0]["usi"] = "2g2f"
+    second = deepcopy(matching_legacy(record)["records"][0])
+    second["record_id"] = "legacy-b"
+    second["source"]["source_title"] = "Different source"
+    second["nodes"] = []
+
+    reports = [
+        compare_canonical_to_legacy(record, {"records": candidates})
+        for candidates in ([first, second], [second, first])
+    ]
+    assert reports[0] == reports[1]
+    assert reports[0] == {
+        "line_key": record["line_key"],
+        "status": "ambiguous",
+        "metadata_changed": [],
+        "nodes": [],
+        "unverifiable": ["legacy_record_match"],
+    }
+
+
+def test_legacy_name_match_zero_one_and_multiple_canonical_keys():
+    record = artifact()["records"][0]
+    assert compare_canonical_to_legacy(record, {"records": []}) == {
+        "line_key": record["line_key"], "status": "added", "unverifiable": [],
+    }
+    assert compare_canonical_to_legacy(
+        record, matching_legacy(record)
+    )["status"] == "unchanged"
+
+    duplicate_legacy = matching_legacy(record)["records"] * 2
+    other_canonical = deepcopy(record)
+    other_canonical["line_key"] = "other-line-key"
+    for canonical in (record, other_canonical):
+        report = compare_canonical_to_legacy(
+            canonical, {"records": duplicate_legacy}
+        )
+        assert report["line_key"] == canonical["line_key"]
+        assert report["status"] == "ambiguous"
+        assert report["nodes"] == []
+        assert report["metadata_changed"] == []
+        assert report["unverifiable"] == ["legacy_record_match"]
+
+
 def test_static_seed_does_not_overwrite_claimed_canonical_line_or_duplicate_after_rename(
     client, monkeypatch
 ):

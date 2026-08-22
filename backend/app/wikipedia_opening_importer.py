@@ -273,6 +273,14 @@ def compare_canonical_to_legacy(record: dict[str, Any], legacy: dict[str, Any]) 
     candidates = [item for item in legacy.get("records", []) if item.get("line_name") == record["line_name"]]
     if not candidates:
         return {"line_key": record["line_key"], "status": "added", "unverifiable": []}
+    if len(candidates) > 1:
+        return {
+            "line_key": record["line_key"],
+            "status": "ambiguous",
+            "metadata_changed": [],
+            "nodes": [],
+            "unverifiable": ["legacy_record_match"],
+        }
     old = candidates[0]
     old_nodes = {node["move_key"]: node for node in old.get("nodes", [])}
     node_changes = []
