@@ -811,17 +811,18 @@ def upsert_opening_move_nodes(conn, line_id: int, move_nodes: list[dict]) -> dic
         if node["parent_key"] is not None and parent_id is None:
             continue
         parent_clause = "parent_move_id IS NULL" if parent_id is None else "parent_move_id=?"
-        params = [line_id, node["ply"], node["variation_group"], node["sort_order"], node["usi"]]
+        params = [line_id, node["usi"]]
         if parent_id is not None:
             params.append(parent_id)
         candidates = conn.execute(
             f"""SELECT id, comment FROM opening_line_moves
-                WHERE line_id=? AND ply=? AND variation_group=? AND sort_order=? AND usi=?
+                WHERE line_id=? AND usi=?
                   AND {parent_clause} AND move_key = 'legacy-' || id ORDER BY id""",
             params,
         ).fetchall()
-        candidate = next((row for row in candidates if int(row["id"]) not in claimed_ids), None)
-        if candidate is not None:
+        available = [row for row in candidates if int(row["id"]) not in claimed_ids]
+        if len(available) == 1:
+            candidate = available[0]
             existing_ids[node["key"]] = int(candidate["id"])
             existing_rows[node["key"]] = candidate
             claimed_ids.add(int(candidate["id"]))

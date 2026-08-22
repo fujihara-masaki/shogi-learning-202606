@@ -897,6 +897,117 @@ def test_legacy_move_claim_preserves_main_and_branch_comments(client):
         conn.close()
 
 
+@pytest.mark.parametrize("legacy_difference", ["sort_order", "variation_group", "both", "ply"])
+def test_legacy_move_claim_identity_ignores_display_metadata_and_ply(
+    client, legacy_difference
+):
+    conn = get_connection()
+    try:
+        data = artifact(True)
+        line_id = apply_wikipedia_opening_artifact(conn, data)[0]
+        before = rows(conn, line_id)
+        for key, row in before.items():
+            updates = ["move_key=?", "comment=?"]
+            values = [f"legacy-{row['id']}", f"retained {key}"]
+            if legacy_difference in ("sort_order", "both"):
+                updates.append("sort_order=?")
+                values.append(100 + row["id"])
+            if legacy_difference in ("variation_group", "both"):
+                updates.append("variation_group=?")
+                values.append(f"legacy group {key}")
+            if legacy_difference == "ply":
+                updates.append("ply=?")
+                values.append(100 + row["id"])
+            values.append(row["id"])
+            conn.execute(
+                f"UPDATE opening_line_moves SET {', '.join(updates)} WHERE id=?",
+                values,
+            )
+
+        apply_wikipedia_opening_artifact(conn, data)
+        after = rows(conn, line_id)
+        expected = {node["key"]: node for node in data["records"][0]["nodes"]}
+        assert {key: row["id"] for key, row in after.items()} == {
+            key: row["id"] for key, row in before.items()
+        }
+        for key, row in after.items():
+            assert row["comment"] == f"retained {key}"
+            assert row["sort_order"] == expected[key]["sort_order"]
+            assert row["variation_group"] == expected[key]["variation_group"]
+    finally:
+        conn.close()
+
+
+def test_legacy_move_claim_requires_matching_direct_parent(client):
+    conn = get_connection()
+    try:
+        data = artifact(True)
+        line_id = apply_wikipedia_opening_artifact(conn, data)[0]
+        before = rows(conn, line_id)
+        root = data["records"][0]["nodes"][0]
+        unrelated_parent_id = int(conn.execute(
+            """INSERT INTO opening_line_moves
+               (line_id, ply, usi, from_sfen, to_sfen, comment, variation_group,
+                parent_move_id, sort_order, move_key, is_main)
+               VALUES (?, 1, '2g2f', ?, ?, 'unrelated', 'legacy', NULL, 99, 'pending', 0)""",
+            (line_id, root["from_sfen"], root["to_sfen"]),
+        ).lastrowid)
+        conn.execute(
+            "UPDATE opening_line_moves SET move_key=? WHERE id=?",
+            (f"legacy-{unrelated_parent_id}", unrelated_parent_id),
+        )
+        old_b_id = before["b"]["id"]
+        for row in before.values():
+            conn.execute(
+                "UPDATE opening_line_moves SET move_key=? WHERE id=?",
+                (f"legacy-{row['id']}", row["id"]),
+            )
+        conn.execute(
+            "UPDATE opening_line_moves SET parent_move_id=? WHERE id=?",
+            (unrelated_parent_id, old_b_id),
+        )
+
+        apply_wikipedia_opening_artifact(conn, data)
+        after = rows(conn, line_id)
+        assert after["a"]["id"] == before["a"]["id"]
+        assert after["b"]["id"] != old_b_id
+        assert after["b"]["parent_move_id"] == after["a"]["id"]
+    finally:
+        conn.close()
+
+
+def test_ambiguous_legacy_sibling_usi_candidates_are_not_claimed(client):
+    conn = get_connection()
+    try:
+        data = artifact(True)
+        line_id = apply_wikipedia_opening_artifact(conn, data)[0]
+        before = rows(conn, line_id)
+        old_root_id = before["a"]["id"]
+        conn.execute(
+            "UPDATE opening_line_moves SET move_key=?, comment='legacy first' WHERE id=?",
+            (f"legacy-{old_root_id}", old_root_id),
+        )
+        root = data["records"][0]["nodes"][0]
+        other_id = int(conn.execute(
+            """INSERT INTO opening_line_moves
+               (line_id, ply, usi, from_sfen, to_sfen, comment, variation_group,
+                parent_move_id, sort_order, move_key, is_main)
+               VALUES (?, 99, ?, ?, ?, 'legacy second', 'other', NULL, 99, 'pending', 0)""",
+            (line_id, root["usi"], root["from_sfen"], root["to_sfen"]),
+        ).lastrowid)
+        conn.execute(
+            "UPDATE opening_line_moves SET move_key=? WHERE id=?",
+            (f"legacy-{other_id}", other_id),
+        )
+
+        apply_wikipedia_opening_artifact(conn, data)
+        claimed = rows(conn, line_id)["a"]
+        assert claimed["id"] not in {old_root_id, other_id}
+        assert claimed["comment"] not in {"legacy first", "legacy second"}
+    finally:
+        conn.close()
+
+
 @pytest.mark.parametrize(
     ("corrupt", "report_section", "detail"),
     [
