@@ -248,6 +248,21 @@ def test_uri_outside_https_wikimedia_contract_is_rejected(url):
     assert diagnostics[0].path == "/records/0/source/url"
 
 
+@pytest.mark.parametrize("url", [
+    "https://user@ja.wikipedia.org/wiki/Test",
+    "https://user:password@ja.wikibooks.org/wiki/Test",
+    "https://ja.wikipedia.org:443/wiki/Test",
+    "https://ja.wikipedia.org:65536/wiki/Test",
+    "https://ja.wikipedia.org:not-a-port/wiki/Test",
+])
+def test_source_url_userinfo_and_explicit_ports_are_rejected_without_exceptions(url):
+    artifact = _artifact()
+    artifact["records"][0]["source"]["url"] = url
+    diagnostics = validate_wikipedia_opening_artifact(artifact)
+    assert [diagnostic.code for diagnostic in diagnostics] == ["source_url"]
+    assert diagnostics[0].path == "/records/0/source/url"
+
+
 def test_json_pointer_uses_empty_string_for_document_root():
     diagnostics = validate_wikipedia_opening_artifact([])
     assert diagnostics[0].code == "schema"

@@ -59,7 +59,14 @@ def _diag(errors: list[ValidationDiagnostic], code: str, path: str, message: str
 
 def validate_wikipedia_opening_artifact(artifact: Any) -> tuple[ValidationDiagnostic, ...]:
     """Return stable, machine-assertable diagnostics; an empty tuple means valid."""
-    schema = json.loads(SCHEMA_PATH.read_text(encoding="utf-8"))
+    return _validate_wikipedia_opening_artifact(artifact, SCHEMA_PATH)
+
+
+def _validate_wikipedia_opening_artifact(
+    artifact: Any, schema_path: Path
+) -> tuple[ValidationDiagnostic, ...]:
+    """Validate with an injected schema path for CLI infrastructure tests."""
+    schema = json.loads(schema_path.read_text(encoding="utf-8"))
     jsonschema.Draft202012Validator.check_schema(schema)
     errors: list[ValidationDiagnostic] = []
     schema_validator = jsonschema.Draft202012Validator(
@@ -147,9 +154,17 @@ def _is_allowed_source_url(url: str) -> bool:
     try:
         parsed = urlsplit(url)
         host = parsed.hostname
+        port = parsed.port
     except ValueError:
         return False
-    return parsed.scheme == "https" and host is not None and _is_allowed_wikimedia_host(host)
+    return (
+        parsed.scheme == "https"
+        and host is not None
+        and parsed.username is None
+        and parsed.password is None
+        and port is None
+        and _is_allowed_wikimedia_host(host)
+    )
 
 
 def _source_revision_matches(url: str, revision: int) -> bool:
