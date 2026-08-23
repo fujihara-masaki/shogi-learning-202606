@@ -10,6 +10,7 @@ import sys
 from typing import Any
 
 import jsonschema
+from referencing.exceptions import Unresolvable
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
@@ -54,8 +55,8 @@ def validate_path(
 
     try:
         diagnostics = _validate_wikipedia_opening_artifact(artifact, schema_path)
-    except jsonschema.exceptions.SchemaError as exc:
-        return 2, _error("schema_definition_invalid", f"canonical schema is invalid: {exc.message}")
+    except (jsonschema.exceptions.SchemaError, Unresolvable) as exc:
+        return 2, _error("schema_definition_invalid", f"canonical schema is invalid: {exc}")
 
     errors = [
         {"path": item.path, "code": item.code, "message": item.message}

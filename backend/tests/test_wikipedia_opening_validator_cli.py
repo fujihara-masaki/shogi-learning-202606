@@ -136,3 +136,15 @@ def test_invalid_schema_definition_is_an_operational_error(tmp_path):
     status, result = load_cli_module().validate_path(write_artifact(tmp_path), schema_path=schema)
     assert status == 2
     assert result["errors"][0]["code"] == "schema_definition_invalid"
+
+
+def test_unresolved_schema_reference_is_an_operational_error(tmp_path):
+    schema = tmp_path / "schema.json"
+    schema.write_text(json.dumps({
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "$ref": "#/$defs/missing",
+    }))
+    status, result = load_cli_module().validate_path(write_artifact(tmp_path), schema_path=schema)
+    assert status == 2
+    assert result["valid"] is False
+    assert result["errors"][0]["code"] == "schema_definition_invalid"

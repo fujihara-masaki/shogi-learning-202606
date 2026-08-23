@@ -251,6 +251,8 @@ def test_uri_outside_https_wikimedia_contract_is_rejected(url):
 @pytest.mark.parametrize("url", [
     "https://user@ja.wikipedia.org/wiki/Test",
     "https://user:password@ja.wikibooks.org/wiki/Test",
+    "https://ja.wikipedia.org:/wiki/Test",
+    "https://ja.wikibooks.org:/wiki/Test",
     "https://ja.wikipedia.org:443/wiki/Test",
     "https://ja.wikipedia.org:65536/wiki/Test",
     "https://ja.wikipedia.org:not-a-port/wiki/Test",

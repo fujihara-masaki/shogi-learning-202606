@@ -163,6 +163,7 @@ def _is_allowed_source_url(url: str) -> bool:
         and parsed.username is None
         and parsed.password is None
         and port is None
+        and ":" not in parsed.netloc.rsplit("@", 1)[-1]
         and _is_allowed_wikimedia_host(host)
     )
 
