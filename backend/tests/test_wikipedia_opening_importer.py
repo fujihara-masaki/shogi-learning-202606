@@ -1067,3 +1067,52 @@ def test_runtime_comparison_detects_complete_persisted_projection(
             assert report[report_section]["actual"] != report[report_section]["expected"]
     finally:
         conn.close()
+
+
+def test_runtime_comparison_distinguishes_foreign_parents_from_roots(client):
+    conn = get_connection()
+    try:
+        data = artifact()
+        record = data["records"][0]
+        line_id = apply_wikipedia_opening_artifact(conn, data)[0]
+        local = rows(conn, line_id)
+        assert compare_canonical_to_runtime(conn, record)["status"] == "unchanged"
+        assert local["a"]["parent_move_id"] is None
+        assert local["b"]["parent_move_id"] == local["a"]["id"]
+
+        foreign_data = artifact()
+        foreign_record = foreign_data["records"][0]
+        foreign_record["record_key"] = "foreign-record"
+        foreign_record["line_key"] = "foreign-line"
+        foreign_record["line_name"] = "Foreign line"
+        foreign_line_id = apply_wikipedia_opening_artifact(conn, foreign_data)[0]
+        foreign = rows(conn, foreign_line_id)
+        # The foreign root deliberately has the same move_key as the expected
+        # local parent. Parent identity must still remain line-local.
+        assert foreign["a"]["move_key"] == local["a"]["move_key"] == "a"
+
+        conn.execute(
+            "UPDATE opening_line_moves SET parent_move_id=? WHERE id=?",
+            (foreign["a"]["id"], local["a"]["id"]),
+        )
+        root_report = compare_canonical_to_runtime(conn, record)
+        root = next(node for node in root_report["nodes"] if node["key"] == "a")
+        assert root["status"] == "changed"
+        assert "parent" in root["fields"]
+
+        conn.execute(
+            "UPDATE opening_line_moves SET parent_move_id=NULL WHERE id=?",
+            (local["a"]["id"],),
+        )
+        assert compare_canonical_to_runtime(conn, record)["status"] == "unchanged"
+
+        conn.execute(
+            "UPDATE opening_line_moves SET parent_move_id=? WHERE id=?",
+            (foreign["a"]["id"], local["b"]["id"]),
+        )
+        child_report = compare_canonical_to_runtime(conn, record)
+        child = next(node for node in child_report["nodes"] if node["key"] == "b")
+        assert child["status"] == "changed"
+        assert "parent" in child["fields"]
+    finally:
+        conn.close()

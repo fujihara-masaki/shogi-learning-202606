@@ -189,6 +189,7 @@ def compare_canonical_to_runtime(conn, record: dict[str, Any]) -> dict[str, Any]
         return {"line_key": record["line_key"], "status": "added", "nodes": []}
     rows = conn.execute("SELECT * FROM opening_line_moves WHERE line_id=?", (line["id"],)).fetchall()
     db = {row["move_key"]: row for row in rows}
+    id_to_key = {row["id"]: row["move_key"] for row in rows}
     ordered_nodes = _ordered_nodes(record)
     canonical = {node["key"]: node for node in ordered_nodes}
     main_moves, main_sfens = _main_projection(ordered_nodes)
@@ -199,10 +200,15 @@ def compare_canonical_to_runtime(conn, record: dict[str, Any]) -> dict[str, Any]
         elif key not in canonical:
             changes.append({"key": key, "status": "removed"})
         else:
-            parent = db[key]["parent_move_id"]
-            db_parent = next((row["move_key"] for row in rows if row["id"] == parent), None)
+            stored_parent_id = db[key]["parent_move_id"]
+            if stored_parent_id is None:
+                db_parent_key = None
+                parent_resolved = True
+            else:
+                db_parent_key = id_to_key.get(stored_parent_id)
+                parent_resolved = db_parent_key is not None
             fields = [name for name in ("ply", "usi", "is_main", "variation_group", "from_sfen", "to_sfen") if db[key][name] != canonical[key][name]]
-            if db_parent != canonical[key]["parent_key"]:
+            if not parent_resolved or db_parent_key != canonical[key]["parent_key"]:
                 fields.append("parent")
             if db[key]["sort_order"] != canonical[key]["sort_order"]:
                 fields.append("sort_order")
