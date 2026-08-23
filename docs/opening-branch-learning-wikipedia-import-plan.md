@@ -439,6 +439,12 @@ follow-up:                         現計画完了 → visual branch tree検討
 
 - **目的**: 新しいcanonical structured artifactとseed/import結果が一致することを保証する。stable key、繰り返しimport時のidempotency、既存対象を安全に置換できること（欠落・重複・parent drift・意図しないID driftを起こさないこと）を重視する。
 - **歴史的seedの扱い**: 既存seedが過去のある時点のWikipedia本文と完全一致していたことを遡及的に証明することは主目的にしない。現在レビューされたcanonical artifactを移行基準とし、差分と置換方針を明示する。
+- **runtime投影境界**: `line_key` / `line_name` / `initial_sfen`、nodeのstable key・parent・USI・表示順・main・variation group・SFEN、および既存列が保持するsource URL/title/section/license/retrieved date/source noteをDBに投影する。`line_key` はrenameでidentityを失わないための最小additive列である。旧rowは名前が一意に合う初回だけclaimし、以後は名前でなくkeyをidentityとする。
+- **ownership境界**: bundled static seed は `seed_key`、canonical importer は `line_key` をowner identityとする。既存static lineをcanonicalがclaimした場合は両keyを保持し、以後の通常seedはそのlineをcanonical-managedとしてskipする。これによりcanonical rename後も旧static名のlineを再生成せず、canonical treeやruntime-owned node commentを巻き戻さない。canonical artifactは学習commentの正本ではないため、stable node keyが残るcommentは保持し、新規nodeだけ空commentとする。
+- **static seed identity制約**: 現行 `seed_key` の `sample:{name}` は既存display nameからownership aliasをbackfillする移行形式であり、bundled seed自体のrenameまで独立に扱える恒久stable IDではない。`SAMPLE_OPENING_LINES` のname変更は禁止し、必要な場合は先に明示的なdisplay非依存seed IDと既存`seed_key`移行を別follow-upで導入する。canonical renameは永続化済みの旧aliasと`line_key`の組で安全に扱う。
+- **source type投影**: D1bで許可・検証済みの `source.url` のhostだけを用い、`wikipedia.org` 系を `wikipedia`、`wikibooks.org` 系を `wikibooks` としてruntime `source_type`へ決定論的に投影・比較する。本文やnoteの意味解析は行わない。
+- **canonicalのみの監査情報**: revision、node provenance/source section/evidence、segment、正規化coverage status/boundaryはartifactに残す。特に正規化coverage statusをlegacy自由文の `opening_lines.coverage_status` へ書かず、同義として比較しない。非対応fieldのために大量のDB列も追加しない。
+- **適用と差分**: D1b validatorでartifact全体を先にgateし、move-lineごとのsavepoint内でstable-key upsert、sort order退避、parent再設定、最後のobsolete削除を行う。catalog-onlyはmovesにしない。legacy auditはcanonicalとしてvalidate/変換せず、既知値のunchanged/added/removed/content/parent/order/metadata差分と、revision/section/review等の「確認不能」を報告する。
 
 ### PR-D1d: validator CLI / CI hardening
 

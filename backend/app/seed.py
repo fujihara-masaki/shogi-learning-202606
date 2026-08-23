@@ -787,11 +787,107 @@ def _semantic_main_nodes(nodes: list[dict]) -> list[dict]:
     return result
 
 
+def upsert_opening_move_nodes(conn, line_id: int, move_nodes: list[dict]) -> dict[str, int]:
+    """Replace one line's tree by stable key while retaining claimed row IDs.
+
+    Callers must supply parent-before-child nodes.  Moving every existing row's
+    order out of range avoids transient sibling uniqueness failures.  Obsolete
+    parents are deleted only after retained children have been reparented.
+    """
+    existing_rows = {
+        node["key"]: row
+        for node in move_nodes
+        if (row := conn.execute(
+            "SELECT id, comment FROM opening_line_moves WHERE line_id=? AND move_key=?",
+            (line_id, node["key"]),
+        ).fetchone()) is not None
+    }
+    existing_ids = {key: int(row["id"]) for key, row in existing_rows.items()}
+    claimed_ids = set(existing_ids.values())
+    for node in move_nodes:
+        if node["key"] in existing_ids:
+            continue
+        parent_id = existing_ids.get(node["parent_key"])
+        if node["parent_key"] is not None and parent_id is None:
+            continue
+        parent_clause = "parent_move_id IS NULL" if parent_id is None else "parent_move_id=?"
+        params = [line_id, node["usi"]]
+        if parent_id is not None:
+            params.append(parent_id)
+        candidates = conn.execute(
+            f"""SELECT id, comment FROM opening_line_moves
+                WHERE line_id=? AND usi=?
+                  AND {parent_clause} AND move_key = 'legacy-' || id ORDER BY id""",
+            params,
+        ).fetchall()
+        available = [row for row in candidates if int(row["id"]) not in claimed_ids]
+        if len(available) == 1:
+            candidate = available[0]
+            existing_ids[node["key"]] = int(candidate["id"])
+            existing_rows[node["key"]] = candidate
+            claimed_ids.add(int(candidate["id"]))
+
+    conn.execute(
+        "UPDATE opening_line_moves SET sort_order = -1000000000 - id WHERE line_id=?",
+        (line_id,),
+    )
+    id_by_key = {}
+    for node in move_nodes:
+        parent_id = id_by_key.get(node["parent_key"])
+        values = (
+            node["ply"], node["usi"], node["from_sfen"], node["to_sfen"],
+            (node["comment"] if "comment" in node else
+             existing_rows[node["key"]]["comment"] if node["key"] in existing_rows else ""),
+            node["variation_group"], parent_id,
+            node["sort_order"], node["key"], int(node["is_main"]),
+        )
+        current_id = existing_ids.get(node["key"])
+        if current_id is None:
+            current_id = int(conn.execute(
+                """INSERT INTO opening_line_moves
+                   (line_id, ply, usi, from_sfen, to_sfen, comment, variation_group,
+                    parent_move_id, sort_order, move_key, is_main)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (line_id, *values),
+            ).lastrowid)
+        else:
+            conn.execute(
+                """UPDATE opening_line_moves SET ply=?, usi=?, from_sfen=?, to_sfen=?,
+                   comment=?, variation_group=?, parent_move_id=?, sort_order=?, move_key=?,
+                   is_main=? WHERE id=?""",
+                (*values, current_id),
+            )
+        id_by_key[node["key"]] = current_id
+
+    retained = tuple(id_by_key.values())
+    if retained:
+        marks = ", ".join("?" for _ in retained)
+        conn.execute(
+            f"DELETE FROM opening_line_moves WHERE line_id=? AND id NOT IN ({marks})",
+            (line_id, *retained),
+        )
+    else:
+        conn.execute("DELETE FROM opening_line_moves WHERE line_id=?", (line_id,))
+    return id_by_key
+
+
+def _static_opening_seed_key(opening: dict) -> str:
+    """Stable ownership identity for a bundled SAMPLE_OPENING_LINES entry."""
+    return f"sample:{opening['name']}"
+
+
+def static_opening_seed_key_for_name(name: str) -> str:
+    """Return a seed owner only when the bundled name identifies one entry."""
+    matches = [_static_opening_seed_key(item) for item in SAMPLE_OPENING_LINES if item["name"] == name]
+    return matches[0] if len(matches) == 1 else ""
+
+
 def seed_openings_if_empty(conn) -> None:
     import shogi
 
     seeded_line_ids = []
     for opening in SAMPLE_OPENING_LINES:
+        seed_key = _static_opening_seed_key(opening)
         opening.setdefault("comments", [f"{opening['name']}の代表手順 {i}手目です。" for i in range(1, len(opening.get("moves", [])) + 1)])
         metadata = _opening_source_metadata(opening)
         initial_sfen = opening.get("initial_sfen", shogi.STARTING_SFEN)
@@ -807,14 +903,36 @@ def seed_openings_if_empty(conn) -> None:
         type_id = type_row["id"] if type_row else None
         line_row = conn.execute(
             """
-            SELECT id
+            SELECT id, line_key
             FROM opening_lines
-            WHERE source_id IS NULL AND name = ?
+            WHERE seed_key = ?
             ORDER BY id
             LIMIT 1
             """,
-            (opening["name"],),
+            (seed_key,),
         ).fetchone()
+        if line_row is None:
+            # Backfill ownership for databases created before seed_key.  A
+            # unique canonical row with the old bundled name receives the
+            # static alias too, making the decision persistent rather than
+            # relying on name matching on every startup.
+            candidates = conn.execute(
+                """SELECT id, line_key FROM opening_lines
+                   WHERE seed_key='' AND source_id IS NULL AND name=?
+                   ORDER BY id""",
+                (opening["name"],),
+            ).fetchall()
+            if len(candidates) == 1:
+                line_row = candidates[0]
+                conn.execute(
+                    "UPDATE opening_lines SET seed_key=? WHERE id=?",
+                    (seed_key, line_row["id"]),
+                )
+        # A canonical claim keeps seed_key solely as the old static ownership
+        # alias.  Static seeding must neither overwrite it nor create a second
+        # line under the pre-rename SAMPLE name.
+        if line_row is not None and line_row["line_key"]:
+            continue
         if line_row:
             line_id = int(line_row["id"])
             conn.execute(
@@ -848,12 +966,13 @@ def seed_openings_if_empty(conn) -> None:
         else:
             cur = conn.execute(
                 """
-                INSERT INTO opening_lines(opening_type_id, name, opening_type, initial_sfen, moves, comments, tags,
+                INSERT INTO opening_lines(seed_key, opening_type_id, name, opening_type, initial_sfen, moves, comments, tags,
                                           source_url, source_title, license, source_note, coverage_status,
                                           source_type, source_section, source_license, source_retrieved_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
+                    seed_key,
                     type_id,
                     opening["name"],
                     opening["opening_type"],
@@ -894,98 +1013,7 @@ def seed_openings_if_empty(conn) -> None:
             (line_id, len(positions)),
         )
 
-        existing_ids = {}
-        claimed_legacy_ids = set()
-        for node in move_nodes:
-            row = conn.execute(
-                "SELECT id FROM opening_line_moves WHERE line_id=? AND move_key=?",
-                (line_id, node["key"]),
-            ).fetchone()
-            if row is not None:
-                existing_ids[node["key"]] = int(row["id"])
-
-        # A user-defined stable key may itself start with ``legacy-``. Reserve
-        # every row already matched by its natural key, and only treat the
-        # exact ``legacy-<id>`` form emitted by the schema migration as a
-        # compatibility candidate below.
-        claimed_legacy_ids.update(existing_ids.values())
-
-        for node in move_nodes:
-            if node["key"] in existing_ids:
-                continue
-            parent_key = node["parent_key"]
-            parent_id = existing_ids.get(parent_key)
-            # Do not force a structural match when a non-root parent itself is
-            # new: its database identity is not known yet.
-            if parent_key is not None and parent_id is None:
-                continue
-            parent_clause = "parent_move_id IS NULL" if parent_id is None else "parent_move_id=?"
-            params = [
-                line_id, node["ply"], node["variation_group"], node["sort_order"], node["usi"],
-            ]
-            if parent_id is not None:
-                params.append(parent_id)
-            candidates = conn.execute(
-                f"""SELECT id FROM opening_line_moves
-                    WHERE line_id=? AND ply=? AND variation_group=? AND sort_order=? AND usi=?
-                      AND {parent_clause} AND move_key = 'legacy-' || id
-                    ORDER BY id""",
-                params,
-            ).fetchall()
-            row = next(
-                (candidate for candidate in candidates
-                 if int(candidate["id"]) not in claimed_legacy_ids),
-                None,
-            )
-            if row is not None:
-                claimed_id = int(row["id"])
-                claimed_legacy_ids.add(claimed_id)
-                existing_ids[node["key"]] = claimed_id
-
-        # Avoid transient sibling-unique conflicts if an existing seed changes
-        # its parent or display order. Stable move_key remains the natural key.
-        conn.execute(
-            "UPDATE opening_line_moves SET sort_order = -1000000000 - id WHERE line_id = ?",
-            (line_id,),
-        )
-        id_by_key = {}
-        for node in move_nodes:
-            parent_id = id_by_key.get(node["parent_key"])
-            current_id = existing_ids.get(node["key"])
-            values = (
-                node["ply"], node["usi"], node["from_sfen"], node["to_sfen"], node["comment"],
-                node["variation_group"], parent_id, node["sort_order"], int(node["is_main"]),
-            )
-            if current_id is not None:
-                conn.execute(
-                    """UPDATE opening_line_moves
-                       SET ply=?, usi=?, from_sfen=?, to_sfen=?, comment=?, variation_group=?,
-                           parent_move_id=?, sort_order=?, move_key=?, is_main=? WHERE id=?""",
-                    (*values[:-1], node["key"], values[-1], current_id),
-                )
-            else:
-                cur = conn.execute(
-                    """INSERT INTO opening_line_moves
-                       (line_id, ply, usi, from_sfen, to_sfen, comment, variation_group,
-                        parent_move_id, sort_order, move_key, is_main)
-                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                    (line_id, *values[:-1], node["key"], values[-1]),
-                )
-                current_id = int(cur.lastrowid)
-            id_by_key[node["key"]] = current_id
-
-        # The stable-key seed is the canonical snapshot for this line.  Prune
-        # only after every retained node has been upserted and reparented, so an
-        # obsolete parent's ON DELETE CASCADE cannot remove a retained child.
-        retained_ids = tuple(id_by_key.values())
-        if retained_ids:
-            placeholders = ", ".join("?" for _ in retained_ids)
-            conn.execute(
-                f"DELETE FROM opening_line_moves WHERE line_id = ? AND id NOT IN ({placeholders})",
-                (line_id, *retained_ids),
-            )
-        else:
-            conn.execute("DELETE FROM opening_line_moves WHERE line_id = ?", (line_id,))
+        upsert_opening_move_nodes(conn, line_id, move_nodes)
 
         tag_row = conn.execute(
             "SELECT id FROM opening_tags WHERE line_id = ? AND tag = ?",

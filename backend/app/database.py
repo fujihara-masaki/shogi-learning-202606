@@ -92,6 +92,8 @@ CREATE TABLE IF NOT EXISTS opening_lines (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     source_id INTEGER REFERENCES opening_sources(id) ON DELETE SET NULL,
     opening_type_id INTEGER REFERENCES opening_types(id) ON DELETE SET NULL,
+    line_key TEXT NOT NULL DEFAULT '',
+    seed_key TEXT NOT NULL DEFAULT '',
     name TEXT NOT NULL,
     opening_type TEXT NOT NULL,     -- 矢倉 / 角換わり / 四間飛車 など
     initial_sfen TEXT NOT NULL,
@@ -295,6 +297,10 @@ def _ensure_opening_line_columns(conn: sqlite3.Connection) -> None:
         conn.execute("ALTER TABLE opening_lines ADD COLUMN source_id INTEGER REFERENCES opening_sources(id) ON DELETE SET NULL")
     if "opening_type_id" not in columns:
         conn.execute("ALTER TABLE opening_lines ADD COLUMN opening_type_id INTEGER REFERENCES opening_types(id) ON DELETE SET NULL")
+    if "line_key" not in columns:
+        conn.execute("ALTER TABLE opening_lines ADD COLUMN line_key TEXT NOT NULL DEFAULT ''")
+    if "seed_key" not in columns:
+        conn.execute("ALTER TABLE opening_lines ADD COLUMN seed_key TEXT NOT NULL DEFAULT ''")
     for column in ("source_url", "source_title", "license", "source_note", "coverage_status", "source_type", "source_section", "source_license", "source_retrieved_at"):
         if column not in columns:
             conn.execute(f"ALTER TABLE opening_lines ADD COLUMN {column} TEXT NOT NULL DEFAULT ''")
@@ -304,6 +310,16 @@ def _ensure_opening_line_indexes(conn: sqlite3.Connection) -> None:
     columns = {row["name"] for row in conn.execute("PRAGMA table_info(opening_lines)").fetchall()}
     if "opening_type_id" in columns:
         conn.execute("CREATE INDEX IF NOT EXISTS idx_opening_lines_type ON opening_lines(opening_type_id)")
+    if "line_key" in columns:
+        conn.execute(
+            "CREATE UNIQUE INDEX IF NOT EXISTS idx_opening_lines_line_key "
+            "ON opening_lines(line_key) WHERE line_key <> ''"
+        )
+    if "seed_key" in columns:
+        conn.execute(
+            "CREATE UNIQUE INDEX IF NOT EXISTS idx_opening_lines_seed_key "
+            "ON opening_lines(seed_key) WHERE seed_key <> ''"
+        )
 
 
 def _migrate_opening_moves(conn: sqlite3.Connection) -> None:
