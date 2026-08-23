@@ -4,6 +4,8 @@ from pathlib import Path
 import subprocess
 import sys
 
+import pytest
+
 
 BACKEND = Path(__file__).resolve().parents[1]
 SCRIPT = BACKEND / "scripts" / "validate_wikipedia_opening_artifact.py"
@@ -95,6 +97,17 @@ def test_malformed_json_exits_two_without_traceback(tmp_path):
     assert "Traceback" not in completed.stderr
 
 
+@pytest.mark.parametrize("contents", ["NaN", '{"value": Infinity}', "[-Infinity]"])
+def test_non_json_numeric_constants_in_artifact_exit_two(tmp_path, contents):
+    path = tmp_path / "non-json-number.json"
+    path.write_text(contents, encoding="utf-8")
+    completed, result = run_cli(path)
+    assert completed.returncode == 2
+    assert result["valid"] is False
+    assert result["errors"][0]["code"] == "artifact_json_invalid"
+    assert "Traceback" not in completed.stderr
+
+
 def test_invalid_utf8_exits_two(tmp_path):
     path = tmp_path / "bad-utf8.json"
     path.write_bytes(b"\xff\xfe")
@@ -127,6 +140,16 @@ def test_malformed_canonical_schema_is_an_operational_error(tmp_path):
     schema.write_text("{bad", encoding="utf-8")
     status, result = load_cli_module().validate_path(write_artifact(tmp_path), schema_path=schema)
     assert status == 2
+    assert result["errors"][0]["code"] == "schema_json_invalid"
+
+
+@pytest.mark.parametrize("contents", ["NaN", '{"value": Infinity}', "[-Infinity]"])
+def test_non_json_numeric_constants_in_schema_are_operational_errors(tmp_path, contents):
+    schema = tmp_path / "schema.json"
+    schema.write_text(contents, encoding="utf-8")
+    status, result = load_cli_module().validate_path(write_artifact(tmp_path), schema_path=schema)
+    assert status == 2
+    assert result["valid"] is False
     assert result["errors"][0]["code"] == "schema_json_invalid"
 
 

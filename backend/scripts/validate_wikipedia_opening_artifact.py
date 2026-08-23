@@ -24,6 +24,16 @@ def _error(code: str, message: str) -> dict[str, Any]:
     return {"valid": False, "errors": [{"path": "", "code": code, "message": message}]}
 
 
+class _InvalidJsonConstant(ValueError):
+    """Raised when Python's JSON decoder encounters a non-JSON number token."""
+
+
+def _reject_json_constant(token: str) -> None:
+    raise _InvalidJsonConstant(
+        f"non-standard JSON numeric constant is not allowed: {token}"
+    )
+
+
 def _read_json(path: Path, prefix: str) -> tuple[Any | None, dict[str, Any] | None]:
     if not path.exists():
         return None, _error(f"{prefix}_not_found", f"{prefix} file does not exist: {path}")
@@ -36,8 +46,8 @@ def _read_json(path: Path, prefix: str) -> tuple[Any | None, dict[str, Any] | No
     except OSError as exc:
         return None, _error(f"{prefix}_read_error", f"could not read {prefix}: {exc}")
     try:
-        return json.loads(contents), None
-    except json.JSONDecodeError as exc:
+        return json.loads(contents, parse_constant=_reject_json_constant), None
+    except (json.JSONDecodeError, _InvalidJsonConstant) as exc:
         return None, _error(f"{prefix}_json_invalid", f"{prefix} is not valid JSON: {exc}")
 
 
