@@ -459,7 +459,10 @@ PR #58はWikipedia provenance validatorの実装・レビューを通して責�
 
 ### PR-E以降: Wikipedia seed追加
 
-1. **PR-E1 石田流・早石田系**
+1. **PR-E1 石田流・早石田系**（巨大化を避け、E1a〜E1cへ分割）
+   - [x] **PR-E1a: 新・早石田** — `backend/app/wikipedia_opening_artifacts/new-haya-ishida.json`。Wikipedia「石田流」固定版 revision `107928861` の「新・早石田」節を、17手目 `B*5e` まで provenance A / `partial_explicit_sequence` として収録し、続く `P*7c` は `omitted_after` に記録した。backend python-shogi と frontend tsshogi の全edge合法性・SFEN一致を確認済み。
+   - [ ] **PR-E1b: 升田式石田流**
+   - [ ] **PR-E1c: 早石田戦法の多分岐**
 2. **PR-E2 横歩取り系**
 3. **PR-E3 角換わり系**
 4. **PR-E4 棒銀系**

@@ -859,6 +859,27 @@ test("seeded opening replay controls move forward, backward, reset, and finish",
   await expect(page.getByRole("button", { name: "ここから本線を最後まで再生" })).toBeDisabled();
 });
 
+test("new Haya Ishida replays all 17 canonical moves with fixed attribution", async ({ page }) => {
+  const title = "新・早石田（鈴木流急戦・Wikipedia明示手順）";
+  await page.goto("/openings");
+  await showOpeningTypeLines(page, "早石田");
+  await openingLineByExactTitle(page, title).getByRole("link", { name: "学習する" }).click();
+  await page.getByRole("button", { name: "ここから本線を最後まで再生" }).click();
+  await expect(page.locator(".move-history .move-usi")).toHaveCount(17);
+  await expect(page.locator(".move-history .move-usi").last()).toHaveText("(B*5e)");
+  const source = page.getByTestId("opening-source");
+  await expect(source).toContainText("Wikipedia 石田流");
+  await expect(source).toContainText("セクション: 新・早石田");
+  await expect(source).toContainText("ライセンス: CC BY-SA 4.0");
+  await expect(source.getByRole("link")).toHaveAttribute("href", /oldid=107928861$/);
+  await page.getByRole("button", { name: "一手戻る" }).click();
+  await expect(page.locator(".move-history .move-usi")).toHaveCount(16);
+  await page.getByRole("button", { name: "本線を一手進む" }).click();
+  await expect(page.locator(".move-history .move-usi")).toHaveCount(17);
+  await page.setViewportSize({ width: 360, height: 800 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
+});
+
 
 test("licenses page renders data source and MIT License from API", async ({ page }) => {
   await page.route("**/api/licenses", async (route) => {
