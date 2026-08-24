@@ -883,9 +883,9 @@ def test_wikipedia_long_seed_branches_are_idempotent_and_replayable(client):
     import shogi
 
     names = {
-        "原始鬼殺し（Wikipedia明示手順）": ("原始鬼殺し", 19),
-        "新・早石田（鈴木流急戦・Wikipedia明示手順）": ("新・早石田", 7),
-        "升田式石田流（Wikipedia明示手順）": ("升田式石田流", 7),
+        "原始鬼殺し（Wikipedia明示手順）": ("原始鬼殺し", 19, "2026-07-03"),
+        "新・早石田（鈴木流急戦・Wikipedia明示手順）": ("新・早石田", 17, "2026-08-24"),
+        "升田式石田流（Wikipedia明示手順）": ("升田式石田流", 7, "2026-07-03"),
     }
     lines = client.get("/api/openings").json()
     ids = {line["name"]: line["id"] for line in lines if line["name"] in names}
@@ -906,12 +906,12 @@ def test_wikipedia_long_seed_branches_are_idempotent_and_replayable(client):
     finally:
         conn.close()
 
-    for name, (section, min_main_moves) in names.items():
+    for name, (section, min_main_moves, retrieved_at) in names.items():
         detail = client.get(f"/api/openings/{ids[name]}").json()
         assert detail["source"]["source_type"] == "wikipedia"
         assert detail["source"]["source_section"] == section
         assert detail["source"]["source_license"] == "CC BY-SA 4.0"
-        assert detail["source"]["source_retrieved_at"] == "2026-07-03"
+        assert detail["source"]["source_retrieved_at"] == retrieved_at
 
         main_moves = sorted([m for m in detail["moves"] if m["variation_group"] == "main"], key=lambda m: m["ply"])
         assert len(main_moves) >= min_main_moves

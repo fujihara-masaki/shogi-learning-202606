@@ -10,6 +10,7 @@
 ただし芸術性は考慮していない練習用サンプルのため、タイトルに [sample] を付与。
 """
 import json
+from pathlib import Path
 
 from .database import get_connection
 from .shogi_utils import validate_problem
@@ -1040,6 +1041,26 @@ def seed_openings_if_empty(conn) -> None:
     validate_opening_move_tree(conn, seeded_line_ids)
 
 
+BUNDLED_WIKIPEDIA_OPENING_ARTIFACTS = (
+    "new-haya-ishida.json",
+)
+
+
+def apply_bundled_wikipedia_opening_artifacts(conn) -> list[int]:
+    """Apply reviewed bundled artifacts in an explicit, deterministic order."""
+    # Local import avoids the importer -> seed dependency becoming circular at
+    # module initialization time. The importer remains the sole projection path.
+    from .wikipedia_opening_importer import apply_wikipedia_opening_artifact
+
+    artifact_dir = Path(__file__).with_name("wikipedia_opening_artifacts")
+    applied: list[int] = []
+    for filename in BUNDLED_WIKIPEDIA_OPENING_ARTIFACTS:
+        with (artifact_dir / filename).open(encoding="utf-8") as artifact_file:
+            artifact = json.load(artifact_file)
+        applied.extend(apply_wikipedia_opening_artifact(conn, artifact))
+    return applied
+
+
 def seed_if_empty() -> None:
     conn = get_connection()
     try:
@@ -1071,6 +1092,7 @@ def seed_if_empty() -> None:
                 )
         seed_opening_catalog_if_empty(conn)
         seed_openings_if_empty(conn)
+        apply_bundled_wikipedia_opening_artifacts(conn)
         conn.commit()
     finally:
         conn.close()
