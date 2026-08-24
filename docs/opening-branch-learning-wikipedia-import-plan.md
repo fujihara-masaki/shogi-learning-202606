@@ -449,7 +449,9 @@ follow-up:                         現計画完了 → visual branch tree検討
 ### PR-D1d: validator CLI / CI hardening
 
 - **目的**: malformed JSON、invalid UTF-8、missing file、invalid schema、machine-readable errors、module経由でないdirect CLI execution、URL validation等、validator外周の堅牢性を整える。
-- **順序**: D1b/D1c完了後に、実際の利用経路とfailure modeから必要範囲を再評価する。D1bの構造検証やD1cのimport整合をこのPRへ先送りしない。
+- **再評価結果（採用）**: D1b/D1c完了後の利用経路に合わせ、canonical schema固定のdirect CLI、file/UTF-8/JSON/schema definition error処理、1個のmachine-readable JSON diagnostics、終了code契約、URL userinfo/explicit port拒否、subprocess回帰testを採用する。終了codeは`0`=valid、`1`=読み込み済みartifactのschema/semantic違反、`2`=artifact/schemaの読み込み・encoding・JSON parse・validator設定の運用エラーとする。外周codeは`artifact_not_found`、`artifact_not_file`、`artifact_invalid_utf8`、`artifact_json_invalid`、`artifact_read_error`、`schema_not_found`、`schema_not_file`、`schema_invalid_utf8`、`schema_json_invalid`、`schema_read_error`、`schema_definition_invalid`を安定した識別子とする。
+- **再評価結果（不採用）**: D0 legacy audit adapter、Wikipedia本文取得、自由文の自然言語解析、D1c import/DB検証のCLI統合、新規GitHub Actions workflow、PR-E用canonical artifact追加は行わない。現リポジトリには既存GitHub Actions workflowがなく、PR-Eでgateする実artifact pathも未確定のため、workflowによる実artifact gateはPR-EまたはCI基盤導入時へ延期する。
+- **責務境界**: D1bのschema/tree/合法手/coverage/provenance検査を唯一の検証実装として再利用し、D1cのimport・stable-key upsert・DB projectionは変更しない。CLIはD0 legacy schemaとの互換や任意schemaを選択する公開optionを持たない。
 
 ### PR #58 の扱い
 
@@ -560,9 +562,11 @@ git diff --check
 
 #### PR-D1d
 
-- [ ] D1b/D1c後にCLI/CI hardeningの必要範囲を再評価して記録する。
-- [ ] 採用範囲でmalformed JSON、invalid UTF-8、missing file、invalid schemaを安定した終了codeとmachine-readable errorで報告する。
-- [ ] direct CLI executionが動作し、URLのscheme/host等の採用したvalidation規則を検査する。
+- [x] D1b/D1c後にCLI/CI hardeningの必要範囲を再評価し、採用範囲と延期事項を記録した。
+- [x] malformed JSON、invalid UTF-8、missing file/directory、invalid canonical schemaを安定した終了codeと1個のmachine-readable JSON errorで報告する。
+- [x] repository rootと`backend`からのdirect CLI execution、既存scheme/host/oldid規則、userinfo/explicit port（非数値・範囲外を含む）の拒否を検査する。
+- [x] `sys.executable`・`shell=False`・一時fileを使うsubprocess testでvalid/schema/semantic/各運用errorとtraceback非出力を固定する。
+- [x] D0 adapter、本文取得/自然言語解析、import/DB統合、新規workflow、PR-E artifactをこのPRへ含めない。
 
 #### 各 PR-E
 

@@ -160,6 +160,24 @@ curl -X POST http://localhost:8000/api/tsume-problems \
 
 ## 定跡データの取り込み
 
+### Canonical Wikipedia artifact の検証
+
+D1b canonical schema (`backend/app/wikipedia_opening_artifact.schema.json`) に従うartifactは、
+リポジトリrootまたは`backend`から直接検証できます（D0 legacy audit JSONは入力対象外です）。
+
+```bash
+# repository root
+python backend/scripts/validate_wikipedia_opening_artifact.py path/to/artifact.json
+
+# または backend/
+python scripts/validate_wikipedia_opening_artifact.py path/to/artifact.json
+```
+
+stdoutには常に通常結果を1個のJSON objectとして出力します。成功時は
+`{"valid": true, "errors": []}`、失敗時は`errors`に安定した`path` / `code`と
+説明用`message`を格納します。終了codeは、`0`が有効、`1`が読み込み済みartifactの
+schema/semantic違反、`2`がfile・UTF-8・JSON・bundled schema等の運用エラーです。
+
 再利用許諾済みの SFEN/USI 定跡データは `data/openings/*.sfen` に配置し、backend のインポートスクリプトで SQLite に取り込めます。KIF/CSA は今後の拡張対象です。
 
 対応形式:
