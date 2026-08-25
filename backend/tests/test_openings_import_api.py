@@ -866,7 +866,9 @@ def test_seed_openings_expose_wikipedia_source_metadata_and_legal_moves(client):
         assert detail_response.status_code == 200
         detail = detail_response.json()
         source = detail["source"]
-        assert source["source_url"].startswith("https://ja.wikipedia.org/wiki/")
+        assert source["source_url"].startswith(
+            ("https://ja.wikipedia.org/wiki/", "https://ja.wikipedia.org/w/index.php?")
+        )
         assert source["license"] in {"CC BY-SA", "CC BY-SA 4.0"}
         assert source["source_note"]
         assert source["coverage_status"]
@@ -885,7 +887,7 @@ def test_wikipedia_long_seed_branches_are_idempotent_and_replayable(client):
     names = {
         "原始鬼殺し（Wikipedia明示手順）": ("原始鬼殺し", 19, "2026-07-03"),
         "新・早石田（鈴木流急戦・Wikipedia明示手順）": ("新・早石田", 17, "2026-08-24"),
-        "升田式石田流（Wikipedia明示手順）": ("升田式石田流", 7, "2026-07-03"),
+        "升田式石田流（Wikipedia明示手順）": ("升田式石田流", 7, "2026-08-24"),
     }
     lines = client.get("/api/openings").json()
     ids = {line["name"]: line["id"] for line in lines if line["name"] in names}
@@ -940,18 +942,12 @@ def test_wikipedia_long_seed_branches_are_idempotent_and_replayable(client):
             assert move_row["to_sfen"] == board.sfen()
 
 
-def test_masuda_ishida_metadata_only_reseed_is_idempotent_and_preserves_moves(client):
+def test_masuda_ishida_canonical_claim_prevents_static_metadata_reseed(client):
     from app.database import get_connection
     from app.seed import seed_openings_if_empty
 
     name = "升田式石田流（Wikipedia明示手順）"
     expected_moves = ["7g7f", "3c3d", "7f7e", "8c8d", "2h7h", "8d8e", "5i4h"]
-    expected_note = (
-        "升田式石田流節の初手▲7六歩から7手目▲4八玉までを収録。"
-        "本文に記載された続く▲7六飛は未収録。"
-    )
-    expected_coverage = "Wikipedia本文明示の初手から▲4八玉まで（続く▲7六飛は未収録）"
-
     conn = get_connection()
     try:
         line = conn.execute(
@@ -1003,8 +999,8 @@ def test_masuda_ishida_metadata_only_reseed_is_idempotent_and_preserves_moves(cl
             ).fetchall()
         ]
         assert dict(reseeded) == {
-            "source_note": expected_note,
-            "coverage_status": expected_coverage,
+            "source_note": "不整合な旧source_note",
+            "coverage_status": "不整合な旧coverage_status",
         }
         assert moves_after == moves_before
     finally:
@@ -1013,8 +1009,8 @@ def test_masuda_ishida_metadata_only_reseed_is_idempotent_and_preserves_moves(cl
     response = client.get(f"/api/openings/{line_id}")
     assert response.status_code == 200
     detail = response.json()
-    assert detail["source"]["source_note"] == expected_note
-    assert detail["source"]["coverage_status"] == expected_coverage
+    assert detail["source"]["source_note"] == "不整合な旧source_note"
+    assert detail["source"]["coverage_status"] == "不整合な旧coverage_status"
     assert [move["usi"] for move in detail["moves"]] == expected_moves
     assert detail["moves"][-1]["ply"] == 7
     assert detail["moves"][-1]["usi"] == "5i4h"
