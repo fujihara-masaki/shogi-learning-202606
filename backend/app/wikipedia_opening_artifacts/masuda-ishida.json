@@ -1,0 +1,131 @@
+{
+  "artifact_version": 1,
+  "review": {
+    "review_status": "reviewed",
+    "reviewed_by": "Codex",
+    "reviewed_on": "2026-08-24",
+    "legality_checks": {
+      "backend_python_shogi": "passed",
+      "frontend_tsshogi": "passed"
+    }
+  },
+  "records": [
+    {
+      "record_type": "move_line",
+      "record_key": "wikipedia.ishida.masuda-ishida",
+      "line_key": "wikipedia.ishida.masuda-ishida",
+      "line_name": "升田式石田流（Wikipedia明示手順）",
+      "source": {
+        "url": "https://ja.wikipedia.org/w/index.php?title=%E7%9F%B3%E7%94%B0%E6%B5%81&oldid=107928861",
+        "title": "Wikipedia 石田流",
+        "section": "升田式石田流"
+      },
+      "license": "CC BY-SA 4.0",
+      "retrieved_date": "2026-08-24",
+      "revision": 107928861,
+      "provenance": "A",
+      "coverage_status": "complete_for_cited_sequence",
+      "initial_sfen": "lnsgkgsnl/1r5b1/ppppppppp/9/9/9/PPPPPPPPP/1B5R1/LNSGKGSNL b - 1",
+      "coverage": {
+        "covered_through_ply": 7,
+        "covered_through_move": "5i4h",
+        "omitted_after": null
+      },
+      "source_note": "固定版の升田式石田流節で初手から連続して示された7手目▲4八玉までを収録。",
+      "evidence_note": "後段で▲7六飛に言及されるが、介在する後手着手が連続手順として明示されていないためdirect continuationとして収録しない。",
+      "nodes": [
+        {
+          "key": "main-1",
+          "parent_key": null,
+          "usi": "7g7f",
+          "sort_order": 0,
+          "is_main": true,
+          "variation_group": "main",
+          "from_sfen": "lnsgkgsnl/1r5b1/ppppppppp/9/9/9/PPPPPPPPP/1B5R1/LNSGKGSNL b - 1",
+          "to_sfen": "lnsgkgsnl/1r5b1/ppppppppp/9/9/2P6/PP1PPPPPP/1B5R1/LNSGKGSNL w - 2",
+          "provenance": "A",
+          "source_section": "升田式石田流",
+          "evidence_note": "固定版の同一段落で初手から連続して確認した手順。"
+        },
+        {
+          "key": "main-2",
+          "parent_key": "main-1",
+          "usi": "3c3d",
+          "sort_order": 0,
+          "is_main": true,
+          "variation_group": "main",
+          "from_sfen": "lnsgkgsnl/1r5b1/ppppppppp/9/9/2P6/PP1PPPPPP/1B5R1/LNSGKGSNL w - 2",
+          "to_sfen": "lnsgkgsnl/1r5b1/pppppp1pp/6p2/9/2P6/PP1PPPPPP/1B5R1/LNSGKGSNL b - 3",
+          "provenance": "A",
+          "source_section": "升田式石田流",
+          "evidence_note": "固定版の同一段落で初手から連続して確認した手順。"
+        },
+        {
+          "key": "main-3",
+          "parent_key": "main-2",
+          "usi": "7f7e",
+          "sort_order": 0,
+          "is_main": true,
+          "variation_group": "main",
+          "from_sfen": "lnsgkgsnl/1r5b1/pppppp1pp/6p2/9/2P6/PP1PPPPPP/1B5R1/LNSGKGSNL b - 3",
+          "to_sfen": "lnsgkgsnl/1r5b1/pppppp1pp/6p2/2P6/9/PP1PPPPPP/1B5R1/LNSGKGSNL w - 4",
+          "provenance": "A",
+          "source_section": "升田式石田流",
+          "evidence_note": "固定版の同一段落で初手から連続して確認した手順。"
+        },
+        {
+          "key": "main-4",
+          "parent_key": "main-3",
+          "usi": "8c8d",
+          "sort_order": 0,
+          "is_main": true,
+          "variation_group": "main",
+          "from_sfen": "lnsgkgsnl/1r5b1/pppppp1pp/6p2/2P6/9/PP1PPPPPP/1B5R1/LNSGKGSNL w - 4",
+          "to_sfen": "lnsgkgsnl/1r5b1/p1pppp1pp/1p4p2/2P6/9/PP1PPPPPP/1B5R1/LNSGKGSNL b - 5",
+          "provenance": "A",
+          "source_section": "升田式石田流",
+          "evidence_note": "固定版の同一段落で初手から連続して確認した手順。"
+        },
+        {
+          "key": "main-5",
+          "parent_key": "main-4",
+          "usi": "2h7h",
+          "sort_order": 0,
+          "is_main": true,
+          "variation_group": "main",
+          "from_sfen": "lnsgkgsnl/1r5b1/p1pppp1pp/1p4p2/2P6/9/PP1PPPPPP/1B5R1/LNSGKGSNL b - 5",
+          "to_sfen": "lnsgkgsnl/1r5b1/p1pppp1pp/1p4p2/2P6/9/PP1PPPPPP/1BR6/LNSGKGSNL w - 6",
+          "provenance": "A",
+          "source_section": "升田式石田流",
+          "evidence_note": "固定版の同一段落で初手から連続して確認した手順。"
+        },
+        {
+          "key": "main-6",
+          "parent_key": "main-5",
+          "usi": "8d8e",
+          "sort_order": 0,
+          "is_main": true,
+          "variation_group": "main",
+          "from_sfen": "lnsgkgsnl/1r5b1/p1pppp1pp/1p4p2/2P6/9/PP1PPPPPP/1BR6/LNSGKGSNL w - 6",
+          "to_sfen": "lnsgkgsnl/1r5b1/p1pppp1pp/6p2/1pP6/9/PP1PPPPPP/1BR6/LNSGKGSNL b - 7",
+          "provenance": "A",
+          "source_section": "升田式石田流",
+          "evidence_note": "固定版の同一段落で初手から連続して確認した手順。"
+        },
+        {
+          "key": "main-7",
+          "parent_key": "main-6",
+          "usi": "5i4h",
+          "sort_order": 0,
+          "is_main": true,
+          "variation_group": "main",
+          "from_sfen": "lnsgkgsnl/1r5b1/p1pppp1pp/6p2/1pP6/9/PP1PPPPPP/1BR6/LNSGKGSNL b - 7",
+          "to_sfen": "lnsgkgsnl/1r5b1/p1pppp1pp/6p2/1pP6/9/PP1PPPPPP/1BR2K3/LNSG1GSNL w - 8",
+          "provenance": "A",
+          "source_section": "升田式石田流",
+          "evidence_note": "固定版の同一段落で初手から連続して確認した手順。"
+        }
+      ]
+    }
+  ]
+}
