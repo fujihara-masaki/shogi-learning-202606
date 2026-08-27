@@ -1044,6 +1044,7 @@ def seed_openings_if_empty(conn) -> None:
 BUNDLED_WIKIPEDIA_OPENING_ARTIFACTS = (
     "new-haya-ishida.json",
     "masuda-ishida.json",
+    "haya-ishida.json",
 )
 
 

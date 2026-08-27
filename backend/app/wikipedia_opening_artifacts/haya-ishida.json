@@ -1,0 +1,183 @@
+{
+  "artifact_version": 1,
+  "review": {
+    "review_status": "reviewed",
+    "reviewed_by": "Codex",
+    "reviewed_on": "2026-08-27",
+    "legality_checks": {
+      "backend_python_shogi": "passed",
+      "frontend_tsshogi": "passed"
+    }
+  },
+  "records": [
+    {
+      "record_type": "move_line",
+      "record_key": "wikipedia.ishida.haya-ishida",
+      "line_key": "wikipedia.ishida.haya-ishida",
+      "line_name": "早石田",
+      "source": {
+        "url": "https://ja.wikipedia.org/w/index.php?title=%E7%9F%B3%E7%94%B0%E6%B5%81&oldid=107928861",
+        "title": "Wikipedia 石田流",
+        "section": "早石田"
+      },
+      "license": "CC BY-SA 4.0",
+      "retrieved_date": "2026-08-27",
+      "revision": 107928861,
+      "provenance": "B",
+      "coverage_status": "diagram_reconstruction",
+      "initial_sfen": "lnsgkgsnl/1r5b1/ppppppppp/9/9/9/PPPPPPPPP/1B5R1/LNSGKGSNL b - 1",
+      "coverage": {
+        "covered_through_ply": 7,
+        "covered_through_move": "7h7f",
+        "omitted_after": null
+      },
+      "source_note": "固定版「早石田」節の局面図と周辺説明から、△8四歩、△4二玉、△6二銀の3経路を再構成した。",
+      "evidence_note": "本文にない中間手を明示手順とは扱わず、各図の到達経路をprovenance Bとして分離した。図の先の応手は未収録。",
+      "nodes": [
+        {
+          "key": "main-1",
+          "parent_key": null,
+          "usi": "7g7f",
+          "sort_order": 0,
+          "is_main": true,
+          "variation_group": "早石田の基本進行",
+          "from_sfen": "lnsgkgsnl/1r5b1/ppppppppp/9/9/9/PPPPPPPPP/1B5R1/LNSGKGSNL b - 1",
+          "to_sfen": "lnsgkgsnl/1r5b1/ppppppppp/9/9/2P6/PP1PPPPPP/1B5R1/LNSGKGSNL w - 2",
+          "provenance": "B",
+          "source_section": "早石田",
+          "evidence_note": "固定版「早石田」節の局面図と周辺説明から、この経路の局面を再構成。"
+        },
+        {
+          "key": "main-2",
+          "parent_key": "main-1",
+          "usi": "3c3d",
+          "sort_order": 0,
+          "is_main": true,
+          "variation_group": "早石田の基本進行",
+          "from_sfen": "lnsgkgsnl/1r5b1/ppppppppp/9/9/2P6/PP1PPPPPP/1B5R1/LNSGKGSNL w - 2",
+          "to_sfen": "lnsgkgsnl/1r5b1/pppppp1pp/6p2/9/2P6/PP1PPPPPP/1B5R1/LNSGKGSNL b - 3",
+          "provenance": "B",
+          "source_section": "早石田",
+          "evidence_note": "固定版「早石田」節の局面図と周辺説明から、この経路の局面を再構成。"
+        },
+        {
+          "key": "main-3",
+          "parent_key": "main-2",
+          "usi": "7f7e",
+          "sort_order": 0,
+          "is_main": true,
+          "variation_group": "早石田の基本進行",
+          "from_sfen": "lnsgkgsnl/1r5b1/pppppp1pp/6p2/9/2P6/PP1PPPPPP/1B5R1/LNSGKGSNL b - 3",
+          "to_sfen": "lnsgkgsnl/1r5b1/pppppp1pp/6p2/2P6/9/PP1PPPPPP/1B5R1/LNSGKGSNL w - 4",
+          "provenance": "B",
+          "source_section": "早石田",
+          "evidence_note": "固定版「早石田」節の局面図と周辺説明から、この経路の局面を再構成。"
+        },
+        {
+          "key": "castle-defense-4",
+          "parent_key": "main-3",
+          "usi": "5a4b",
+          "sort_order": 0,
+          "is_main": false,
+          "variation_group": "4手目△4二玉の変化",
+          "from_sfen": "lnsgkgsnl/1r5b1/pppppp1pp/6p2/2P6/9/PP1PPPPPP/1B5R1/LNSGKGSNL w - 4",
+          "to_sfen": "lnsg1gsnl/1r3k1b1/pppppp1pp/6p2/2P6/9/PP1PPPPPP/1B5R1/LNSGKGSNL b - 5",
+          "provenance": "B",
+          "source_section": "早石田",
+          "evidence_note": "固定版「早石田」節の局面図と周辺説明から、この経路の局面を再構成。"
+        },
+        {
+          "key": "castle-defense-5",
+          "parent_key": "castle-defense-4",
+          "usi": "2h7h",
+          "sort_order": 0,
+          "is_main": true,
+          "variation_group": "4手目△4二玉の変化",
+          "from_sfen": "lnsg1gsnl/1r3k1b1/pppppp1pp/6p2/2P6/9/PP1PPPPPP/1B5R1/LNSGKGSNL b - 5",
+          "to_sfen": "lnsg1gsnl/1r3k1b1/pppppp1pp/6p2/2P6/9/PP1PPPPPP/1BR6/LNSGKGSNL w - 6",
+          "provenance": "B",
+          "source_section": "早石田",
+          "evidence_note": "固定版「早石田」節の局面図と周辺説明から、この経路の局面を再構成。"
+        },
+        {
+          "key": "main-4",
+          "parent_key": "main-3",
+          "usi": "8c8d",
+          "sort_order": 1,
+          "is_main": true,
+          "variation_group": "4手目△8四歩の本線",
+          "from_sfen": "lnsgkgsnl/1r5b1/pppppp1pp/6p2/2P6/9/PP1PPPPPP/1B5R1/LNSGKGSNL w - 4",
+          "to_sfen": "lnsgkgsnl/1r5b1/p1pppp1pp/1p4p2/2P6/9/PP1PPPPPP/1B5R1/LNSGKGSNL b - 5",
+          "provenance": "B",
+          "source_section": "早石田",
+          "evidence_note": "固定版「早石田」節の局面図と周辺説明から、この経路の局面を再構成。"
+        },
+        {
+          "key": "main-5",
+          "parent_key": "main-4",
+          "usi": "2h7h",
+          "sort_order": 0,
+          "is_main": true,
+          "variation_group": "4手目△8四歩の本線",
+          "from_sfen": "lnsgkgsnl/1r5b1/p1pppp1pp/1p4p2/2P6/9/PP1PPPPPP/1B5R1/LNSGKGSNL b - 5",
+          "to_sfen": "lnsgkgsnl/1r5b1/p1pppp1pp/1p4p2/2P6/9/PP1PPPPPP/1BR6/LNSGKGSNL w - 6",
+          "provenance": "B",
+          "source_section": "早石田",
+          "evidence_note": "固定版「早石田」節の局面図と周辺説明から、この経路の局面を再構成。"
+        },
+        {
+          "key": "main-6",
+          "parent_key": "main-5",
+          "usi": "8d8e",
+          "sort_order": 0,
+          "is_main": true,
+          "variation_group": "4手目△8四歩の本線",
+          "from_sfen": "lnsgkgsnl/1r5b1/p1pppp1pp/1p4p2/2P6/9/PP1PPPPPP/1BR6/LNSGKGSNL w - 6",
+          "to_sfen": "lnsgkgsnl/1r5b1/p1pppp1pp/6p2/1pP6/9/PP1PPPPPP/1BR6/LNSGKGSNL b - 7",
+          "provenance": "B",
+          "source_section": "早石田",
+          "evidence_note": "固定版「早石田」節の局面図と周辺説明から、この経路の局面を再構成。"
+        },
+        {
+          "key": "main-7",
+          "parent_key": "main-6",
+          "usi": "7h7f",
+          "sort_order": 0,
+          "is_main": true,
+          "variation_group": "4手目△8四歩の本線",
+          "from_sfen": "lnsgkgsnl/1r5b1/p1pppp1pp/6p2/1pP6/9/PP1PPPPPP/1BR6/LNSGKGSNL b - 7",
+          "to_sfen": "lnsgkgsnl/1r5b1/p1pppp1pp/6p2/1pP6/2R6/PP1PPPPPP/1B7/LNSGKGSNL w - 8",
+          "provenance": "B",
+          "source_section": "早石田",
+          "evidence_note": "固定版「早石田」節の局面図と周辺説明から、この経路の局面を再構成。"
+        },
+        {
+          "key": "silver-defense-4",
+          "parent_key": "main-3",
+          "usi": "7a6b",
+          "sort_order": 2,
+          "is_main": false,
+          "variation_group": "4手目△6二銀の変化",
+          "from_sfen": "lnsgkgsnl/1r5b1/pppppp1pp/6p2/2P6/9/PP1PPPPPP/1B5R1/LNSGKGSNL w - 4",
+          "to_sfen": "ln1gkgsnl/1r1s3b1/pppppp1pp/6p2/2P6/9/PP1PPPPPP/1B5R1/LNSGKGSNL b - 5",
+          "provenance": "B",
+          "source_section": "早石田",
+          "evidence_note": "固定版「早石田」節の局面図と周辺説明から、この経路の局面を再構成。"
+        },
+        {
+          "key": "silver-defense-5",
+          "parent_key": "silver-defense-4",
+          "usi": "2h7h",
+          "sort_order": 0,
+          "is_main": true,
+          "variation_group": "4手目△6二銀の変化",
+          "from_sfen": "ln1gkgsnl/1r1s3b1/pppppp1pp/6p2/2P6/9/PP1PPPPPP/1B5R1/LNSGKGSNL b - 5",
+          "to_sfen": "ln1gkgsnl/1r1s3b1/pppppp1pp/6p2/2P6/9/PP1PPPPPP/1BR6/LNSGKGSNL w - 6",
+          "provenance": "B",
+          "source_section": "早石田",
+          "evidence_note": "固定版「早石田」節の局面図と周辺説明から、この経路の局面を再構成。"
+        }
+      ]
+    }
+  ]
+}

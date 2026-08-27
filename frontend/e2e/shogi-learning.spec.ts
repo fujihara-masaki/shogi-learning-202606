@@ -1177,3 +1177,25 @@ test.describe("mobile layout (360px)", () => {
     }
   });
 });
+
+test("Haya Ishida exposes the canonical non-leading explicit-main branches", async ({ page }) => {
+  await page.goto("/openings");
+  await showOpeningTypeLines(page, "早石田");
+  await openingLineByExactTitle(page, "早石田").getByRole("link", { name: "学習する" }).click();
+  await page.getByRole("button", { name: "本線を一手進む" }).click();
+  await page.getByRole("button", { name: "本線を一手進む" }).click();
+  await page.getByRole("button", { name: "本線を一手進む" }).click();
+  const branches = page.getByTestId("opening-branches");
+  await expect(branches).toContainText("4手目△4二玉の変化");
+  await expect(branches).toContainText("4手目△8四歩の本線");
+  await expect(branches).toContainText("4手目△6二銀の変化");
+  await page.getByRole("button", { name: /4手目△4二玉の変化.*この変化を見る/ }).click();
+  await expect(page.locator(".move-history .move-usi").last()).toHaveText("(5a4b)");
+  await page.getByRole("button", { name: /この分岐点の本線へ切り替える/ }).click();
+  await expect(page.locator(".move-history .move-usi").last()).toHaveText("(8c8d)");
+  const source = page.getByTestId("opening-source");
+  await expect(source).toContainText("セクション: 早石田");
+  await expect(source.getByRole("link")).toHaveAttribute("href", /oldid=107928861$/);
+  await page.setViewportSize({ width: 360, height: 800 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
+});
