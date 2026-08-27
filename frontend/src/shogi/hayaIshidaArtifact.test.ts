@@ -31,17 +31,27 @@ describe("Haya Ishida production canonical tree", () => {
     }
   });
 
-  it("keeps direct parents, sibling order, labels, and non-leading explicit main", () => {
+  it("branches after move five and keeps labels, leaves, and non-leading explicit main", () => {
     const opening = fixture();
-    expect(flattenMainLine(opening).map((node) => node.usi)).toEqual(["7g7f", "3c3d", "7f7e", "8c8d", "2h7h", "8d8e", "7h7f"]);
-    const choices = opening.moves[0].next![0].next![0].next!;
+    expect(flattenMainLine(opening).map((node) => node.usi)).toEqual(["7g7f", "3c3d", "7f7e", "8c8d", "2h7h", "8d8e"]);
+    const moveFive = opening.moves[0].next![0].next![0].next![0].next![0];
+    const choices = moveFive.next!;
     expect(choices.map((node) => [node.usi, node.branchLabel, node.isMain])).toEqual([
-      ["5a4b", "4手目△4二玉の変化", false], ["8c8d", "4手目△8四歩の本線", true], ["7a6b", "4手目△6二銀の変化", false],
+      ["7a6b", "△6二銀の変化", false], ["5a4b", "△4二玉の変化", false],
+      ["8d8e", "図2-Dへの△8五歩", true], ["2b8h+", "図2-Cの角交換変化", false],
     ]);
-    expect(expectedOpeningMove(opening, [0, 0, 0])?.usi).toBe("8c8d");
-    expect(continueOpeningMainLine(opening, [])).toEqual([0, 0, 0, 1, 0, 0, 0]);
-    expect(continueOpeningMainLine(opening, [0, 0, 0, 0])).toEqual([0, 0, 0, 0, 0]);
-    expect(applyOpeningPath(opening, [0, 0, 0, 0, 0]).moves.map((move) => move.usi)).toEqual(["7g7f", "3c3d", "7f7e", "5a4b", "2h7h"]);
-    expect(choices[0].next![0]).not.toBe(choices[2].next![0]);
+    expect(expectedOpeningMove(opening, [0, 0, 0, 0, 0])?.usi).toBe("8d8e");
+    expect(continueOpeningMainLine(opening, [])).toEqual([0, 0, 0, 0, 0, 2]);
+    expect(continueOpeningMainLine(opening, [0, 0, 0, 0, 0, 0])).toEqual([0, 0, 0, 0, 0, 0, 0]);
+    expect(choices[0].next?.[0].usi).toBe("6g6f");
+    expect(choices[1].next?.[0].usi).toBe("6g6f");
+    expect(choices[0].next?.[0]).not.toBe(choices[1].next?.[0]);
+    expect(applyOpeningPath(opening, [0, 0, 0, 0, 0, 3, 0, 0, 0]).moves.map((move) => move.usi)).toEqual(
+      ["7g7f", "3c3d", "7f7e", "8c8d", "2h7h", "2b8h+", "7i8h", "B*4e", "B*7f"],
+    );
+    expect(choices[0].next?.[0].usi).toBe("6g6f");
+    expect(choices[1].next?.[0].usi).toBe("6g6f");
+    expect(choices[2].usi).toBe("8d8e");
+    expect(choices[3].next?.[0].next?.[0].next?.[0].usi).toBe("B*7f");
   });
 });

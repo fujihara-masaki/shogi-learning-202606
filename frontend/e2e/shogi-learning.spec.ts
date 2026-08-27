@@ -1178,21 +1178,39 @@ test.describe("mobile layout (360px)", () => {
   });
 });
 
-test("Haya Ishida exposes the canonical non-leading explicit-main branches", async ({ page }) => {
+test("Haya Ishida exposes all figure 2 branches after move five", async ({ page }) => {
   await page.goto("/openings");
   await showOpeningTypeLines(page, "早石田");
   await openingLineByExactTitle(page, "早石田").getByRole("link", { name: "学習する" }).click();
-  await page.getByRole("button", { name: "本線を一手進む" }).click();
-  await page.getByRole("button", { name: "本線を一手進む" }).click();
-  await page.getByRole("button", { name: "本線を一手進む" }).click();
+  const reachBranchPoint = async () => {
+    await page.getByRole("button", { name: "最初に戻る" }).click();
+    for (let ply = 0; ply < 5; ply += 1) await page.getByRole("button", { name: "本線を一手進む" }).click();
+    await expect(page.locator(".move-history .move-usi").last()).toHaveText("(2h7h)");
+  };
+  await reachBranchPoint();
+  const branchCases = [
+    ["△6二銀の変化", "7a6b", "6g6f"], ["△4二玉の変化", "5a4b", "6g6f"],
+    ["図2-Dへの△8五歩", "8d8e", "8d8e"], ["図2-Cの角交換変化", "2b8h+", "B*7f"],
+  ] as const;
   const branches = page.getByTestId("opening-branches");
-  await expect(branches).toContainText("4手目△4二玉の変化");
-  await expect(branches).toContainText("4手目△8四歩の本線");
-  await expect(branches).toContainText("4手目△6二銀の変化");
-  await page.getByRole("button", { name: /4手目△4二玉の変化.*この変化を見る/ }).click();
-  await expect(page.locator(".move-history .move-usi").last()).toHaveText("(5a4b)");
+  for (const [label, firstUsi, leafUsi] of branchCases) {
+    await expect(branches).toContainText(label);
+    await page.getByRole("button", { name: new RegExp(`${label} ${firstUsi}.*この変化を見る`) }).click();
+    await page.getByRole("button", { name: "ここから本線を最後まで再生" }).click();
+    await expect(page.locator(".move-history .move-usi").last()).toHaveText(`(${leafUsi})`);
+    await reachBranchPoint();
+  }
+  await page.getByRole("button", { name: /△6二銀の変化 7a6b.*この変化を見る/ }).click();
   await page.getByRole("button", { name: /この分岐点の本線へ切り替える/ }).click();
-  await expect(page.locator(".move-history .move-usi").last()).toHaveText("(8c8d)");
+  await expect(page.locator(".move-history .move-usi").last()).toHaveText("(8d8e)");
+  const disclosure = page.getByTestId("opening-variation-disclosure");
+  await disclosure.locator("summary").click();
+  const jumps = disclosure.locator(".opening-variation-jump");
+  await expect(jumps).toHaveCount(14);
+  const names = await jumps.evaluateAll((buttons) => buttons.map((button) => button.getAttribute("aria-label")));
+  expect(new Set(names).size).toBe(14);
+  await jumps.filter({ hasText: "B*7f" }).click();
+  await expect(page.locator(".move-history .move-usi").last()).toHaveText("(B*7f)");
   const source = page.getByTestId("opening-source");
   await expect(source).toContainText("セクション: 早石田");
   await expect(source.getByRole("link")).toHaveAttribute("href", /oldid=107928861$/);
