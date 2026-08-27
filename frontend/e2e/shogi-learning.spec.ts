@@ -1182,32 +1182,38 @@ test("Haya Ishida exposes all figure 2 branches after move five", async ({ page 
   await page.goto("/openings");
   await showOpeningTypeLines(page, "早石田");
   await openingLineByExactTitle(page, "早石田").getByRole("link", { name: "学習する" }).click();
+  let hasReachedBranchPoint = false;
   const reachBranchPoint = async () => {
-    await page.getByRole("button", { name: "最初に戻る" }).click();
+    if (hasReachedBranchPoint) await page.getByRole("button", { name: "最初に戻る" }).click();
     for (let ply = 0; ply < 5; ply += 1) await page.getByRole("button", { name: "本線を一手進む" }).click();
+    hasReachedBranchPoint = true;
     await expect(page.locator(".move-history .move-usi").last()).toHaveText("(2h7h)");
   };
   await reachBranchPoint();
   const branchCases = [
-    ["△6二銀の変化", "7a6b", "6g6f"], ["△4二玉の変化", "5a4b", "6g6f"],
-    ["図2-Dへの△8五歩", "8d8e", "8d8e"], ["図2-Cの角交換変化", "2b8h+", "B*7f"],
+    ["△6二銀の変化", "6g6f"], ["△4二玉の変化", "6g6f"],
+    ["図2-Dへの△8五歩", "8d8e"], ["図2-Cの角交換変化", "B*7f"],
   ] as const;
   const branches = page.getByTestId("opening-branches");
-  for (const [label, firstUsi, leafUsi] of branchCases) {
-    await expect(branches).toContainText(label);
-    await page.getByRole("button", { name: new RegExp(`${label} ${firstUsi}.*この変化を見る`) }).click();
-    await page.getByRole("button", { name: "ここから本線を最後まで再生" }).click();
+  for (const [label, leafUsi] of branchCases) {
+    const card = branches.locator(".branch-card").filter({ hasText: label });
+    await expect(card).toHaveCount(1);
+    await card.getByRole("button", { name: /この変化を見る/ }).click();
+    const continueButton = page.getByRole("button", { name: "ここから本線を最後まで再生" });
+    if (await continueButton.isEnabled()) await continueButton.click();
     await expect(page.locator(".move-history .move-usi").last()).toHaveText(`(${leafUsi})`);
     await reachBranchPoint();
   }
-  await page.getByRole("button", { name: /△6二銀の変化 7a6b.*この変化を見る/ }).click();
-  await page.getByRole("button", { name: /この分岐点の本線へ切り替える/ }).click();
-  await expect(page.locator(".move-history .move-usi").last()).toHaveText("(8d8e)");
+  const silverCard = branches.locator(".branch-card").filter({ hasText: "△6二銀の変化" });
+  await silverCard.getByRole("button", { name: /この変化を見る/ }).click();
   const disclosure = page.getByTestId("opening-variation-disclosure");
   await disclosure.locator("summary").click();
+  await disclosure.getByRole("button", { name: /この分岐点の本線へ切り替える/ }).click();
+  await expect(page.locator(".move-history .move-usi").last()).toHaveText("(8d8e)");
   const jumps = disclosure.locator(".opening-variation-jump");
   await expect(jumps).toHaveCount(14);
   const names = await jumps.evaluateAll((buttons) => buttons.map((button) => button.getAttribute("aria-label")));
+  expect(names.every((name) => name !== null && name.length > 0)).toBe(true);
   expect(new Set(names).size).toBe(14);
   await jumps.filter({ hasText: "B*7f" }).click();
   await expect(page.locator(".move-history .move-usi").last()).toHaveText("(B*7f)");

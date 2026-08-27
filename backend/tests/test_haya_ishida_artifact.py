@@ -76,10 +76,20 @@ def test_seed_claim_preserves_line_main_ids_comments_and_is_idempotent(tmp_path,
         old = conn.execute("SELECT * FROM opening_lines WHERE name=?", (LINE_NAME,)).fetchone()
         old_nodes = conn.execute("SELECT id, comment FROM opening_line_moves WHERE line_id=? ORDER BY ply", (old["id"],)).fetchall()
         other = dict(conn.execute("SELECT * FROM opening_lines WHERE name='棒銀'").fetchone())
+        other_moves = [dict(row) for row in conn.execute(
+            "SELECT * FROM opening_line_moves WHERE line_id=? ORDER BY id", (other["id"],)
+        )]
         removed_id = old_nodes[-1]["id"]
         apply_bundled_wikipedia_opening_artifacts(conn)
+        assert dict(conn.execute("SELECT * FROM opening_lines WHERE name='棒銀'").fetchone()) == other
+        assert [dict(row) for row in conn.execute(
+            "SELECT * FROM opening_line_moves WHERE line_id=? ORDER BY id", (other["id"],)
+        )] == other_moves
         seed_openings_if_empty(conn)
-        other_after_static = dict(conn.execute("SELECT * FROM opening_lines WHERE name='棒銀'").fetchone())
+        assert dict(conn.execute("SELECT * FROM opening_lines WHERE name='棒銀'").fetchone()) == other
+        assert [dict(row) for row in conn.execute(
+            "SELECT * FROM opening_line_moves WHERE line_id=? ORDER BY id", (other["id"],)
+        )] == other_moves
         first = [dict(r) for r in conn.execute("SELECT * FROM opening_line_moves WHERE line_id=? ORDER BY id", (old["id"],))]
         apply_bundled_wikipedia_opening_artifacts(conn)
         second = [dict(r) for r in conn.execute("SELECT * FROM opening_line_moves WHERE line_id=? ORDER BY id", (old["id"],))]
@@ -93,7 +103,7 @@ def test_seed_claim_preserves_line_main_ids_comments_and_is_idempotent(tmp_path,
         assert all(row["usi"] != "7h7f" for row in second)
         assert first == second
         assert compare_canonical_to_runtime(conn, artifact()["records"][0])["status"] == "unchanged"
-        assert dict(conn.execute("SELECT * FROM opening_lines WHERE name='棒銀'").fetchone()) == other_after_static
+        assert dict(conn.execute("SELECT * FROM opening_lines WHERE name='棒銀'").fetchone()) == other
     finally:
         conn.close()
 
