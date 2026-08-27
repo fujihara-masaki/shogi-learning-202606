@@ -462,7 +462,7 @@ PR #58はWikipedia provenance validatorの実装・レビューを通して責�
 1. **PR-E1 石田流・早石田系**（巨大化を避け、E1a〜E1cへ分割）
    - [x] **PR-E1a: 新・早石田** — `backend/app/wikipedia_opening_artifacts/new-haya-ishida.json`。Wikipedia「石田流」固定版 revision `107928861` の「新・早石田」節を、17手目 `B*5e` まで provenance A / `partial_explicit_sequence` として収録し、続く `P*7c` は `omitted_after` に記録した。backend python-shogi と frontend tsshogi の全edge合法性・SFEN一致を確認済み。
    - [x] **PR-E1b: 升田式石田流** — `backend/app/wikipedia_opening_artifacts/masuda-ishida.json`。Wikipedia「石田流」固定版 revision `107928861` の「升田式石田流」節を、7手目 `5i4h` まで provenance A / `complete_for_cited_sequence`（`omitted_after: null`）として収録した。後段の▲7六飛は介在する後手着手が連続明示されず、図5-Bも「少し進んだ」局面であるため補間していない。backend python-shogi と frontend tsshogi の全edge合法性・SFEN一致を確認済み。
-   - [ ] **PR-E1c: 早石田戦法の多分岐**
+   - [x] **PR-E1c: 早石田戦法の多分岐** — `backend/app/wikipedia_opening_artifacts/haya-ishida.json`。Wikipedia「石田流」固定版 revision `107928861` の「早石田」節（図2-A〜2-D）で連続確認できる手順を provenance A / `complete_for_cited_sequence` として収録。共通5手の後に4 branch、node総数14、semantic main終端は6手目 `8d8e`、最大深さ9。△6二銀・△4二玉後の▲6六歩と図2-Cの角交換経路を収録し、根拠のない7手目▲7六飛は削除。各leaf以後は未収録。D1b/D1c、backend python-shogi、frontend tsshogiで全edgeの合法性・SFEN一致を確認済み。
 2. **PR-E2 横歩取り系**
 3. **PR-E3 角換わり系**
 4. **PR-E4 棒銀系**

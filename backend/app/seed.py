@@ -941,8 +941,7 @@ def seed_openings_if_empty(conn) -> None:
                 UPDATE opening_lines
                 SET opening_type_id = ?, opening_type = ?, initial_sfen = ?, moves = ?, comments = ?, tags = ?,
                     source_url = ?, source_title = ?, license = ?, source_note = ?, coverage_status = ?,
-                    source_type = ?, source_section = ?, source_license = ?, source_retrieved_at = ?,
-                    updated_at = datetime('now')
+                    source_type = ?, source_section = ?, source_license = ?, source_retrieved_at = ?
                 WHERE id = ?
                 """,
                 (
@@ -1044,6 +1043,7 @@ def seed_openings_if_empty(conn) -> None:
 BUNDLED_WIKIPEDIA_OPENING_ARTIFACTS = (
     "new-haya-ishida.json",
     "masuda-ishida.json",
+    "haya-ishida.json",
 )
 
 

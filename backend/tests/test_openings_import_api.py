@@ -108,7 +108,15 @@ def test_major_opening_types_have_playable_seed_lines(client):
         body = detail.json()
         assert body["opening_type_id"] == opening_type["id"]
         assert body["initial_sfen"]
-        main_body_moves = [move for move in body["moves"] if move["variation_group"] == "main"]
+        main_body_moves = []
+        parent_id = None
+        while True:
+            siblings = [move for move in body["moves"] if move["parent_move_id"] == parent_id]
+            if not siblings:
+                break
+            main = next(move for move in siblings if move["is_main"])
+            main_body_moves.append(main)
+            parent_id = main["id"]
         assert len(main_body_moves) == playable_lines[0]["move_count"]
         assert body["moves"][0]["usi"]
         assert body["moves"][0]["from_sfen"]
