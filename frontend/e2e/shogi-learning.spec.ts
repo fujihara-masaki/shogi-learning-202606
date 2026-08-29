@@ -923,11 +923,13 @@ test("Yokofudori replays the fixed 15-move canonical line", async ({ page }) => 
   const names = await jumps.evaluateAll((buttons) => buttons.map((button) => button.getAttribute("aria-label")));
   expect(names.every((name) => name !== null && name.length > 0)).toBe(true);
   expect(new Set(names).size).toBe(15);
+  const currentMoveStatus = page.locator('.player-board > .visually-hidden[role="status"]');
 
   await jumps.nth(7).click();
   await expect(history).toHaveCount(8);
   await expect(history.last()).toHaveText("(4a3b)");
   await expect(page.getByTestId("opening-feedback")).toContainText("8手目");
+  await expect(currentMoveStatus).toContainText("8手目");
   await expect(page.getByTestId("turn-indicator")).toContainText("▲先手");
   const board = page.getByTestId("shogi-board");
   await expect(board.locator('[data-square="32"]')).toHaveAccessibleName(/3二.*後手の金/);
@@ -936,7 +938,8 @@ test("Yokofudori replays the fixed 15-move canonical line", async ({ page }) => 
   await jumps.last().click();
   await expect(history).toHaveCount(15);
   await expect(history.last()).toHaveText("(2d3d)");
-  await expect(page.getByTestId("opening-feedback")).toContainText("15手目");
+  await expect(page.getByTestId("opening-feedback")).toContainText("この定跡手順を完了しました");
+  await expect(currentMoveStatus).toContainText("15手目");
   await expect(page.getByTestId("turn-indicator")).toContainText("△後手");
   await expect(board.locator('[data-square="34"]')).toHaveAccessibleName(/3四.*先手の飛/);
   await expect(board.locator('[data-square="24"]')).toHaveAccessibleName(/2四.*空きマス/);
