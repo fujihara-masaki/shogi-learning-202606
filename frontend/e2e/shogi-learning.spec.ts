@@ -1286,7 +1286,7 @@ test("Ai Yokofudori exposes branch-heavy canonical variations", async ({ page })
   const jumps = disclosure.locator(".opening-variation-jump"); await expect(jumps).toHaveCount(24);
   const commonPath = Array(18).fill("1").join("-");
   const pawnJump = disclosure.getByRole("button", {
-    name: `19手目 ▲7七歩、USI P*7g、▲7七歩の受け、経路 ${commonPath}-1、ここへ移動`, exact: true,
+    name: `19手目 P*7g、USI P*7g、▲7七歩の受け、経路 ${commonPath}-1、ここへ移動`, exact: true,
   });
   await expect(pawnJump).toHaveCount(1); await pawnJump.click();
   await expect(history).toHaveCount(19); await expect(history.last()).toHaveText("(P*7g)");
@@ -1303,7 +1303,7 @@ test("Ai Yokofudori exposes branch-heavy canonical variations", async ({ page })
   });
   await expect(move19MainSwitch).toHaveCount(1); await move19MainSwitch.click();
   const silverJump = disclosure.getByRole("button", {
-    name: `19手目 ▲7七銀、USI 8h7g、▲7七銀の主流形、経路 ${commonPath}-3、ここへ移動`, exact: true,
+    name: `19手目 8h7g、USI 8h7g、▲7七銀の主流形、経路 ${commonPath}-3、ここへ移動`, exact: true,
   });
   await expect(history.last()).toHaveText("(8h7g)");
   await expect(history).toHaveCount(19);
@@ -1317,7 +1317,7 @@ test("Ai Yokofudori exposes branch-heavy canonical variations", async ({ page })
   await expect(feedback).toContainText("この分岐点より後の手順を破棄し、本線へ移動しました");
   await page.getByRole("button", { name: "ここから本線を最後まで再生" }).click();
   const declineJump = disclosure.getByRole("button", {
-    name: `21手目 ▲3六飛、USI 3d3f、▲7七銀の主流形 → 飛車交換拒否型（持久戦）、経路 ${commonPath}-3-1-2、ここへ移動`, exact: true,
+    name: `21手目 3d3f、USI 3d3f、▲7七銀の主流形 → 飛車交換拒否型（持久戦）、経路 ${commonPath}-3-1-2、ここへ移動`, exact: true,
   });
   await expect(declineJump).toHaveCount(1); await declineJump.click();
   await expect(history).toHaveCount(21); await expect(history.last()).toHaveText("(3d3f)");
@@ -1334,7 +1334,7 @@ test("Ai Yokofudori exposes branch-heavy canonical variations", async ({ page })
   });
   await expect(move21MainSwitch).toHaveCount(1); await move21MainSwitch.click();
   const exchangeJump = disclosure.getByRole("button", {
-    name: `21手目 ▲7四飛、USI 3d7d、▲7七銀の主流形 → 飛車交換型（超急戦）、経路 ${commonPath}-3-1-1、ここへ移動`, exact: true,
+    name: `21手目 3d7d、USI 3d7d、▲7七銀の主流形 → 飛車交換型（超急戦）、経路 ${commonPath}-3-1-1、ここへ移動`, exact: true,
   });
   await expect(history.last()).toHaveText("(3d7d)");
   await expect(history).toHaveCount(21);
