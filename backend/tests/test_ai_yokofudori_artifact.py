@@ -38,10 +38,18 @@ def test_contract_legality_and_tree_signature():
     assert [(n["usi"], n["sort_order"], n["is_main"]) for n in children["main-18"]] == [("P*7g", 0, False), ("8i7g", 1, False), ("8h7g", 2, True)]
     assert [n["usi"] for n in children["main-19"]] == ["7f7d"]
     assert [(n["usi"], n["is_main"]) for n in children["main-20"]] == [("3d7d", True), ("3d3f", False)]
+    def depth(node):
+        result = 1
+        while node["parent_key"] is not None:
+            node = nodes[node["parent_key"]]
+            result += 1
+        return result
+
     leaves = [n for n in record["nodes"] if n["key"] not in children]
     assert {n["usi"] for n in leaves} == {"P*7g", "8i7g", "3d7d", "3d3f"}
+    assert len(leaves) == 4  # Each leaf represents one root-to-leaf path in this tree.
     assert [nodes[f"main-{i}"]["usi"] for i in range(1, 22)] == MAIN
-    assert max(int(n["key"].split("-")[-1]) for n in record["nodes"]) == 21
+    assert max(depth(node) for node in record["nodes"]) == 21
 
 
 def test_static_claim_identity_classification_and_e2a_non_regression(tmp_path, monkeypatch):
