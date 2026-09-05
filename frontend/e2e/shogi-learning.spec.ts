@@ -1270,3 +1270,85 @@ test("Haya Ishida exposes all figure 2 branches after move five", async ({ page 
   await page.setViewportSize({ width: 360, height: 800 });
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
 });
+
+test("Ai Yokofudori exposes branch-heavy canonical variations", async ({ page }) => {
+  await page.goto("/openings");
+  await showOpeningTypeLines(page, "相横歩取り");
+  await openingLineByExactTitle(page, "相横歩取り").getByRole("link", { name: "学習する" }).click();
+  await page.getByRole("button", { name: "ここから本線を最後まで再生" }).click();
+  const history = page.locator(".move-history .move-usi");
+  await expect(history).toHaveCount(21); await expect(history.last()).toHaveText("(3d7d)");
+  const board = page.getByTestId("shogi-board");
+  const feedback = page.getByTestId("opening-feedback");
+  const currentMove = page.getByTestId("opening-current-move");
+  const turn = page.getByTestId("turn-indicator");
+  const disclosure = page.getByTestId("opening-variation-disclosure"); await disclosure.locator("summary").click();
+  const jumps = disclosure.locator(".opening-variation-jump"); await expect(jumps).toHaveCount(24);
+  const commonPath = Array(18).fill("1").join("-");
+  const pawnJump = disclosure.getByRole("button", {
+    name: `19手目 P*7g、USI P*7g、▲7七歩の受け、経路 ${commonPath}-1、ここへ移動`, exact: true,
+  });
+  await expect(pawnJump).toHaveCount(1); await pawnJump.click();
+  await expect(history).toHaveCount(19); await expect(history.last()).toHaveText("(P*7g)");
+  await expect(board.locator('[data-square="77"]')).toHaveAccessibleName(/7七.*先手の歩/);
+  await expect(board.locator('[data-square="88"]')).toHaveAccessibleName(/8八.*先手の銀/);
+  await expect(turn).toContainText("△後手");
+  await expect(disclosure.locator("summary")).toContainText("現在19手・▲7七歩の受け");
+  await expect(pawnJump).toHaveAttribute("aria-current", "step");
+  await expect(disclosure.locator('[aria-current="step"]')).toHaveCount(1);
+  await expect(currentMove).toContainText("すべての手順を学習しました");
+  await expect(feedback).toContainText("この定跡手順を完了しました");
+  const move19MainSwitch = disclosure.getByRole("button", {
+    name: `この分岐点の本線へ切り替える、第19手の分岐点 ルート、経路 ${commonPath}`, exact: true,
+  });
+  await expect(move19MainSwitch).toHaveCount(1); await move19MainSwitch.click();
+  const silverJump = disclosure.getByRole("button", {
+    name: `19手目 8h7g、USI 8h7g、▲7七銀の主流形、経路 ${commonPath}-3、ここへ移動`, exact: true,
+  });
+  await expect(history.last()).toHaveText("(8h7g)");
+  await expect(history).toHaveCount(19);
+  await expect(board.locator('[data-square="77"]')).toHaveAccessibleName(/7七.*先手の銀/);
+  await expect(board.locator('[data-square="88"]')).toHaveAccessibleName(/8八.*空きマス/);
+  await expect(turn).toContainText("△後手");
+  await expect(disclosure.locator("summary")).toContainText("現在19手・▲7七銀の主流形");
+  await expect(silverJump).toHaveAttribute("aria-current", "step");
+  await expect(disclosure.locator('[aria-current="step"]')).toHaveCount(1);
+  await expect(currentMove).toContainText("7f7d");
+  await expect(feedback).toContainText("この分岐点より後の手順を破棄し、本線へ移動しました");
+  await page.getByRole("button", { name: "ここから本線を最後まで再生" }).click();
+  const declineJump = disclosure.getByRole("button", {
+    name: `21手目 3d3f、USI 3d3f、▲7七銀の主流形 → 飛車交換拒否型（持久戦）、経路 ${commonPath}-3-1-2、ここへ移動`, exact: true,
+  });
+  await expect(declineJump).toHaveCount(1); await declineJump.click();
+  await expect(history).toHaveCount(21); await expect(history.last()).toHaveText("(3d3f)");
+  await expect(board.locator('[data-square="36"]')).toHaveAccessibleName(/3六.*先手の飛/);
+  await expect(board.locator('[data-square="74"]')).toHaveAccessibleName(/7四.*後手の飛/);
+  await expect(turn).toContainText("△後手");
+  await expect(disclosure.locator("summary")).toContainText("現在21手・▲7七銀の主流形 → 飛車交換拒否型（持久戦）");
+  await expect(declineJump).toHaveAttribute("aria-current", "step");
+  await expect(disclosure.locator('[aria-current="step"]')).toHaveCount(1);
+  await expect(currentMove).toContainText("すべての手順を学習しました");
+  await expect(feedback).toContainText("この定跡手順を完了しました");
+  const move21MainSwitch = disclosure.getByRole("button", {
+    name: `この分岐点の本線へ切り替える、第21手の分岐点 ▲7七銀の主流形、経路 ${commonPath}-3-1`, exact: true,
+  });
+  await expect(move21MainSwitch).toHaveCount(1); await move21MainSwitch.click();
+  const exchangeJump = disclosure.getByRole("button", {
+    name: `21手目 3d7d、USI 3d7d、▲7七銀の主流形 → 飛車交換型（超急戦）、経路 ${commonPath}-3-1-1、ここへ移動`, exact: true,
+  });
+  await expect(history.last()).toHaveText("(3d7d)");
+  await expect(history).toHaveCount(21);
+  await expect(board.locator('[data-square="74"]')).toHaveAccessibleName(/7四.*先手の飛/);
+  await expect(board.locator('[data-square="36"]')).toHaveAccessibleName(/3六.*空きマス/);
+  await expect(turn).toContainText("△後手");
+  await expect(disclosure.locator("summary")).toContainText("現在21手・▲7七銀の主流形 → 飛車交換型（超急戦）");
+  await expect(exchangeJump).toHaveAttribute("aria-current", "step");
+  await expect(disclosure.locator('[aria-current="step"]')).toHaveCount(1);
+  await expect(currentMove).toContainText("すべての手順を学習しました");
+  await expect(feedback).toContainText("この定跡手順を完了しました");
+  const source = page.getByTestId("opening-source");
+  await expect(source).toContainText("セクション: 戦法の詳細と近年の傾向");
+  await expect(source.getByRole("link")).toHaveAttribute("href", /oldid=92929410$/);
+  await page.setViewportSize({ width: 360, height: 800 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
+});
