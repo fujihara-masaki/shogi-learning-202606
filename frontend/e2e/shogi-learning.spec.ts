@@ -1270,3 +1270,28 @@ test("Haya Ishida exposes all figure 2 branches after move five", async ({ page 
   await page.setViewportSize({ width: 360, height: 800 });
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
 });
+
+test("Ai Yokofudori exposes branch-heavy canonical variations", async ({ page }) => {
+  await page.goto("/openings");
+  await showOpeningTypeLines(page, "相横歩取り");
+  await openingLineByExactTitle(page, "相横歩取り").getByRole("link", { name: "学習する" }).click();
+  await page.getByRole("button", { name: "ここから本線を最後まで再生" }).click();
+  const history = page.locator(".move-history .move-usi");
+  await expect(history).toHaveCount(21); await expect(history.last()).toHaveText("(3d7d)");
+  const disclosure = page.getByTestId("opening-variation-disclosure"); await disclosure.locator("summary").click();
+  const jumps = disclosure.locator(".opening-variation-jump"); await expect(jumps).toHaveCount(24);
+  await jumps.filter({ hasText: "P*7g" }).click();
+  await expect(history).toHaveCount(19); await expect(history.last()).toHaveText("(P*7g)");
+  await disclosure.getByRole("button", { name: /この分岐点の本線へ切り替える/ }).click();
+  await expect(history.last()).toHaveText("(8h7g)");
+  await page.getByRole("button", { name: "ここから本線を最後まで再生" }).click();
+  await jumps.filter({ hasText: "3d3f" }).click();
+  await expect(history).toHaveCount(21); await expect(history.last()).toHaveText("(3d3f)");
+  await disclosure.getByRole("button", { name: /この分岐点の本線へ切り替える/ }).click();
+  await expect(history.last()).toHaveText("(3d7d)");
+  const source = page.getByTestId("opening-source");
+  await expect(source).toContainText("セクション: 戦法の詳細と近年の傾向");
+  await expect(source.getByRole("link")).toHaveAttribute("href", /oldid=92929410$/);
+  await page.setViewportSize({ width: 360, height: 800 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
+});
