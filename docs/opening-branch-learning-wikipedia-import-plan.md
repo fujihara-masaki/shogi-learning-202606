@@ -466,7 +466,8 @@ PR #58はWikipedia provenance validatorの実装・レビューを通して責�
 2. **PR-E2 横歩取り系**（article/section単位の小PRへ分割し、E2全体は継続中）
    - [x] **PR-E2a: 横歩取りの基本15手** — `backend/app/wikipedia_opening_artifacts/yokofudori.json`。Wikipedia「横歩取り」固定版 revision `109255965` の「最初の共通手順（初手から15手まで）」節に連続して明記された15手を provenance A / `complete_for_cited_sequence` として収録した。既存seedに欠けていた7手目▲7八金 (`6i7h`)・8手目△3二金 (`4a3b`) を追加し、既存13 nodeはstable key・ID・USI・学習commentを保持したまま `main-7` 以降をreparentした。backend python-shogi / frontend tsshogiで全edgeの合法性とSFEN一致を確認済み。
    - [x] **PR-E2b: 相横歩取り** — `backend/app/wikipedia_opening_artifacts/ai-yokofudori.json`。Wikipedia「相横歩取り」固定版 revision `92929410` の「戦法の詳細と近年の傾向」節を provenance A / `complete_for_cited_sequence` として収録した。24 node、semantic main 21手、2分岐点・4経路で、19手目は本文の列挙順を保ちながら非先頭の▲7七銀を実戦頻度記述に基づくexplicit mainとした。21手目より先の暗黙の中間手は補間していない。
-   - [ ] **PR-E2c以降** — 横歩取り△4五角、横歩取り△3三桂、横歩取り△3三角／空中戦法、横歩取り△8五飛／中座飛車、横歩取り△2三歩を、それぞれ根拠となるarticle/section単位で調査・レビューして扱う。5二玉型、4一玉型、青野流、勇気流等を根拠調査なしに完了対象へ加えない。
+   - [ ] **PR-E2c: 横歩取り△4五角の基本手順・初期分岐** — Wikipedia「横歩取り4五角」の「概要」節を対象に、共通20手と21手目の▲7七角・▲2四飛・▲8七歩・▲3五飛の4候補を独立lineとして扱う。提案範囲は35 node、semantic main 26手、最大深さ27手、4経路、`partial_explicit_sequence`。ただし固定版 revision `88731470` の本文とrevision対応を再取得できるまで provenance A artifactを有効化しない。本文で先に列挙される▲7七角を既定本線候補とし、深い変化、△2八歩への別応、若島・佐々木流、後段の歴史的手順、△3八歩・△4四角系統は後続へ残す。
+   - [ ] **PR-E2d以降** — 横歩取り△3三桂、横歩取り△3三角／空中戦法、横歩取り△8五飛／中座飛車、横歩取り△2三歩を、それぞれ根拠となるarticle/section単位で調査・レビューして扱う。5二玉型、4一玉型、青野流、勇気流等を根拠調査なしに完了対象へ加えない。
 3. **PR-E3 角換わり系**
 4. **PR-E4 棒銀系**
 5. **PR-E5 ゴキゲン・対ゴキゲン**
