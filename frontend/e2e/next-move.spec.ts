@@ -738,12 +738,23 @@ test.describe("次の一手", () => {
         await route.fulfill({ json: requests.length === 1 ? SAMPLES[0] : SAMPLES[1] });
       });
       await page.goto("/next-move");
-      await page.getByRole("button", { name: policy === "random" ? "ランダムに1問" : "未挑戦から1問" }).click();
+      const nextMoveSection = page.getByTestId("next-move-section");
+      const startButton = nextMoveSection.getByRole("button", {
+        name: policy === "random" ? "ランダムに1問" : "未挑戦から1問",
+        exact: true,
+      });
+      await expect(startButton).toHaveCount(1);
+      await startButton.click();
       await expect(page).toHaveURL(new RegExp(`policy=${policy}`));
       await playMove(page, "77", "76");
       await page.getByTestId("next-move-next-button").click();
       await expect(page).toHaveURL(/next-move\/102/);
+      expect(requests).toHaveLength(2);
+      expect(requests[0].searchParams.get("policy")).toBe(policy);
+      expect(requests[0].searchParams.get("opening_key")).toBe("bogin");
+      expect(requests[0].searchParams.get("exclude_problem_key")).toBeNull();
       expect(requests[1].searchParams.get("policy")).toBe(policy);
+      expect(requests[1].searchParams.get("opening_key")).toBe("bogin");
       expect(requests[1].searchParams.get("exclude_problem_key")).toBe("v1:problem-101");
     });
   }
