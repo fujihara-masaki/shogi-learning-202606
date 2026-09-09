@@ -1352,3 +1352,16 @@ test("Ai Yokofudori exposes branch-heavy canonical variations", async ({ page })
   await page.setViewportSize({ width: 360, height: 800 });
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
 });
+
+test("Yokofudori 4e bishop bundled line reaches every reviewed leaf", async ({ page }) => {
+  await page.goto("/openings");
+  await showOpeningTypeLines(page, "横歩取り△4五角");
+  await expect(openingLineByExactTitle(page, "横歩取り△4五角")).toHaveCount(1);
+  await openingLineByExactTitle(page, "横歩取り△4五角").getByRole("link", { name: "学習する", exact: true }).click();
+  const reachBranch = async () => { const reset=page.getByRole("button", { name: "最初に戻る", exact: true }); if(await reset.isEnabled()) await reset.click(); for(let i=0;i<20;i+=1) await page.getByRole("button", { name: "本線を一手進む", exact: true }).click(); };
+  await reachBranch(); const history=page.locator(".move-history .move-usi"); await expect(history.last()).toHaveText("(B*4e)"); const branches=page.getByTestId("opening-branches");
+  const cases=[["▲7七角の主流変化","S*8g",26],["▲2四飛の主流変化","8h1a+",27],["▲8七歩の変化","P*8g",21],["▲3五飛の変化","3d3e",21]] as const;
+  for(const [label,leaf,count] of cases){const card=branches.locator(".branch-card").filter({hasText:label});await expect(card).toHaveCount(1);await card.getByRole("button",{name:/この変化を見る/}).click();const replay=page.getByRole("button",{name:"ここから本線を最後まで再生",exact:true});if(await replay.isEnabled())await replay.click();await expect(history).toHaveCount(count);await expect(history.last()).toHaveText(`(${leaf})`);await expect(page.getByTestId("opening-feedback")).toContainText("この定跡手順を完了しました");await reachBranch();}
+  const disclosure=page.getByTestId("opening-variation-disclosure");await disclosure.locator("summary").click();await expect(disclosure.locator(".opening-variation-jump")).toHaveCount(35);const common=Array(20).fill("1").join("-");await disclosure.getByRole("button",{name:`21手目 3d2d、USI 3d2d、▲2四飛の主流変化、経路 ${common}-2、ここへ移動`,exact:true}).click();await page.getByRole("button",{name:"ここから本線を最後まで再生",exact:true}).click();await expect(history.last()).toHaveText("(8h1a+)");await disclosure.getByRole("button",{name:`この分岐点の本線へ切り替える、第21手の分岐点 ルート、経路 ${common}`,exact:true}).click();await expect(history.last()).toHaveText("(B*7g)");
+  const source=page.getByTestId("opening-source");await expect(source).toContainText("セクション: 概要");await expect(source.getByRole("link")).toHaveAttribute("href",/oldid=88731470/);await page.setViewportSize({width:360,height:800});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=document.documentElement.clientWidth)).toBe(true);
+});
