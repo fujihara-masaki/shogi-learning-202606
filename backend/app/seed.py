@@ -185,6 +185,14 @@ SAMPLE_OPENING_LINES = [
         "moves": ["7g7f", "3c3d", "2g2f", "8c8d", "2f2e", "8d8e", "6i7h", "4a3b", "2e2d", "2c2d", "2h2d", "8e8f", "8g8f", "8b8f", "2d3d", "2b8h+", "7i8h", "P*2h", "3i2h", "B*4e", "B*7g", "8f8h+", "7g8h", "4e3d", "8h1a+", "S*8g"],
     },
     {
+        "name": "横歩取り△3三桂",
+        "opening_type": "相居飛車",
+        "opening_type_name": "横歩取り△3三桂",
+        "description": "横歩取りの基本局面から後手が3三桂と跳ねる戦法です。",
+        "tag": "yokofudori",
+        "moves": ["7g7f", "3c3d", "2g2f", "8c8d", "2f2e", "8d8e", "6i7h", "4a3b", "2e2d", "2c2d", "2h2d", "8e8f", "8g8f", "8b8f", "2d3d", "2a3c"],
+    },
+    {
         "name": "相横歩取り",
         "opening_type": "相居飛車",
         "opening_type_name": "相横歩取り",
@@ -428,6 +436,7 @@ OPENING_TYPE_SEEDS = [
     ("相居飛車", None, "相掛かり", "あいがかり", "Double Wing Attack", [], "双方が飛車先を伸ばして主導権を争う戦型です。", "Wikipedia 将棋の戦法", "https://ja.wikipedia.org/wiki/将棋の戦法", "CC BY-SA", 30),
     ("相居飛車", None, "横歩取り", "よこふどり", "Side Pawn Picker", [], "飛車先交換から横歩を取る激しい相居飛車です。", "Wikipedia 将棋の戦法", "https://ja.wikipedia.org/wiki/将棋の戦法", "CC BY-SA", 40),
     ("相居飛車", "横歩取り", "横歩取り△4五角", "よこふどりよんごかく", "Side Pawn Picker 4e Bishop", ["横歩取り4五角"], "後手が角交換後に4五角と打つ横歩取りの急戦定跡です。", "Wikipedia 横歩取り4五角", "https://ja.wikipedia.org/w/index.php?oldid=88731470&title=%E6%A8%AA%E6%AD%A9%E5%8F%96%E3%82%8A4%E4%BA%94%E8%A7%92", "CC BY-SA", 42),
+    ("相居飛車", "横歩取り", "横歩取り△3三桂", "よこふどりさんさんけい", "Side Pawn Picker 3c Knight", ["横歩取り3三桂", "△3三桂戦法"], "後手が3三桂と跳ねて角道を保つ横歩取りの戦法です。", "Wikipedia 横歩取り3三桂", "https://ja.wikipedia.org/w/index.php?oldid=106803367&title=%E6%A8%AA%E6%AD%A9%E5%8F%96%E3%82%8A3%E4%B8%89%E6%A1%82", "CC BY-SA", 43),
     ("相居飛車", "横歩取り", "相横歩取り", "あいよこふどり", "Double Side Pawn Picker", [], "双方が横歩を取り飛車交換も辞さず戦う激しい相居飛車です。", "Wikipedia 相横歩取り", "https://ja.wikipedia.org/w/index.php?title=%E7%9B%B8%E6%A8%AA%E6%AD%A9%E5%8F%96%E3%82%8A&oldid=92929410", "CC BY-SA", 41),
     ("相居飛車", None, "雁木", "がんぎ", "Gangi", [], "金銀を盛り上げる相居飛車の構想です。", "Wikipedia 将棋の戦法", "https://ja.wikipedia.org/wiki/将棋の戦法", "CC BY-SA", 50),
     ("相居飛車", None, "棒銀", "ぼうぎん", "Climbing Silver", ["棒銀戦法"], "銀を飛車先から進出させて突破を狙う代表的な急戦です。", "local seed", "local seed", "CC BY-SA", 60),
@@ -1066,6 +1075,7 @@ BUNDLED_WIKIPEDIA_OPENING_ARTIFACTS = (
     "yokofudori.json",
     "ai-yokofudori.json",
     "yokofudori-4e-bishop.json",
+    "yokofudori-3c-knight.json",
 )
 
 
