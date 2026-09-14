@@ -1415,3 +1415,47 @@ test("Yokofudori 4e bishop bundled line reaches every reviewed leaf", async ({ p
   await page.setViewportSize({ width: 360, height: 800 });
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
 });
+
+test("Yokofudori 3c knight bundled line replays the complete cited sequence", async ({ page }) => {
+  await page.goto("/openings");
+  await showOpeningTypeLines(page, "横歩取り△3三桂");
+  const card = openingLineByExactTitle(page, "横歩取り△3三桂");
+  await expect(card).toHaveCount(1);
+  await expect(card).toContainText("16手");
+  await card.getByRole("link", { name: "学習する", exact: true }).click();
+
+  const next = page.getByRole("button", { name: "本線を一手進む", exact: true });
+  const history = page.locator(".move-history .move-usi");
+  for (let ply = 1; ply <= 16; ply += 1) {
+    await next.click();
+    await expect(history).toHaveCount(ply);
+  }
+  await expect(history.last()).toHaveText("(2a3c)");
+  await expect(next).toBeDisabled();
+  await expect(page.getByTestId("opening-feedback")).toContainText("この定跡手順を完了しました");
+  const board = page.getByTestId("shogi-board");
+  await expect(board.locator('[data-square="33"]')).toHaveAccessibleName(/3三.*後手の桂/);
+  await expect(board.locator('[data-square="21"]')).toHaveAccessibleName(/2一.*空きマス/);
+
+  await page.getByRole("button", { name: "一手戻る", exact: true }).click();
+  await expect(history).toHaveCount(15); await expect(history.last()).toHaveText("(2d3d)");
+  await next.click(); await expect(history.last()).toHaveText("(2a3c)");
+  await page.getByRole("button", { name: "最初に戻る", exact: true }).click();
+  await expect(history).toHaveCount(0);
+
+  const disclosure = page.getByTestId("opening-variation-disclosure");
+  await disclosure.locator("summary").click();
+  const path8 = Array(8).fill("1").join("-");
+  await disclosure.getByRole("button", {
+    name: `8手目 4a3b、USI 4a3b、ルート、経路 ${path8}、ここへ移動`, exact: true,
+  }).click();
+  await expect(history).toHaveCount(8); await expect(history.last()).toHaveText("(4a3b)");
+  await expect(disclosure.locator("summary")).toContainText("現在8手");
+
+  const source = page.getByTestId("opening-source");
+  await expect(source).toContainText("セクション: 導入部（「解説」節より前）");
+  await expect(source).toContainText("引用対象の基本16手をすべて収録");
+  await expect(source.getByRole("link")).toHaveAttribute("href", /oldid=106803367/);
+  await page.setViewportSize({ width: 360, height: 800 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
+});

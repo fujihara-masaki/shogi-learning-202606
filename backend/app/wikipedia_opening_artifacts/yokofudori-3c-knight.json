@@ -1,0 +1,248 @@
+{
+  "artifact_version": 1,
+  "review": {
+    "review_status": "reviewed",
+    "reviewed_by": "ChatGPT (source review); Codex (artifact review and legality verification)",
+    "reviewed_on": "2026-09-12",
+    "legality_checks": {
+      "backend_python_shogi": "passed",
+      "frontend_tsshogi": "passed"
+    }
+  },
+  "records": [
+    {
+      "record_type": "move_line",
+      "record_key": "wikipedia.yokofudori.knight-3c",
+      "line_key": "wikipedia.yokofudori.knight-3c",
+      "line_name": "横歩取り△3三桂",
+      "source": {
+        "url": "https://ja.wikipedia.org/w/index.php?oldid=106803367&title=%E6%A8%AA%E6%AD%A9%E5%8F%96%E3%82%8A3%E4%B8%89%E6%A1%82",
+        "title": "Wikipedia 横歩取り3三桂",
+        "section": "導入部（「解説」節より前）"
+      },
+      "license": "CC BY-SA 4.0",
+      "retrieved_date": "2026-09-12",
+      "revision": 106803367,
+      "provenance": "A",
+      "coverage_status": "complete_for_cited_sequence",
+      "initial_sfen": "lnsgkgsnl/1r5b1/ppppppppp/9/9/9/PPPPPPPPP/1B5R1/LNSGKGSNL b - 1",
+      "coverage": {
+        "covered_through_ply": 16,
+        "covered_through_move": "2a3c",
+        "omitted_after": null
+      },
+      "source_note": "2026-09-12にChatGPTのWeb閲覧で固定版の版表示と導入部（「解説」節より前）を確認した外部出典レビューに基づく。引用対象の基本16手をすべて収録した限定的な範囲であり、戦法全体の網羅ではない。Codex端末からの固定版取得はHTTP 403で不可だったため、Codexはartifactの正規化・合法性・SFENを検証した。",
+      "evidence_note": "導入部で初手から▲3四飛までの連続手順と、その局面の△3三桂まで明記された基本16手をすべて収録。△3三角・相横歩取り、「解説」節、および明示のない17手目以後は収録しない。",
+      "nodes": [
+        {
+          "key": "main-1",
+          "parent_key": null,
+          "usi": "7g7f",
+          "sort_order": 0,
+          "is_main": true,
+          "variation_group": "△3三桂基本手順",
+          "from_sfen": "lnsgkgsnl/1r5b1/ppppppppp/9/9/9/PPPPPPPPP/1B5R1/LNSGKGSNL b - 1",
+          "to_sfen": "lnsgkgsnl/1r5b1/ppppppppp/9/9/2P6/PP1PPPPPP/1B5R1/LNSGKGSNL w - 2",
+          "provenance": "A",
+          "source_section": "導入部（「解説」節より前）",
+          "evidence_note": "固定版の導入部に連続手順として明記された基本16手の着手。"
+        },
+        {
+          "key": "main-2",
+          "parent_key": "main-1",
+          "usi": "3c3d",
+          "sort_order": 0,
+          "is_main": true,
+          "variation_group": "△3三桂基本手順",
+          "from_sfen": "lnsgkgsnl/1r5b1/ppppppppp/9/9/2P6/PP1PPPPPP/1B5R1/LNSGKGSNL w - 2",
+          "to_sfen": "lnsgkgsnl/1r5b1/pppppp1pp/6p2/9/2P6/PP1PPPPPP/1B5R1/LNSGKGSNL b - 3",
+          "provenance": "A",
+          "source_section": "導入部（「解説」節より前）",
+          "evidence_note": "固定版の導入部に連続手順として明記された基本16手の着手。"
+        },
+        {
+          "key": "main-3",
+          "parent_key": "main-2",
+          "usi": "2g2f",
+          "sort_order": 0,
+          "is_main": true,
+          "variation_group": "△3三桂基本手順",
+          "from_sfen": "lnsgkgsnl/1r5b1/pppppp1pp/6p2/9/2P6/PP1PPPPPP/1B5R1/LNSGKGSNL b - 3",
+          "to_sfen": "lnsgkgsnl/1r5b1/pppppp1pp/6p2/9/2P4P1/PP1PPPP1P/1B5R1/LNSGKGSNL w - 4",
+          "provenance": "A",
+          "source_section": "導入部（「解説」節より前）",
+          "evidence_note": "固定版の導入部に連続手順として明記された基本16手の着手。"
+        },
+        {
+          "key": "main-4",
+          "parent_key": "main-3",
+          "usi": "8c8d",
+          "sort_order": 0,
+          "is_main": true,
+          "variation_group": "△3三桂基本手順",
+          "from_sfen": "lnsgkgsnl/1r5b1/pppppp1pp/6p2/9/2P4P1/PP1PPPP1P/1B5R1/LNSGKGSNL w - 4",
+          "to_sfen": "lnsgkgsnl/1r5b1/p1pppp1pp/1p4p2/9/2P4P1/PP1PPPP1P/1B5R1/LNSGKGSNL b - 5",
+          "provenance": "A",
+          "source_section": "導入部（「解説」節より前）",
+          "evidence_note": "固定版の導入部に連続手順として明記された基本16手の着手。"
+        },
+        {
+          "key": "main-5",
+          "parent_key": "main-4",
+          "usi": "2f2e",
+          "sort_order": 0,
+          "is_main": true,
+          "variation_group": "△3三桂基本手順",
+          "from_sfen": "lnsgkgsnl/1r5b1/p1pppp1pp/1p4p2/9/2P4P1/PP1PPPP1P/1B5R1/LNSGKGSNL b - 5",
+          "to_sfen": "lnsgkgsnl/1r5b1/p1pppp1pp/1p4p2/7P1/2P6/PP1PPPP1P/1B5R1/LNSGKGSNL w - 6",
+          "provenance": "A",
+          "source_section": "導入部（「解説」節より前）",
+          "evidence_note": "固定版の導入部に連続手順として明記された基本16手の着手。"
+        },
+        {
+          "key": "main-6",
+          "parent_key": "main-5",
+          "usi": "8d8e",
+          "sort_order": 0,
+          "is_main": true,
+          "variation_group": "△3三桂基本手順",
+          "from_sfen": "lnsgkgsnl/1r5b1/p1pppp1pp/1p4p2/7P1/2P6/PP1PPPP1P/1B5R1/LNSGKGSNL w - 6",
+          "to_sfen": "lnsgkgsnl/1r5b1/p1pppp1pp/6p2/1p5P1/2P6/PP1PPPP1P/1B5R1/LNSGKGSNL b - 7",
+          "provenance": "A",
+          "source_section": "導入部（「解説」節より前）",
+          "evidence_note": "固定版の導入部に連続手順として明記された基本16手の着手。"
+        },
+        {
+          "key": "main-7",
+          "parent_key": "main-6",
+          "usi": "6i7h",
+          "sort_order": 0,
+          "is_main": true,
+          "variation_group": "△3三桂基本手順",
+          "from_sfen": "lnsgkgsnl/1r5b1/p1pppp1pp/6p2/1p5P1/2P6/PP1PPPP1P/1B5R1/LNSGKGSNL b - 7",
+          "to_sfen": "lnsgkgsnl/1r5b1/p1pppp1pp/6p2/1p5P1/2P6/PP1PPPP1P/1BG4R1/LNS1KGSNL w - 8",
+          "provenance": "A",
+          "source_section": "導入部（「解説」節より前）",
+          "evidence_note": "固定版の導入部に連続手順として明記された基本16手の着手。"
+        },
+        {
+          "key": "main-8",
+          "parent_key": "main-7",
+          "usi": "4a3b",
+          "sort_order": 0,
+          "is_main": true,
+          "variation_group": "△3三桂基本手順",
+          "from_sfen": "lnsgkgsnl/1r5b1/p1pppp1pp/6p2/1p5P1/2P6/PP1PPPP1P/1BG4R1/LNS1KGSNL w - 8",
+          "to_sfen": "lnsgk1snl/1r4gb1/p1pppp1pp/6p2/1p5P1/2P6/PP1PPPP1P/1BG4R1/LNS1KGSNL b - 9",
+          "provenance": "A",
+          "source_section": "導入部（「解説」節より前）",
+          "evidence_note": "固定版の導入部に連続手順として明記された基本16手の着手。"
+        },
+        {
+          "key": "main-9",
+          "parent_key": "main-8",
+          "usi": "2e2d",
+          "sort_order": 0,
+          "is_main": true,
+          "variation_group": "△3三桂基本手順",
+          "from_sfen": "lnsgk1snl/1r4gb1/p1pppp1pp/6p2/1p5P1/2P6/PP1PPPP1P/1BG4R1/LNS1KGSNL b - 9",
+          "to_sfen": "lnsgk1snl/1r4gb1/p1pppp1pp/6pP1/1p7/2P6/PP1PPPP1P/1BG4R1/LNS1KGSNL w - 10",
+          "provenance": "A",
+          "source_section": "導入部（「解説」節より前）",
+          "evidence_note": "固定版の導入部に連続手順として明記された基本16手の着手。"
+        },
+        {
+          "key": "main-10",
+          "parent_key": "main-9",
+          "usi": "2c2d",
+          "sort_order": 0,
+          "is_main": true,
+          "variation_group": "△3三桂基本手順",
+          "from_sfen": "lnsgk1snl/1r4gb1/p1pppp1pp/6pP1/1p7/2P6/PP1PPPP1P/1BG4R1/LNS1KGSNL w - 10",
+          "to_sfen": "lnsgk1snl/1r4gb1/p1pppp2p/6pp1/1p7/2P6/PP1PPPP1P/1BG4R1/LNS1KGSNL b p 11",
+          "provenance": "A",
+          "source_section": "導入部（「解説」節より前）",
+          "evidence_note": "固定版の導入部に連続手順として明記された基本16手の着手。"
+        },
+        {
+          "key": "main-11",
+          "parent_key": "main-10",
+          "usi": "2h2d",
+          "sort_order": 0,
+          "is_main": true,
+          "variation_group": "△3三桂基本手順",
+          "from_sfen": "lnsgk1snl/1r4gb1/p1pppp2p/6pp1/1p7/2P6/PP1PPPP1P/1BG4R1/LNS1KGSNL b p 11",
+          "to_sfen": "lnsgk1snl/1r4gb1/p1pppp2p/6pR1/1p7/2P6/PP1PPPP1P/1BG6/LNS1KGSNL w Pp 12",
+          "provenance": "A",
+          "source_section": "導入部（「解説」節より前）",
+          "evidence_note": "固定版の導入部に連続手順として明記された基本16手の着手。"
+        },
+        {
+          "key": "main-12",
+          "parent_key": "main-11",
+          "usi": "8e8f",
+          "sort_order": 0,
+          "is_main": true,
+          "variation_group": "△3三桂基本手順",
+          "from_sfen": "lnsgk1snl/1r4gb1/p1pppp2p/6pR1/1p7/2P6/PP1PPPP1P/1BG6/LNS1KGSNL w Pp 12",
+          "to_sfen": "lnsgk1snl/1r4gb1/p1pppp2p/6pR1/9/1pP6/PP1PPPP1P/1BG6/LNS1KGSNL b Pp 13",
+          "provenance": "A",
+          "source_section": "導入部（「解説」節より前）",
+          "evidence_note": "固定版の導入部に連続手順として明記された基本16手の着手。"
+        },
+        {
+          "key": "main-13",
+          "parent_key": "main-12",
+          "usi": "8g8f",
+          "sort_order": 0,
+          "is_main": true,
+          "variation_group": "△3三桂基本手順",
+          "from_sfen": "lnsgk1snl/1r4gb1/p1pppp2p/6pR1/9/1pP6/PP1PPPP1P/1BG6/LNS1KGSNL b Pp 13",
+          "to_sfen": "lnsgk1snl/1r4gb1/p1pppp2p/6pR1/9/1PP6/P2PPPP1P/1BG6/LNS1KGSNL w 2Pp 14",
+          "provenance": "A",
+          "source_section": "導入部（「解説」節より前）",
+          "evidence_note": "固定版の導入部に連続手順として明記された基本16手の着手。"
+        },
+        {
+          "key": "main-14",
+          "parent_key": "main-13",
+          "usi": "8b8f",
+          "sort_order": 0,
+          "is_main": true,
+          "variation_group": "△3三桂基本手順",
+          "from_sfen": "lnsgk1snl/1r4gb1/p1pppp2p/6pR1/9/1PP6/P2PPPP1P/1BG6/LNS1KGSNL w 2Pp 14",
+          "to_sfen": "lnsgk1snl/6gb1/p1pppp2p/6pR1/9/1rP6/P2PPPP1P/1BG6/LNS1KGSNL b 2P2p 15",
+          "provenance": "A",
+          "source_section": "導入部（「解説」節より前）",
+          "evidence_note": "固定版の導入部に連続手順として明記された基本16手の着手。"
+        },
+        {
+          "key": "main-15",
+          "parent_key": "main-14",
+          "usi": "2d3d",
+          "sort_order": 0,
+          "is_main": true,
+          "variation_group": "△3三桂基本手順",
+          "from_sfen": "lnsgk1snl/6gb1/p1pppp2p/6pR1/9/1rP6/P2PPPP1P/1BG6/LNS1KGSNL b 2P2p 15",
+          "to_sfen": "lnsgk1snl/6gb1/p1pppp2p/6R2/9/1rP6/P2PPPP1P/1BG6/LNS1KGSNL w 3P2p 16",
+          "provenance": "A",
+          "source_section": "導入部（「解説」節より前）",
+          "evidence_note": "固定版の導入部に連続手順として明記された基本16手の着手。"
+        },
+        {
+          "key": "main-16",
+          "parent_key": "main-15",
+          "usi": "2a3c",
+          "sort_order": 0,
+          "is_main": true,
+          "variation_group": "△3三桂基本手順",
+          "from_sfen": "lnsgk1snl/6gb1/p1pppp2p/6R2/9/1rP6/P2PPPP1P/1BG6/LNS1KGSNL w 3P2p 16",
+          "to_sfen": "lnsgk1s1l/6gb1/p1ppppn1p/6R2/9/1rP6/P2PPPP1P/1BG6/LNS1KGSNL b 3P2p 17",
+          "provenance": "A",
+          "source_section": "導入部（「解説」節より前）",
+          "evidence_note": "固定版の導入部に連続手順として明記された基本16手の着手。"
+        }
+      ]
+    }
+  ]
+}
