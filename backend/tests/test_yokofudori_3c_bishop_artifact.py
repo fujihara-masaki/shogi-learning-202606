@@ -87,7 +87,7 @@ def test_fresh_and_existing_seed_are_idempotent_and_preserve_other_lines(tmp_pat
         conn.close()
 
 
-def test_upgrade_from_pre_e2d_database_adds_line_without_changing_existing_trees(tmp_path, monkeypatch):
+def test_upgrade_from_pre_e2e_database_adds_line_without_changing_existing_trees(tmp_path, monkeypatch):
     """Model an existing PR-E2d DB, excluding timestamps that imports refresh."""
     monkeypatch.setenv("SHOGI_DB_PATH", str(tmp_path / "upgrade.db"))
     init_db()
@@ -121,41 +121,64 @@ def test_upgrade_from_pre_e2d_database_adds_line_without_changing_existing_trees
                 [dict(row) for row in conn.execute(f"SELECT {node_columns} FROM opening_line_moves WHERE line_id=? ORDER BY id", (line["id"],))],
             )
 
+        def assert_protected_lines_unchanged():
+            for name, expected in protected.items():
+                line = conn.execute(f"SELECT {line_columns} FROM opening_lines WHERE name=?", (name,)).fetchone()
+                nodes = conn.execute(f"SELECT {node_columns} FROM opening_line_moves WHERE line_id=? ORDER BY id", (line["id"],)).fetchall()
+                assert dict(line) == expected[0]
+                assert [dict(row) for row in nodes] == expected[1]
+
+        def assert_added_line():
+            own = conn.execute("SELECT * FROM opening_types WHERE name_ja='横歩取り△3三角'").fetchall()
+            line_rows = conn.execute("SELECT * FROM opening_lines WHERE line_key='wikipedia.yokofudori.bishop-3c'").fetchall()
+            assert len(own) == len(line_rows) == 1
+            parent = conn.execute("SELECT * FROM opening_types WHERE id=?", (own[0]["parent_id"],)).fetchone()
+            category = conn.execute("SELECT * FROM opening_categories WHERE id=?", (own[0]["category_id"],)).fetchone()
+            assert (parent["name_ja"], category["name_ja"], own[0]["description_short"]) == ("横歩取り", "相居飛車", DESCRIPTION)
+            line = line_rows[0]
+            nodes = conn.execute("SELECT * FROM opening_line_moves WHERE line_id=? ORDER BY ply", (line["id"],)).fetchall()
+            assert (line["seed_key"], line["opening_type_id"], json.loads(line["moves"])) == ("sample:横歩取り△3三角", own[0]["id"], MOVES)
+            assert [row["usi"] for row in nodes] == MOVES
+            assert [row["move_key"] for row in nodes] == [f"main-{ply}" for ply in range(1, 17)]
+            assert all(row["is_main"] and row["sort_order"] == 0 for row in nodes)
+            assert [row["parent_move_id"] for row in nodes] == [None] + [row["id"] for row in nodes[:-1]]
+            assert [row["tag"] for row in conn.execute("SELECT tag FROM opening_tags WHERE line_id=?", (line["id"],))] == ["yokofudori"]
+            assert compare_canonical_to_runtime(conn, artifact()["records"][0])["status"] == "unchanged"
+            return own[0], line, nodes
+
         monkeypatch.setattr(seed_module, "SAMPLE_OPENING_LINES", original_lines)
         monkeypatch.setattr(seed_module, "OPENING_TYPE_SEEDS", original_types)
         monkeypatch.setattr(seed_module, "BUNDLED_WIKIPEDIA_OPENING_ARTIFACTS", original_artifacts)
         seed_opening_catalog_if_empty(conn)
         seed_openings_if_empty(conn)
         apply_bundled_wikipedia_opening_artifacts(conn)
-        added_line_id = conn.execute("SELECT id FROM opening_lines WHERE line_key='wikipedia.yokofudori.bishop-3c'").fetchone()[0]
+
+        # Assert the first-add result before any runtime edit or repair-like
+        # second import, then retain every new identity used by the tree.
+        assert_protected_lines_unchanged()
+        first_type, first_line, first_nodes = assert_added_line()
+        first_identity = (
+            first_type["id"],
+            first_line["id"],
+            [(row["id"], row["move_key"], row["parent_move_id"]) for row in first_nodes],
+        )
         conn.execute(
             "UPDATE opening_line_moves SET comment='PR-E2e runtime memo' WHERE line_id=? AND move_key='main-16'",
-            (added_line_id,),
+            (first_line["id"],),
         )
         seed_opening_catalog_if_empty(conn)
         seed_openings_if_empty(conn)
         apply_bundled_wikipedia_opening_artifacts(conn)
 
-        own = conn.execute("SELECT * FROM opening_types WHERE name_ja='横歩取り△3三角'").fetchall()
-        line_rows = conn.execute("SELECT * FROM opening_lines WHERE line_key='wikipedia.yokofudori.bishop-3c'").fetchall()
-        assert len(own) == len(line_rows) == 1
-        parent = conn.execute("SELECT * FROM opening_types WHERE id=?", (own[0]["parent_id"],)).fetchone()
-        category = conn.execute("SELECT * FROM opening_categories WHERE id=?", (own[0]["category_id"],)).fetchone()
-        assert (parent["name_ja"], category["name_ja"], own[0]["description_short"]) == ("横歩取り", "相居飛車", DESCRIPTION)
-        new_line = line_rows[0]
-        new_nodes = conn.execute("SELECT * FROM opening_line_moves WHERE line_id=? ORDER BY ply", (new_line["id"],)).fetchall()
-        assert (new_line["seed_key"], new_line["opening_type_id"], json.loads(new_line["moves"])) == ("sample:横歩取り△3三角", own[0]["id"], MOVES)
-        assert [row["usi"] for row in new_nodes] == MOVES
-        assert all(row["move_key"] == f"main-{row['ply']}" and row["is_main"] for row in new_nodes)
-        assert [row["parent_move_id"] for row in new_nodes] == [None] + [row["id"] for row in new_nodes[:-1]]
-        assert new_nodes[-1]["comment"] == "PR-E2e runtime memo"
-        assert [row["tag"] for row in conn.execute("SELECT tag FROM opening_tags WHERE line_id=?", (new_line["id"],))] == ["yokofudori"]
-
-        for name, expected in protected.items():
-            line = conn.execute(f"SELECT {line_columns} FROM opening_lines WHERE name=?", (name,)).fetchone()
-            nodes = conn.execute(f"SELECT {node_columns} FROM opening_line_moves WHERE line_id=? ORDER BY id", (line["id"],)).fetchall()
-            assert dict(line) == expected[0]
-            assert [dict(row) for row in nodes] == expected[1]
+        assert_protected_lines_unchanged()
+        repeated_type, repeated_line, repeated_nodes = assert_added_line()
+        repeated_identity = (
+            repeated_type["id"],
+            repeated_line["id"],
+            [(row["id"], row["move_key"], row["parent_move_id"]) for row in repeated_nodes],
+        )
+        assert repeated_identity == first_identity
+        assert repeated_nodes[-1]["comment"] == "PR-E2e runtime memo"
     finally:
         conn.close()
 
