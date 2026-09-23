@@ -1,5 +1,6 @@
 import os
 import sqlite3
+from datetime import datetime, timezone
 from pathlib import Path
 
 import pytest
@@ -77,15 +78,32 @@ def test_seed_makes_results_reproducible(tmp_path):
     assert [x["book_position_id"] for x in first.selected] == [x["book_position_id"] for x in second.selected]
 
 
-def test_repeated_extraction_preserves_distinct_run_metadata(tmp_path):
+def test_repeated_extraction_preserves_distinct_run_metadata(tmp_path, monkeypatch):
+    class FixedDateTime:
+        @classmethod
+        def now(cls, tz=None):
+            assert tz is timezone.utc
+            return datetime(2026, 9, 23, 12, 34, 56, 789, tzinfo=tz)
+
+    monkeypatch.setattr("app.learning_samples.datetime", FixedDateTime)
     source_id = imported_source(tmp_path)
-    build_learning_sample_plan(source_id, limit=3, per_opening_limit=10, seed=7, dry_run=False)
-    build_learning_sample_plan(source_id, limit=3, per_opening_limit=10, seed=7, dry_run=False)
+    first = build_learning_sample_plan(source_id, limit=3, per_opening_limit=10, seed=7, dry_run=False)
+    second = build_learning_sample_plan(source_id, limit=3, per_opening_limit=10, seed=7, dry_run=False)
     conn = get_connection()
     try:
-        runs = conn.execute("SELECT extraction_run_key, extracted_at FROM extraction_runs ORDER BY extracted_at").fetchall()
+        runs = conn.execute(
+            "SELECT extraction_run_key, extracted_at, run_instance_id FROM extraction_runs ORDER BY rowid"
+        ).fetchall()
         assert len(runs) == 2
+        assert runs[0]["extracted_at"] == runs[1]["extracted_at"]
+        assert runs[0]["run_instance_id"] != runs[1]["run_instance_id"]
         assert runs[0]["extraction_run_key"] != runs[1]["extraction_run_key"]
+        assert [item["book_position_id"] for item in first.selected] == [
+            item["book_position_id"] for item in second.selected
+        ]
+        assert {
+            row[0] for row in conn.execute("SELECT extraction_run_key FROM learning_samples")
+        } == {runs[1]["extraction_run_key"]}
         assert conn.execute("SELECT COUNT(*) FROM learning_samples ls JOIN extraction_runs er ON er.extraction_run_key=ls.extraction_run_key").fetchone()[0] == 3
     finally:
         conn.close()
@@ -99,6 +117,34 @@ def test_new_schema_enforces_extraction_run_foreign_key(tmp_path):
             conn.execute("""INSERT INTO learning_samples(
                 book_source_id,book_position_id,opening_key,opening_name,sfen,sample_rank,extraction_run_key)
                 VALUES(1,1,'x','x','invalid',1,'missing')""")
+    finally:
+        conn.close()
+
+
+def test_failed_reextraction_keeps_previous_samples_and_run(tmp_path):
+    source_id = imported_source(tmp_path)
+    build_learning_sample_plan(source_id, limit=3, per_opening_limit=10, seed=7, dry_run=False)
+    conn = get_connection()
+    try:
+        original_samples = [tuple(row) for row in conn.execute(
+            "SELECT book_position_id,sample_rank,extraction_run_key FROM learning_samples ORDER BY sample_rank"
+        )]
+        original_runs = conn.execute("SELECT COUNT(*) FROM extraction_runs").fetchone()[0]
+        conn.execute("""CREATE TRIGGER reject_new_samples BEFORE INSERT ON learning_samples
+            BEGIN SELECT RAISE(ABORT, 'injected extraction failure'); END""")
+        conn.commit()
+    finally:
+        conn.close()
+
+    with pytest.raises(sqlite3.IntegrityError, match="injected extraction failure"):
+        build_learning_sample_plan(source_id, limit=2, per_opening_limit=10, seed=8, dry_run=False)
+
+    conn = get_connection()
+    try:
+        assert [tuple(row) for row in conn.execute(
+            "SELECT book_position_id,sample_rank,extraction_run_key FROM learning_samples ORDER BY sample_rank"
+        )] == original_samples
+        assert conn.execute("SELECT COUNT(*) FROM extraction_runs").fetchone()[0] == original_runs
     finally:
         conn.close()
 

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import random
+import uuid
 from datetime import datetime, timezone
 from dataclasses import dataclass
 from typing import Any
@@ -247,14 +248,16 @@ def build_learning_sample_plan(source_id: int, *, limit: int, per_opening_limit:
         if not dry_run:
             source = conn.execute("SELECT file_sha256 FROM book_sources WHERE id=?", (source_id,)).fetchone()
             extracted_at = datetime.now(timezone.utc).isoformat()
+            run_instance_id = str(uuid.uuid4())
             run_metadata = {"extractor_version": EXTRACTOR_VERSION, "limit": limit,
                 "per_opening_limit": per_opening_limit, "seed": seed,
-                "source_file_sha256": source["file_sha256"], "extracted_at": extracted_at}
+                "source_file_sha256": source["file_sha256"], "extracted_at": extracted_at,
+                "run_instance_id": run_instance_id}
             run_key = extraction_run_key(run_metadata)
             conn.execute("""INSERT INTO extraction_runs
-                (extraction_run_key,extractor_version,"limit",per_opening_limit,seed,source_file_sha256,extracted_at)
-                VALUES(?,?,?,?,?,?,?)""", (run_key, EXTRACTOR_VERSION, limit, per_opening_limit, seed,
-                source["file_sha256"], extracted_at))
+                (extraction_run_key,extractor_version,"limit",per_opening_limit,seed,source_file_sha256,extracted_at,run_instance_id)
+                VALUES(?,?,?,?,?,?,?,?)""", (run_key, EXTRACTOR_VERSION, limit, per_opening_limit, seed,
+                source["file_sha256"], extracted_at, run_instance_id))
             conn.execute("DELETE FROM learning_samples WHERE book_source_id = ?", (source_id,))
             conn.executemany(
                 """

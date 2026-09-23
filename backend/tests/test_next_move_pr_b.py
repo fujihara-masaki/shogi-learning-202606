@@ -24,7 +24,9 @@ def test_duplicate_problem_uses_latest_run_then_rank_then_id_and_warns(client, t
     os.environ["NEXT_MOVE_DB_PATH"] = str(tmp_path / "duplicates.db")
     init_next_move_db()
     conn = get_next_move_write_connection()
-    conn.executemany("INSERT INTO extraction_runs VALUES(?,?,?,?,?,?,?)", [
+    conn.executemany("""INSERT INTO extraction_runs(
+        extraction_run_key,extractor_version,"limit",per_opening_limit,seed,source_file_sha256,extracted_at
+        ) VALUES(?,?,?,?,?,?,?)""", [
         ("old", "1", 1, 1, 1, "a", "2026-01-01"), ("new", "1", 1, 1, 1, "b", "2026-02-01")])
     old_source, new_source, tie_source = (_source(conn, value) for value in ("a", "b", "c"))
     _sample(conn, old_source, SFEN.format(1), "7g7f", 1, "old-opening", "old")

@@ -90,6 +90,23 @@ def test_validator_checks_expected_learning_sample_count(client):
     assert hashlib.sha256(Path(path).read_bytes()).hexdigest() == before
 
 
+def test_validator_rejects_run_metadata_that_no_longer_matches_key(client):
+    seed_next_move()
+    script = Path(__file__).parents[1] / "scripts" / "validate_next_move_db.py"
+    path = os.environ["NEXT_MOVE_DB_PATH"]
+    conn = sqlite3.connect(path)
+    conn.execute("UPDATE extraction_runs SET run_instance_id='tampered'")
+    conn.commit()
+    conn.close()
+
+    result = subprocess.run(
+        [sys.executable, str(script), path], capture_output=True, text=True, check=False
+    )
+
+    assert result.returncode == 1
+    assert "invalid extraction_run_key" in result.stdout
+
+
 def _make_legacy(source: Path, target: Path):
     shutil.copy2(source, target)
     conn = sqlite3.connect(target)

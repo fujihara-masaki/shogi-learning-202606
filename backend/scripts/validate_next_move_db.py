@@ -5,7 +5,7 @@ import sqlite3
 import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from app.next_move_identity import problem_key
+from app.next_move_identity import extraction_run_key, problem_key
 
 REQUIRED = {"book_sources", "book_positions", "book_moves", "learning_samples"}
 
@@ -40,6 +40,23 @@ def main() -> int:
                 metadata = conn.execute("SELECT value FROM database_metadata WHERE key='dataset_version'").fetchone()
                 if missing_runs: errors.append(f"invalid extraction_run reference: {missing_runs}")
                 if not metadata or not str(metadata[0]).startswith("v1:"): errors.append("missing/invalid dataset_version")
+                run_columns = {r[1] for r in conn.execute("PRAGMA table_info(extraction_runs)")}
+                has_instance_id = "run_instance_id" in run_columns
+                for run in conn.execute("SELECT * FROM extraction_runs"):
+                    run_metadata = {
+                        "extractor_version": run["extractor_version"],
+                        "limit": run["limit"],
+                        "per_opening_limit": run["per_opening_limit"],
+                        "seed": run["seed"],
+                        "source_file_sha256": run["source_file_sha256"],
+                        "extracted_at": run["extracted_at"],
+                    }
+                    # NULL identifies a pre-migration row whose key was generated
+                    # from the original metadata shape.
+                    if has_instance_id and run["run_instance_id"] is not None:
+                        run_metadata["run_instance_id"] = run["run_instance_id"]
+                    if extraction_run_key(run_metadata) != run["extraction_run_key"]:
+                        errors.append(f"invalid extraction_run_key: {run['extraction_run_key']}")
                 print("schema=new")
             elif present == 0:
                 print("WARNING: legacy schema (extraction metadata unavailable)")
