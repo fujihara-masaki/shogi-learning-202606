@@ -11,7 +11,8 @@ import pytest
 from app.database import get_connection
 from app.importers.yaneuraou_book import import_book
 from app.learning_samples import build_learning_sample_plan
-from app.next_move_identity import get_dataset_version
+from app.next_move_database import init_next_move_db
+from app.next_move_identity import extraction_run_key, get_dataset_version
 
 FIXTURE = Path(__file__).parent / "fixtures" / "yaneuraou_book_sample.db"
 
@@ -88,6 +89,179 @@ def test_validator_checks_expected_learning_sample_count(client):
     assert mismatch.returncode == 1
     assert "expected 10000, actual 1" in mismatch.stdout
     assert hashlib.sha256(Path(path).read_bytes()).hexdigest() == before
+
+
+def test_validator_rejects_run_metadata_that_no_longer_matches_key(client):
+    seed_next_move()
+    script = Path(__file__).parents[1] / "scripts" / "validate_next_move_db.py"
+    path = os.environ["NEXT_MOVE_DB_PATH"]
+    conn = sqlite3.connect(path)
+    conn.execute("UPDATE extraction_runs SET run_instance_id='tampered'")
+    conn.commit()
+    conn.close()
+
+    result = subprocess.run(
+        [sys.executable, str(script), path], capture_output=True, text=True, check=False
+    )
+
+    assert result.returncode == 1
+    assert "invalid extraction_run_key" in result.stdout
+
+
+@pytest.mark.parametrize("row_count", [0, 1])
+@pytest.mark.parametrize("missing_column", [
+    "extraction_run_key", "extractor_version", "limit", "per_opening_limit",
+    "seed", "source_file_sha256", "extracted_at",
+])
+def test_validator_reports_missing_extraction_run_columns_without_writes(
+    tmp_path, missing_column, row_count
+):
+    path = tmp_path / f"missing-{missing_column}-{row_count}.db"
+    definitions = {
+        "extraction_run_key": "TEXT PRIMARY KEY",
+        "extractor_version": "TEXT NOT NULL",
+        "limit": "INTEGER NOT NULL",
+        "per_opening_limit": "INTEGER NOT NULL",
+        "seed": "INTEGER NOT NULL",
+        "source_file_sha256": "TEXT NOT NULL",
+        "extracted_at": "TEXT NOT NULL",
+    }
+    included = [column for column in definitions if column != missing_column]
+    conn = sqlite3.connect(path)
+    for table in ("book_sources", "book_positions", "book_moves"):
+        conn.execute(f"CREATE TABLE {table}(id INTEGER PRIMARY KEY)")
+    conn.execute("CREATE TABLE learning_samples(id INTEGER PRIMARY KEY, extraction_run_key TEXT)")
+    conn.execute("CREATE TABLE database_metadata(key TEXT PRIMARY KEY, value TEXT NOT NULL)")
+    conn.execute("CREATE TABLE extraction_runs(" + ",".join(
+        f'"{column}" {definitions[column]}' for column in included
+    ) + ")")
+    if row_count:
+        values = {
+            "extraction_run_key": "old-key", "extractor_version": "1", "limit": 1,
+            "per_opening_limit": 1, "seed": 1, "source_file_sha256": "sha",
+            "extracted_at": "2026-01-01T00:00:00+00:00",
+        }
+        conn.execute(
+            "INSERT INTO extraction_runs(" + ",".join(f'"{c}"' for c in included)
+            + ") VALUES(" + ",".join("?" for _ in included) + ")",
+            [values[column] for column in included],
+        )
+    conn.commit()
+    conn.close()
+    before = hashlib.sha256(path.read_bytes()).hexdigest()
+
+    script = Path(__file__).parents[1] / "scripts" / "validate_next_move_db.py"
+    result = subprocess.run(
+        [sys.executable, str(script), str(path)], capture_output=True, text=True, check=False
+    )
+
+    assert result.returncode == 1
+    assert "incomplete extraction_runs schema" in result.stdout
+    assert missing_column in result.stdout
+    assert "Traceback" not in result.stdout + result.stderr
+    assert hashlib.sha256(path.read_bytes()).hexdigest() == before
+
+
+def test_pre_run_instance_database_migrates_idempotently_and_accepts_new_runs(tmp_path):
+    path = tmp_path / "pre-run-instance.db"
+    os.environ["NEXT_MOVE_DB_PATH"] = str(path)
+    source = import_book(
+        FIXTURE, name="Pre-instance fixture", license_name="MIT",
+        source_url="https://example.test/pre-instance",
+    )
+    conn = sqlite3.connect(path)
+    conn.row_factory = sqlite3.Row
+    source_row = conn.execute(
+        "SELECT file_sha256 FROM book_sources WHERE id=?", (source.source_id,)
+    ).fetchone()
+    position = conn.execute(
+        "SELECT id,sfen FROM book_positions WHERE source_id=? ORDER BY id LIMIT 1",
+        (source.source_id,),
+    ).fetchone()
+    old_metadata = {
+        "extractor_version": "1", "limit": 1, "per_opening_limit": 1, "seed": 11,
+        "source_file_sha256": source_row["file_sha256"],
+        "extracted_at": "2026-01-01T00:00:00+00:00",
+    }
+    old_key = extraction_run_key(old_metadata)
+    conn.execute("DROP TABLE extraction_runs")
+    conn.execute("""CREATE TABLE extraction_runs (
+        extraction_run_key TEXT PRIMARY KEY, extractor_version TEXT NOT NULL, "limit" INTEGER NOT NULL,
+        per_opening_limit INTEGER NOT NULL, seed INTEGER NOT NULL, source_file_sha256 TEXT NOT NULL,
+        extracted_at TEXT NOT NULL)""")
+    conn.execute(
+        "INSERT INTO extraction_runs VALUES(?,?,?,?,?,?,?)",
+        (old_key, "1", 1, 1, 11, source_row["file_sha256"], old_metadata["extracted_at"]),
+    )
+    conn.execute("""INSERT INTO learning_samples(
+        book_source_id,book_position_id,opening_key,opening_name,sfen,sample_rank,extraction_run_key
+        ) VALUES(?,?,?,?,?,?,?)""", (
+            source.source_id, position["id"], "unclassified", "未分類",
+            position["sfen"], 1, old_key,
+        ))
+    old_dataset_version = "v1:pre-run-instance"
+    conn.execute(
+        "INSERT INTO database_metadata(key,value) VALUES('dataset_version',?)",
+        (old_dataset_version,),
+    )
+    conn.commit()
+    conn.close()
+    script = Path(__file__).parents[1] / "scripts" / "validate_next_move_db.py"
+
+    pre_validation_hash = hashlib.sha256(path.read_bytes()).hexdigest()
+    before_migration = subprocess.run(
+        [sys.executable, str(script), str(path)], capture_output=True, text=True, check=False
+    )
+    assert before_migration.returncode == 0, before_migration.stdout + before_migration.stderr
+    assert hashlib.sha256(path.read_bytes()).hexdigest() == pre_validation_hash
+
+    init_next_move_db()
+    conn = sqlite3.connect(path)
+    migrated = (
+        conn.execute("SELECT * FROM extraction_runs").fetchall(),
+        conn.execute("SELECT book_position_id,extraction_run_key FROM learning_samples").fetchall(),
+        conn.execute("SELECT value FROM database_metadata WHERE key='dataset_version'").fetchone()[0],
+    )
+    assert "run_instance_id" in {row[1] for row in conn.execute("PRAGMA table_info(extraction_runs)")}
+    assert migrated[0][0][-1] is None
+    assert migrated[0][0][0] == old_key
+    assert migrated[1] == [(position["id"], old_key)]
+    assert migrated[2] == old_dataset_version
+    conn.close()
+    after_migration = subprocess.run(
+        [sys.executable, str(script), str(path)], capture_output=True, text=True, check=False
+    )
+    assert after_migration.returncode == 0, after_migration.stdout + after_migration.stderr
+
+    init_next_move_db()
+    conn = sqlite3.connect(path)
+    assert conn.execute("SELECT * FROM extraction_runs").fetchall() == migrated[0]
+    assert conn.execute(
+        "SELECT book_position_id,extraction_run_key FROM learning_samples"
+    ).fetchall() == migrated[1]
+    assert conn.execute(
+        "SELECT value FROM database_metadata WHERE key='dataset_version'"
+    ).fetchone()[0] == migrated[2]
+    conn.close()
+
+    build_learning_sample_plan(source.source_id, limit=2, per_opening_limit=10, seed=11, dry_run=False)
+    conn = sqlite3.connect(path)
+    runs = conn.execute(
+        "SELECT extraction_run_key,run_instance_id FROM extraction_runs ORDER BY rowid"
+    ).fetchall()
+    current_keys = {row[0] for row in conn.execute("SELECT extraction_run_key FROM learning_samples")}
+    new_dataset_version = conn.execute(
+        "SELECT value FROM database_metadata WHERE key='dataset_version'"
+    ).fetchone()[0]
+    conn.close()
+    assert runs[0] == (old_key, None)
+    assert len(runs) == 2 and runs[1][1]
+    assert current_keys == {runs[1][0]}
+    assert new_dataset_version != old_dataset_version
+    mixed = subprocess.run(
+        [sys.executable, str(script), str(path)], capture_output=True, text=True, check=False
+    )
+    assert mixed.returncode == 0, mixed.stdout + mixed.stderr
 
 
 def _make_legacy(source: Path, target: Path):

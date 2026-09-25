@@ -27,7 +27,7 @@ CREATE TABLE IF NOT EXISTS book_moves (
 CREATE TABLE IF NOT EXISTS extraction_runs (
  extraction_run_key TEXT PRIMARY KEY, extractor_version TEXT NOT NULL, "limit" INTEGER NOT NULL,
  per_opening_limit INTEGER NOT NULL, seed INTEGER NOT NULL, source_file_sha256 TEXT NOT NULL,
- extracted_at TEXT NOT NULL
+ extracted_at TEXT NOT NULL, run_instance_id TEXT
 );
 CREATE TABLE IF NOT EXISTS learning_samples (
  id INTEGER PRIMARY KEY AUTOINCREMENT, book_source_id INTEGER NOT NULL REFERENCES book_sources(id) ON DELETE CASCADE,
@@ -111,6 +111,11 @@ def init_next_move_db() -> None:
             # Legacy writer-upgraded DBs therefore rely on the extractor transaction
             # and read-only validator for the same referential guarantee.
             conn.execute("ALTER TABLE learning_samples ADD COLUMN extraction_run_key TEXT")
+        run_columns = {row[1] for row in conn.execute("PRAGMA table_info(extraction_runs)")}
+        if "run_instance_id" not in run_columns:
+            # Existing run keys did not include this value.  NULL preserves their
+            # identity while all newly written runs receive a persisted UUID.
+            conn.execute("ALTER TABLE extraction_runs ADD COLUMN run_instance_id TEXT")
         conn.commit()
     finally:
         conn.close()

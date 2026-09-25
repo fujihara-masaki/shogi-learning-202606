@@ -5,9 +5,13 @@ import sqlite3
 import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from app.next_move_identity import problem_key
+from app.next_move_identity import extraction_run_key, problem_key
 
 REQUIRED = {"book_sources", "book_positions", "book_moves", "learning_samples"}
+REQUIRED_EXTRACTION_RUN_COLUMNS = {
+    "extraction_run_key", "extractor_version", "limit", "per_opening_limit",
+    "seed", "source_file_sha256", "extracted_at",
+}
 
 def main() -> int:
     parser = argparse.ArgumentParser()
@@ -24,8 +28,17 @@ def main() -> int:
         if missing := REQUIRED - tables: errors.append(f"missing tables: {', '.join(sorted(missing))}")
         integrity = conn.execute("PRAGMA integrity_check").fetchone()[0]
         if integrity != "ok": errors.append(f"integrity_check: {integrity}")
-        foreign_keys = conn.execute("PRAGMA foreign_key_check").fetchall()
-        if foreign_keys: errors.append(f"foreign_key_check: {len(foreign_keys)} violation(s)")
+        run_columns = set()
+        if "extraction_runs" in tables:
+            run_columns = {r[1] for r in conn.execute("PRAGMA table_info(extraction_runs)")}
+            if missing := REQUIRED_EXTRACTION_RUN_COLUMNS - run_columns:
+                errors.append(
+                    "incomplete extraction_runs schema; missing columns: "
+                    + ", ".join(sorted(missing))
+                )
+        if not errors:
+            foreign_keys = conn.execute("PRAGMA foreign_key_check").fetchall()
+            if foreign_keys: errors.append(f"foreign_key_check: {len(foreign_keys)} violation(s)")
         if not errors:
             metadata_parts = {
                 "extraction_runs": "extraction_runs" in tables,
@@ -40,6 +53,22 @@ def main() -> int:
                 metadata = conn.execute("SELECT value FROM database_metadata WHERE key='dataset_version'").fetchone()
                 if missing_runs: errors.append(f"invalid extraction_run reference: {missing_runs}")
                 if not metadata or not str(metadata[0]).startswith("v1:"): errors.append("missing/invalid dataset_version")
+                has_instance_id = "run_instance_id" in run_columns
+                for run in conn.execute("SELECT * FROM extraction_runs"):
+                    run_metadata = {
+                        "extractor_version": run["extractor_version"],
+                        "limit": run["limit"],
+                        "per_opening_limit": run["per_opening_limit"],
+                        "seed": run["seed"],
+                        "source_file_sha256": run["source_file_sha256"],
+                        "extracted_at": run["extracted_at"],
+                    }
+                    # NULL identifies a pre-migration row whose key was generated
+                    # from the original metadata shape.
+                    if has_instance_id and run["run_instance_id"] is not None:
+                        run_metadata["run_instance_id"] = run["run_instance_id"]
+                    if extraction_run_key(run_metadata) != run["extraction_run_key"]:
+                        errors.append(f"invalid extraction_run_key: {run['extraction_run_key']}")
                 print("schema=new")
             elif present == 0:
                 print("WARNING: legacy schema (extraction metadata unavailable)")
