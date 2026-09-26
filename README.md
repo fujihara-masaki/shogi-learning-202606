@@ -16,7 +16,7 @@
 ## 必要環境
 
 - Python 3 と `pip`（依存関係の下限は [`backend/requirements.txt`](backend/requirements.txt) を参照）
-- Node.js **20.19.0以上、または22.12.0以上**（lockfileに含まれる Vite 8 の要件）と npm
+- Node.js **20系は20.19.0以上、22系は22.13.0以上、または24以上**と npm（lockfileに含まれる開発ツール一式の共通範囲）
 - 次の一手を利用する場合は、別途準備した `learning_samples` 入りの SQLite DB
 
 この文書更新時の確認環境は Linux x86_64、Python 3.14.4、Node.js 24.15.0、npm 11.4.2 です。対応OSや、それ以外のバージョンでの動作を保証する記載ではありません。
@@ -28,7 +28,7 @@
 ```bash
 python3 -m venv backend/.venv
 backend/.venv/bin/python -m pip install -r backend/requirements.txt
-cd frontend && npm ci
+(cd frontend && npm ci)
 ```
 
 ターミナル1（リポジトリルートから）:
@@ -67,17 +67,16 @@ npm run dev
 
 ## 開発・テスト
 
-各コマンドはリポジトリルートから実行します。テスト件数は更新で変わるため固定していません。
+各コマンドはリポジトリルートから個別に実行します。丸括弧内でディレクトリを移動するため、前のコマンドの作業ディレクトリを引き継ぎません。テスト件数は更新で変わるため固定していません。
 
 ```bash
-cd backend && .venv/bin/python -m pytest
-cd frontend && npx vitest run
-cd frontend && npm run build
-cd frontend && npm run lint
-cd frontend && npm run test:e2e
+(cd backend && .venv/bin/python -m pytest)
+(cd frontend && npx vitest run)
+(cd frontend && npm run build)
+(cd frontend && npm run lint)
 ```
 
-E2Eは専用の小規模DBを生成しますが、既存サーバー再利用設定があります。通常利用中のサーバーやDBとの混同を避ける安全な実行方法、APIモックを使う検証との違いは [開発ガイドのE2E節](docs/development.md#e2eplaywright) を参照してください。
+E2Eは単純なコマンド列から分離しています。専用の小規模DBを生成しますが、環境変数と既存サーバー再利用設定に注意が必要です。通常利用中のサーバーやDBとの混同を避ける安全な実行方法、APIモックを使う検証との違いは [開発ガイドのE2E節](docs/development.md#e2eplaywright) を参照してください。
 
 ## ドキュメント
 

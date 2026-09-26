@@ -18,7 +18,7 @@
 D1b schemaに従うartifactをリポジトリルートで検証します。D0のlegacy監査JSONは入力対象外です。
 
 ```bash
-python3 backend/scripts/validate_wikipedia_opening_artifact.py path/to/artifact.json
+backend/.venv/bin/python backend/scripts/validate_wikipedia_opening_artifact.py path/to/artifact.json
 ```
 
 成功は終了コード0と `{"valid": true, "errors": []}`、schema／semantic違反は1、ファイル・UTF-8・JSON・bundled schemaなどの運用エラーは2です。検証だけではDBへ適用しません。
@@ -35,7 +35,7 @@ sfen <盤面> <手番> <持ち駒> <手数> moves ...
 `backend/` で通常DBの対象パスとライセンスを明示して取り込みます。
 
 ```bash
-SHOGI_DB_PATH=./data/shogi.db python scripts/import_openings.py \
+SHOGI_DB_PATH=./data/shogi.db .venv/bin/python scripts/import_openings.py \
   ../data/openings --license-name CC0 --license-url https://example.com/license
 ```
 
@@ -49,7 +49,7 @@ SHOGI_DB_PATH=./data/shogi.db python scripts/import_openings.py \
 
 ```bash
 NEXT_MOVE_DB_PATH=./data/next_move-staging.db \
-PYTHONPATH=. python -m app.importers.yaneuraou_book /path/to/book.db \
+PYTHONPATH=. .venv/bin/python -m app.importers.yaneuraou_book /path/to/book.db \
   --name "Book name" --license-name "License name" --dry-run
 ```
 
@@ -61,12 +61,12 @@ PYTHONPATH=. python -m app.importers.yaneuraou_book /path/to/book.db \
 
 ```bash
 NEXT_MOVE_DB_PATH=./data/next_move-staging.db \
-PYTHONPATH=. python -m app.importers.yaneuraou_book /path/to/book.db \
+PYTHONPATH=. .venv/bin/python -m app.importers.yaneuraou_book /path/to/book.db \
   --name "Book name" --source-url https://example.com/book \
   --license-name "License name" --limit 100
 
 NEXT_MOVE_DB_PATH=./data/next_move-staging.db \
-python -m app.scripts.extract_learning_samples \
+.venv/bin/python -m app.scripts.extract_learning_samples \
   --source-id 1 --limit 100 --per-opening-limit 20 --seed 1
 ```
 
@@ -77,21 +77,26 @@ python -m app.scripts.extract_learning_samples \
 `backend/` で読み取り検証します。
 
 ```bash
-python scripts/validate_next_move_db.py ./data/next_move-staging.db
+.venv/bin/python scripts/validate_next_move_db.py ./data/next_move-staging.db
 ```
 
 integrity／foreign key、孤立参照、必須項目、出典・ライセンス、重複、件数を確認します。通常は期待件数を固定しません。厳密に照合する必要がある場合だけ、抽出結果の `selected` を `--expected-learning-samples` に渡します。
 
 ## 詰め将棋データの取り込み
 
-本アプリは `tokuhirom/tanuki-tsume-shogi` の `puzzles/1.json`、`3.json`、`5.json` を取り込めます。利用条件と著作権表示は [`../THIRD_PARTY_NOTICES.md`](../THIRD_PARTY_NOTICES.md) を確認してください。取り込み前に通常DBをバックアップし、対象パスを明示します。
+本アプリは `tokuhirom/tanuki-tsume-shogi` の `puzzles/1.json`、`3.json`、`5.json` を取り込めます。利用条件と著作権表示は [`../THIRD_PARTY_NOTICES.md`](../THIRD_PARTY_NOTICES.md) を確認してください。取り込み前に通常DBをバックアップし、対象パスを明示します。スクリプトはディレクトリを展開しないため、JSONファイルまたはURLを引数ごとに指定します。`--dry-run` でも通常DBの初期化処理を呼ぶため、試行時も必ず隔離した `SHOGI_DB_PATH` を指定してください。
 
 ```bash
 cd backend
-SHOGI_DB_PATH=./data/shogi.db python scripts/import_tanuki_tsume.py /path/to/puzzles
+SHOGI_DB_PATH=/tmp/shogi-tanuki-import.db \
+  .venv/bin/python scripts/import_tanuki_tsume.py \
+  /path/to/puzzles/1.json \
+  /path/to/puzzles/3.json \
+  /path/to/puzzles/5.json \
+  --dry-run
 ```
 
-コマンドの引数詳細は `python scripts/import_tanuki_tsume.py --help` で確認してください。
+上はmacOS/Linux向けの検証例です。`/tmp/shogi-tanuki-import.db` は新規の一時パスに置き換え、通常DBを指定しないでください。本取り込みでは、バックアップ後に意図する通常DBのパスへ変更し、`--dry-run` を外します。コマンドの引数詳細は `.venv/bin/python scripts/import_tanuki_tsume.py --help` で確認してください。
 
 ## バックアップ、差し替え、復旧
 
