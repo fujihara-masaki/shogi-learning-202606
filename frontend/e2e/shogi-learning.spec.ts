@@ -1515,49 +1515,103 @@ test("Yokofudori 2c pawn bundled line replays the complete cited sequence", asyn
 
   const next = page.getByRole("button", { name: "本線を一手進む", exact: true });
   const back = page.getByRole("button", { name: "一手戻る", exact: true });
+  const feedback = page.getByTestId("opening-feedback");
   const history = page.locator(".move-history .move-usi");
   const board = page.getByTestId("shogi-board");
+  const senteHand = board.getByRole("group", { name: "先手の持ち駒", exact: true });
+  const goteHand = board.getByRole("group", { name: "後手の持ち駒", exact: true });
+
+  const expectPly12 = async () => {
+    await expect(board.locator('[data-square="23"]')).toHaveAccessibleName(/2三.*後手の歩/);
+    await expect(board.locator('[data-square="24"]')).toHaveAccessibleName(/2四.*先手の飛/);
+    await expect(board.locator('[data-square="82"]')).toHaveAccessibleName(/8二.*後手の飛/);
+    await expect(board.locator('[data-square="85"]')).toHaveAccessibleName(/8五.*後手の歩/);
+    await expect(senteHand.getByRole("button", { name: "先手の持ち駒 歩 1枚", exact: true })).toHaveCount(1);
+    await expect(goteHand).toHaveText("なし");
+    await expect(board.getByTestId("turn-indicator")).toHaveText("手番: ▲先手");
+  };
+  const expectPly16 = async () => {
+    await expect(board.locator('[data-square="25"]')).toHaveAccessibleName(/2五.*後手の角/);
+    await expect(board.locator('[data-square="34"]')).toHaveAccessibleName(/3四.*先手の飛/);
+    await expect(board.locator('[data-square="88"]')).toHaveAccessibleName(/8八.*先手の銀/);
+    await expect(board.locator('[data-square="22"]')).toHaveAccessibleName(/2二.*空きマス/);
+    await expect(board.locator('[data-square="79"]')).toHaveAccessibleName(/7九.*空きマス/);
+    await expect(board.locator('[data-square="82"]')).toHaveAccessibleName(/8二.*後手の飛/);
+    await expect(board.locator('[data-square="85"]')).toHaveAccessibleName(/8五.*後手の歩/);
+    await expect(senteHand.getByRole("button", { name: "先手の持ち駒 角 1枚", exact: true })).toHaveCount(1);
+    await expect(senteHand.getByRole("button", { name: "先手の持ち駒 歩 2枚", exact: true })).toHaveCount(1);
+    await expect(goteHand).toHaveText("なし");
+    await expect(board.getByTestId("turn-indicator")).toHaveText("手番: ▲先手");
+  };
+
   for (let ply = 1; ply <= 12; ply += 1) await next.click();
   await expect(history).toHaveCount(12);
   await expect(history.last()).toHaveText("(P*2c)");
-  await expect(board.locator('[data-square="23"]')).toHaveAccessibleName(/2三.*後手の歩/);
-  await expect(board.locator('[data-square="24"]')).toHaveAccessibleName(/2四.*先手の飛/);
-  await expect(board.locator('[data-square="82"]')).toHaveAccessibleName(/8二.*後手の飛/);
-  await expect(board.locator('[data-square="85"]')).toHaveAccessibleName(/8五.*後手の歩/);
+  await expectPly12();
+
+  // Undoing and replaying the pawn drop restores then consumes Gote's pawn.
+  await back.click();
+  await expect(history).toHaveCount(11);
+  await expect(board.locator('[data-square="23"]')).toHaveAccessibleName(/2三.*空きマス/);
+  await expect(goteHand.getByRole("button", { name: "後手の持ち駒 歩 1枚", exact: true })).toHaveCount(1);
+  await expect(board.getByTestId("turn-indicator")).toHaveText("手番: △後手");
+  await next.click();
+  await expectPly12();
 
   for (let ply = 13; ply <= 16; ply += 1) await next.click();
   await expect(history).toHaveCount(16);
   await expect(history.last()).toHaveText("(B*2e)");
   await expect(next).toBeDisabled();
-  await expect(page.getByTestId("opening-feedback")).toContainText("この定跡手順を完了しました");
-  await expect(board.locator('[data-square="25"]')).toHaveAccessibleName(/2五.*後手の角/);
-  await expect(board.locator('[data-square="34"]')).toHaveAccessibleName(/3四.*先手の飛/);
-  await expect(board.locator('[data-square="88"]')).toHaveAccessibleName(/8八.*先手の銀/);
-  await expect(board.locator('[data-square="22"]')).toHaveAccessibleName(/2二.*空きマス/);
-  await expect(board.locator('[data-square="79"]')).toHaveAccessibleName(/7九.*空きマス/);
-  await expect(board.locator('[data-square="82"]')).toHaveAccessibleName(/8二.*後手の飛/);
-  await expect(board.locator('[data-square="85"]')).toHaveAccessibleName(/8五.*後手の歩/);
+  await expect(feedback).toContainText("この定跡手順を完了しました");
+  await expectPly16();
 
+  // Undoing and replaying the bishop drop restores then consumes Gote's bishop.
   await back.click();
-  await expect(history).toHaveCount(15); await expect(history.last()).toHaveText("(7i8h)");
-  await next.click(); await expect(history.last()).toHaveText("(B*2e)");
-  await page.getByRole("button", { name: "最初に戻る", exact: true }).click();
-  await expect(history).toHaveCount(0);
+  await expect(history).toHaveCount(15);
+  await expect(history.last()).toHaveText("(7i8h)");
+  await expect(board.locator('[data-square="25"]')).toHaveAccessibleName(/2五.*空きマス/);
+  await expect(goteHand.getByRole("button", { name: "後手の持ち駒 角 1枚", exact: true })).toHaveCount(1);
+  await expect(board.getByTestId("turn-indicator")).toHaveText("手番: △後手");
+  await next.click();
+  await expectPly16();
+  await expect(history.last()).toHaveText("(B*2e)");
 
   const disclosure = page.getByTestId("opening-variation-disclosure");
   await disclosure.locator("summary").click();
-  for (const [ply, usi] of [[12, "P*2c"], [16, "B*2e"]] as const) {
+  const jumpTo = async (ply: 12 | 16, usi: "P*2c" | "B*2e") => {
     const path = Array(ply).fill("1").join("-");
-    await disclosure.getByRole("button", {
+    const jump = disclosure.getByRole("button", {
       name: `${ply}手目 ${usi}、USI ${usi}、ルート、経路 ${path}、ここへ移動`, exact: true,
-    }).click();
+    });
+    await jump.click();
     await expect(history).toHaveCount(ply);
     await expect(history.last()).toHaveText(`(${usi})`);
-  }
+    await expect(disclosure.locator("summary")).toContainText(`現在${ply}手`);
+    await expect(jump).toHaveAttribute("aria-current", "step");
+    await expect(disclosure.locator('[aria-current="step"]')).toHaveCount(1);
+    if (ply === 12) {
+      await expectPly12();
+      await expect(next).toBeEnabled();
+      await expect(page.getByTestId("opening-current-move")).toContainText("2d3d");
+      await expect(feedback).toContainText("12手目");
+    } else {
+      await expectPly16();
+      await expect(next).toBeDisabled();
+      await expect(feedback).toContainText("この定跡手順を完了しました");
+    }
+  };
+
+  // Jump backwards and forwards from an already reached leaf and verify all UI state.
+  await jumpTo(12, "P*2c");
+  await jumpTo(16, "B*2e");
   const source = page.getByTestId("opening-source");
   await expect(source).toContainText("図1-Bへ至る基本16手");
   await expect(source).toContainText("引用対象の基本16手をすべて収録");
   await expect(source.getByRole("link")).toHaveAttribute("href", /oldid=92929426/);
+
+  await page.getByRole("button", { name: "最初に戻る", exact: true }).click();
+  await expect(history).toHaveCount(0);
+  await expect(board.getByTestId("turn-indicator")).toHaveText("手番: ▲先手");
   await page.setViewportSize({ width: 360, height: 800 });
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
 });

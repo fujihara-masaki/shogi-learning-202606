@@ -38,10 +38,30 @@ describe("Yokofudori 2c pawn production canonical line", () => {
     expect(continueOpeningMainLine(opening, [])).toEqual(Array(16).fill(0));
     expect(expectedOpeningMove(opening, Array(15).fill(0))?.usi).toBe("B*2e");
     expect(expectedOpeningMove(opening, Array(16).fill(0))).toBeNull();
-    const leaf = applyOpeningPath(opening, Array(16).fill(0));
-    expect(leaf.moves).toHaveLength(16); expect(leaf.moves.at(-1)?.usi).toBe("B*2e");
-    const back = applyOpeningPath(opening, Array(15).fill(0));
-    expect(back.moves.at(-1)?.usi).toBe("7i8h"); expect(expectedOpeningMove(opening, Array(15).fill(0))?.usi).toBe("B*2e");
-    expect(applyOpeningPath(opening, Array(8).fill(0)).moves).toHaveLength(8);
+    const at = (ply: number) => applyOpeningPath(opening, Array(ply).fill(0));
+    const expectCanonicalPosition = (ply: 11 | 12 | 15 | 16, hand: string, turn: "b" | "w") => {
+      const result = at(ply);
+      expect(result.moves).toHaveLength(ply);
+      expect(result.moves.at(-1)?.usi).toBe(record.nodes[ply - 1].usi);
+      expect(result.position.sfen.replace(/\d+$/, String(ply + 1))).toBe(record.nodes[ply - 1].to_sfen);
+      const [, actualTurn, actualHand] = result.position.sfen.split(" ");
+      expect({ turn: actualTurn, hand: actualHand }).toEqual({ turn, hand });
+      return result;
+    };
+
+    // Applying shorter and longer production paths reconstructs the position;
+    // a drop removed by undo returns to hand and redo consumes it again.
+    expectCanonicalPosition(12, "P", "b");
+    const beforePawnDrop = expectCanonicalPosition(11, "Pp", "w");
+    expect(beforePawnDrop.position.sfen.split("/")[2]).toContain("p1pppp2p"); // 2三 is empty.
+    expectCanonicalPosition(12, "P", "b");
+    expect(expectedOpeningMove(opening, Array(12).fill(0))?.usi).toBe("2d3d");
+
+    expectCanonicalPosition(16, "B2P", "b");
+    const beforeBishopDrop = expectCanonicalPosition(15, "B2Pb", "w");
+    expect(beforeBishopDrop.position.sfen.split("/")[4]).toBe("1p7"); // 2五 is empty.
+    expectCanonicalPosition(16, "B2P", "b");
+    expect(expectedOpeningMove(opening, Array(16).fill(0))).toBeNull();
+    expect(at(8).moves).toHaveLength(8);
   });
 });
