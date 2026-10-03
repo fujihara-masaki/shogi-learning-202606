@@ -5,7 +5,7 @@
 | データ | 保存先／供給元 | 初回起動 |
 | --- | --- | --- |
 | 詰め将棋、学習履歴、タイムアタック、次の一手の解答履歴 | `SHOGI_DB_PATH`（既定 `backend/data/shogi.db`） | DB作成。空なら`[sample]` 7問を投入 |
-| 戦型カタログ、定跡手順 | 通常DB、フロントエンド固定手順 | カタログ、38件のローカルseed、同梱canonical artifactを適用 |
+| 戦型カタログ、定跡手順 | 通常DB、フロントエンド固定手順 | カタログ、39件のローカルseed、同梱canonical artifactを適用 |
 | 外部定跡候補、学習サンプル | `NEXT_MOVE_DB_PATH`（既定 `backend/data/next_move.db`） | 作成・更新しない。実行時は読み取り専用 |
 | Shogi Images | `frontend/public/assets/shogi/` | リポジトリに同梱 |
 

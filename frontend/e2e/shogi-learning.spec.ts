@@ -1504,3 +1504,60 @@ test("Yokofudori 3c bishop bundled line replays the complete cited sequence", as
   await page.setViewportSize({ width: 360, height: 800 });
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
 });
+
+test("Yokofudori 2c pawn bundled line replays the complete cited sequence", async ({ page }) => {
+  await page.goto("/openings");
+  await showOpeningTypeLines(page, "横歩取り△2三歩");
+  const card = openingLineByExactTitle(page, "横歩取り△2三歩");
+  await expect(card).toHaveCount(1);
+  await expect(card).toContainText("16手");
+  await card.getByRole("link", { name: "学習する", exact: true }).click();
+
+  const next = page.getByRole("button", { name: "本線を一手進む", exact: true });
+  const back = page.getByRole("button", { name: "一手戻る", exact: true });
+  const history = page.locator(".move-history .move-usi");
+  const board = page.getByTestId("shogi-board");
+  for (let ply = 1; ply <= 12; ply += 1) await next.click();
+  await expect(history).toHaveCount(12);
+  await expect(history.last()).toHaveText("(P*2c)");
+  await expect(board.locator('[data-square="23"]')).toHaveAccessibleName(/2三.*後手の歩/);
+  await expect(board.locator('[data-square="24"]')).toHaveAccessibleName(/2四.*先手の飛/);
+  await expect(board.locator('[data-square="82"]')).toHaveAccessibleName(/8二.*後手の飛/);
+  await expect(board.locator('[data-square="85"]')).toHaveAccessibleName(/8五.*後手の歩/);
+
+  for (let ply = 13; ply <= 16; ply += 1) await next.click();
+  await expect(history).toHaveCount(16);
+  await expect(history.last()).toHaveText("(B*2e)");
+  await expect(next).toBeDisabled();
+  await expect(page.getByTestId("opening-feedback")).toContainText("この定跡手順を完了しました");
+  await expect(board.locator('[data-square="25"]')).toHaveAccessibleName(/2五.*後手の角/);
+  await expect(board.locator('[data-square="34"]')).toHaveAccessibleName(/3四.*先手の飛/);
+  await expect(board.locator('[data-square="88"]')).toHaveAccessibleName(/8八.*先手の銀/);
+  await expect(board.locator('[data-square="22"]')).toHaveAccessibleName(/2二.*空きマス/);
+  await expect(board.locator('[data-square="79"]')).toHaveAccessibleName(/7九.*空きマス/);
+  await expect(board.locator('[data-square="82"]')).toHaveAccessibleName(/8二.*後手の飛/);
+  await expect(board.locator('[data-square="85"]')).toHaveAccessibleName(/8五.*後手の歩/);
+
+  await back.click();
+  await expect(history).toHaveCount(15); await expect(history.last()).toHaveText("(7i8h)");
+  await next.click(); await expect(history.last()).toHaveText("(B*2e)");
+  await page.getByRole("button", { name: "最初に戻る", exact: true }).click();
+  await expect(history).toHaveCount(0);
+
+  const disclosure = page.getByTestId("opening-variation-disclosure");
+  await disclosure.locator("summary").click();
+  for (const [ply, usi] of [[12, "P*2c"], [16, "B*2e"]] as const) {
+    const path = Array(ply).fill("1").join("-");
+    await disclosure.getByRole("button", {
+      name: `${ply}手目 ${usi}、USI ${usi}、ルート、経路 ${path}、ここへ移動`, exact: true,
+    }).click();
+    await expect(history).toHaveCount(ply);
+    await expect(history.last()).toHaveText(`(${usi})`);
+  }
+  const source = page.getByTestId("opening-source");
+  await expect(source).toContainText("図1-Bへ至る基本16手");
+  await expect(source).toContainText("引用対象の基本16手をすべて収録");
+  await expect(source.getByRole("link")).toHaveAttribute("href", /oldid=92929426/);
+  await page.setViewportSize({ width: 360, height: 800 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
+});
