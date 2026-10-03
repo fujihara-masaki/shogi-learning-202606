@@ -1,0 +1,67 @@
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import { describe, expect, it } from "vitest";
+import { Position } from "tsshogi";
+import { applyOpeningPath, continueOpeningMainLine, expectedOpeningMove, flattenMainLine, openingFromImportedLine } from "./openings";
+
+type Node = { key: string; parent_key: string | null; usi: string; from_sfen: string; to_sfen: string; sort_order: number; is_main: boolean; variation_group: string };
+type Record = { line_name: string; initial_sfen: string; nodes: Node[] };
+const path = fileURLToPath(new URL("../../../backend/app/wikipedia_opening_artifacts/yokofudori-2c-pawn.json", import.meta.url));
+const record = (JSON.parse(readFileSync(path, "utf8")) as { records: Record[] }).records[0];
+
+function fixture() {
+  const ids = new Map(record.nodes.map((node, index) => [node.key, index + 1]));
+  return openingFromImportedLine({ id: 203, name: record.line_name, opening_type: "相居飛車", initial_sfen: record.initial_sfen,
+    moves: record.nodes.map((node) => ({ id: ids.get(node.key), parent_move_id: node.parent_key ? ids.get(node.parent_key)! : null,
+      usi: node.usi, from_sfen: node.from_sfen, to_sfen: node.to_sfen, sort_order: node.sort_order,
+      is_main: node.is_main, move_key: node.key, variation_group: node.variation_group })),
+    source: { name: "Wikipedia 横歩取り2三歩", license_name: "CC BY-SA 4.0", license_url: "" },
+  });
+}
+
+describe("Yokofudori 2c pawn production canonical line", () => {
+  it("validates all 16 edges and canonical SFENs with tsshogi", () => {
+    expect(record.nodes.map((node) => node.usi)).toEqual("7g7f 3c3d 2g2f 8c8d 2f2e 8d8e 6i7h 4a3b 2e2d 2c2d 2h2d P*2c 2d3d 2b8h+ 7i8h B*2e".split(" "));
+    for (const node of record.nodes) {
+      const position = Position.newBySFEN(node.from_sfen)!;
+      const move = position.createMoveByUSI(node.usi);
+      expect(move).not.toBeNull(); expect(position.isValidMove(move!)).toBe(true);
+      position.doMove(move!);
+      expect(position.sfen.replace(/\d+$/, node.to_sfen.split(" ").at(-1)!)).toBe(node.to_sfen);
+    }
+  });
+
+  it("builds, replays, jumps, steps back, and stops at the linear leaf", () => {
+    const opening = fixture();
+    expect(flattenMainLine(opening)).toHaveLength(16);
+    expect(opening.moves).toHaveLength(1);
+    expect(continueOpeningMainLine(opening, [])).toEqual(Array(16).fill(0));
+    expect(expectedOpeningMove(opening, Array(15).fill(0))?.usi).toBe("B*2e");
+    expect(expectedOpeningMove(opening, Array(16).fill(0))).toBeNull();
+    const at = (ply: number) => applyOpeningPath(opening, Array(ply).fill(0));
+    const expectCanonicalPosition = (ply: 11 | 12 | 15 | 16, hand: string, turn: "b" | "w") => {
+      const result = at(ply);
+      expect(result.moves).toHaveLength(ply);
+      expect(result.moves.at(-1)?.usi).toBe(record.nodes[ply - 1].usi);
+      expect(result.position.sfen.replace(/\d+$/, String(ply + 1))).toBe(record.nodes[ply - 1].to_sfen);
+      const [, actualTurn, actualHand] = result.position.sfen.split(" ");
+      expect({ turn: actualTurn, hand: actualHand }).toEqual({ turn, hand });
+      return result;
+    };
+
+    // Applying shorter and longer production paths reconstructs the position;
+    // a drop removed by undo returns to hand and redo consumes it again.
+    expectCanonicalPosition(12, "P", "b");
+    const beforePawnDrop = expectCanonicalPosition(11, "Pp", "w");
+    expect(beforePawnDrop.position.sfen.split("/")[2]).toContain("p1pppp2p"); // 2三 is empty.
+    expectCanonicalPosition(12, "P", "b");
+    expect(expectedOpeningMove(opening, Array(12).fill(0))?.usi).toBe("2d3d");
+
+    expectCanonicalPosition(16, "B2P", "b");
+    const beforeBishopDrop = expectCanonicalPosition(15, "B2Pb", "w");
+    expect(beforeBishopDrop.position.sfen.split("/")[4]).toBe("1p7"); // 2五 is empty.
+    expectCanonicalPosition(16, "B2P", "b");
+    expect(expectedOpeningMove(opening, Array(16).fill(0))).toBeNull();
+    expect(at(8).moves).toHaveLength(8);
+  });
+});
