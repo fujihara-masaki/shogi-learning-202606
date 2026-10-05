@@ -2,8 +2,8 @@
   "artifact_version": 1,
   "review": {
     "review_status": "reviewed",
-    "reviewed_by": "ChatGPT (external source review 2026-10-04); Codex (HTTPS source, artifact and legality verification)",
-    "reviewed_on": "2026-10-06",
+    "reviewed_by": "ChatGPT (source review); Codex (artifact review and legality verification)",
+    "reviewed_on": "2026-10-03",
     "legality_checks": {
       "backend_python_shogi": "passed",
       "frontend_tsshogi": "passed"
@@ -18,10 +18,10 @@
       "source": {
         "url": "https://ja.wikipedia.org/w/index.php?title=%E6%A8%AA%E6%AD%A9%E5%8F%96%E3%82%8A2%E4%B8%89%E6%AD%A9&oldid=92929426",
         "title": "Wikipedia 横歩取り2三歩",
-        "section": "戦法の概要／導入～△2三歩からの展開（図1-Bへ至る基本16手と△4五角の明示変化23手目まで）"
+        "section": "戦法の概要／導入～△2三歩からの展開の冒頭（図1-Bへ至る基本16手）"
       },
       "license": "CC BY-SA 4.0",
-      "retrieved_date": "2026-10-06",
+      "retrieved_date": "2026-10-03",
       "revision": 92929426,
       "provenance": "A",
       "coverage_status": "complete_for_cited_sequence",
@@ -31,8 +31,8 @@
         "covered_through_move": "B*2e",
         "omitted_after": null
       },
-      "source_note": "2026-10-04の外部ChatGPTレビューは固定版revision 92929426の2022年12月16日16:51 UTCの版表示・本文・末尾のoldidを確認した。Codexも2026-10-06に同じ固定版をHTTPS GETで取得（curl終了0、HTTP 200、最終URLのoldidと本文・版IDが一致）し、本文との対応、全24nodeのpython-shogi／tsshogiによる合法性とSFENを検証した。既定本線は引用対象の基本16手をすべて収録し、追加の△4五角変化は23手目▲4八角までの明示列を収録する。13手目の別応、本線16手目後の17手目▲3二飛成／▲3六飛と後続等は対象外。このPRの引用対象は完了したが、△2三歩記事全体・小節全体・E2全体の網羅や完了を意味しない。",
-      "evidence_note": "「戦法の概要 > 導入」の1～12手と「△2三歩からの展開」冒頭の13～16手（図1-Bまで）を既定本線として保持。同節第2段落の16手目△4五角から21手目▲3六歩（図1-C相当）、括弧内の△1四歩～23手目▲4八角までを追加する。本文の後手不利という説明を根拠とし、エンジン評価や23手目以後の捕獲手順は追加しない。13手目▲2八飛／▲2六飛、本線16手目後の17手目2候補と後続等は今回の対象外。引用対象の完了と記事・E2全体の完了は区別する。",
+      "source_note": "2026-10-03にChatGPTのWeb閲覧で固定版URLを開き、2022年12月16日16:51 UTCの版表示、本文、末尾のoldidを確認した外部出典レビューに基づく。引用対象の基本16手をすべて収録した限定的な範囲であり、記事や「△2三歩からの展開」小節全体の網羅ではない。Codex環境からの固定版取得はCONNECT tunnelのHTTP 403で失敗した。これは外部出典レビューとは区別し、Codexはartifactの正規化・合法性・SFENを検証した。",
+      "evidence_note": "「戦法の概要 > 導入」の1～12手と「戦法の概要 > △2三歩からの展開」冒頭で▲3四飛を選ぶ13～16手（図1-Bまで）を収録。本文にある▲2八飛・▲2六飛、△4五角、17手目以後その他の変化は今回の引用対象外とする。",
       "nodes": [
         {
           "key": "main-1",
@@ -241,110 +241,6 @@
           "provenance": "A",
           "source_section": "戦法の概要 > △2三歩からの展開（基本導入列）",
           "evidence_note": "固定版本文の引用対象に連続手順として明記された基本16手の着手。"
-        },
-        {
-          "key": "bishop-4e-16",
-          "parent_key": "main-15",
-          "usi": "B*4e",
-          "sort_order": 1,
-          "is_main": false,
-          "variation_group": "△4五角の変化",
-          "from_sfen": "lnsgk1snl/1r4g2/p1pppp1pp/6R2/1p7/2P6/PP1PPPP1P/1SG6/LN2KGSNL w B2Pb 16",
-          "to_sfen": "lnsgk1snl/1r4g2/p1pppp1pp/6R2/1p3b3/2P6/PP1PPPP1P/1SG6/LN2KGSNL b B2P 17",
-          "provenance": "A",
-          "source_section": "戦法の概要 > △2三歩からの展開（第2段落・括弧内を含む）",
-          "evidence_note": "同段落の本文に順序どおり明記された△4五角の変化。図1-Cは21手目▲3六歩後であり、22～23手目は括弧内の続き。23手目以後は補間しない。"
-        },
-        {
-          "key": "bishop-4e-17",
-          "parent_key": "bishop-4e-16",
-          "usi": "3d3e",
-          "sort_order": 0,
-          "is_main": true,
-          "variation_group": "△4五角の変化",
-          "from_sfen": "lnsgk1snl/1r4g2/p1pppp1pp/6R2/1p3b3/2P6/PP1PPPP1P/1SG6/LN2KGSNL b B2P 17",
-          "to_sfen": "lnsgk1snl/1r4g2/p1pppp1pp/9/1p3bR2/2P6/PP1PPPP1P/1SG6/LN2KGSNL w B2P 18",
-          "provenance": "A",
-          "source_section": "戦法の概要 > △2三歩からの展開（第2段落・括弧内を含む）",
-          "evidence_note": "同段落の本文に順序どおり明記された△4五角の変化。図1-Cは21手目▲3六歩後であり、22～23手目は括弧内の続き。23手目以後は補間しない。"
-        },
-        {
-          "key": "bishop-4e-18",
-          "parent_key": "bishop-4e-17",
-          "usi": "4e2g+",
-          "sort_order": 0,
-          "is_main": true,
-          "variation_group": "△4五角の変化",
-          "from_sfen": "lnsgk1snl/1r4g2/p1pppp1pp/9/1p3bR2/2P6/PP1PPPP1P/1SG6/LN2KGSNL w B2P 18",
-          "to_sfen": "lnsgk1snl/1r4g2/p1pppp1pp/9/1p4R2/2P6/PP1PPPP+bP/1SG6/LN2KGSNL b B2P 19",
-          "provenance": "A",
-          "source_section": "戦法の概要 > △2三歩からの展開（第2段落・括弧内を含む）",
-          "evidence_note": "同段落の本文に順序どおり明記された△4五角の変化。図1-Cは21手目▲3六歩後であり、22～23手目は括弧内の続き。23手目以後は補間しない。"
-        },
-        {
-          "key": "bishop-4e-19",
-          "parent_key": "bishop-4e-18",
-          "usi": "B*1e",
-          "sort_order": 0,
-          "is_main": true,
-          "variation_group": "△4五角の変化",
-          "from_sfen": "lnsgk1snl/1r4g2/p1pppp1pp/9/1p4R2/2P6/PP1PPPP+bP/1SG6/LN2KGSNL b B2P 19",
-          "to_sfen": "lnsgk1snl/1r4g2/p1pppp1pp/9/1p4R1B/2P6/PP1PPPP+bP/1SG6/LN2KGSNL w 2P 20",
-          "provenance": "A",
-          "source_section": "戦法の概要 > △2三歩からの展開（第2段落・括弧内を含む）",
-          "evidence_note": "同段落の本文に順序どおり明記された△4五角の変化。図1-Cは21手目▲3六歩後であり、22～23手目は括弧内の続き。23手目以後は補間しない。"
-        },
-        {
-          "key": "bishop-4e-20",
-          "parent_key": "bishop-4e-19",
-          "usi": "5a5b",
-          "sort_order": 0,
-          "is_main": true,
-          "variation_group": "△4五角の変化",
-          "from_sfen": "lnsgk1snl/1r4g2/p1pppp1pp/9/1p4R1B/2P6/PP1PPPP+bP/1SG6/LN2KGSNL w 2P 20",
-          "to_sfen": "lnsg2snl/1r2k1g2/p1pppp1pp/9/1p4R1B/2P6/PP1PPPP+bP/1SG6/LN2KGSNL b 2P 21",
-          "provenance": "A",
-          "source_section": "戦法の概要 > △2三歩からの展開（第2段落・括弧内を含む）",
-          "evidence_note": "同段落の本文に順序どおり明記された△4五角の変化。図1-Cは21手目▲3六歩後であり、22～23手目は括弧内の続き。23手目以後は補間しない。"
-        },
-        {
-          "key": "bishop-4e-21",
-          "parent_key": "bishop-4e-20",
-          "usi": "3g3f",
-          "sort_order": 0,
-          "is_main": true,
-          "variation_group": "△4五角の変化",
-          "from_sfen": "lnsg2snl/1r2k1g2/p1pppp1pp/9/1p4R1B/2P6/PP1PPPP+bP/1SG6/LN2KGSNL b 2P 21",
-          "to_sfen": "lnsg2snl/1r2k1g2/p1pppp1pp/9/1p4R1B/2P3P2/PP1PPP1+bP/1SG6/LN2KGSNL w 2P 22",
-          "provenance": "A",
-          "source_section": "戦法の概要 > △2三歩からの展開（第2段落・括弧内を含む）",
-          "evidence_note": "同段落の本文に順序どおり明記された△4五角の変化。図1-Cは21手目▲3六歩後であり、22～23手目は括弧内の続き。23手目以後は補間しない。"
-        },
-        {
-          "key": "bishop-4e-22",
-          "parent_key": "bishop-4e-21",
-          "usi": "1c1d",
-          "sort_order": 0,
-          "is_main": true,
-          "variation_group": "△4五角の変化",
-          "from_sfen": "lnsg2snl/1r2k1g2/p1pppp1pp/9/1p4R1B/2P3P2/PP1PPP1+bP/1SG6/LN2KGSNL w 2P 22",
-          "to_sfen": "lnsg2snl/1r2k1g2/p1pppp1p1/8p/1p4R1B/2P3P2/PP1PPP1+bP/1SG6/LN2KGSNL b 2P 23",
-          "provenance": "A",
-          "source_section": "戦法の概要 > △2三歩からの展開（第2段落・括弧内を含む）",
-          "evidence_note": "同段落の本文に順序どおり明記された△4五角の変化。図1-Cは21手目▲3六歩後であり、22～23手目は括弧内の続き。23手目以後は補間しない。"
-        },
-        {
-          "key": "bishop-4e-23",
-          "parent_key": "bishop-4e-22",
-          "usi": "1e4h",
-          "sort_order": 0,
-          "is_main": true,
-          "variation_group": "△4五角の変化",
-          "from_sfen": "lnsg2snl/1r2k1g2/p1pppp1p1/8p/1p4R1B/2P3P2/PP1PPP1+bP/1SG6/LN2KGSNL b 2P 23",
-          "to_sfen": "lnsg2snl/1r2k1g2/p1pppp1p1/8p/1p4R2/2P3P2/PP1PPP1+bP/1SG2B3/LN2KGSNL w 2P 24",
-          "provenance": "A",
-          "source_section": "戦法の概要 > △2三歩からの展開（第2段落・括弧内を含む）",
-          "evidence_note": "同段落の本文に順序どおり明記された△4五角の変化。図1-Cは21手目▲3六歩後であり、22～23手目は括弧内の続き。23手目以後は補間しない。"
         }
       ]
     }
