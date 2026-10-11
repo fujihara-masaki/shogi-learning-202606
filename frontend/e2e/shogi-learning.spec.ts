@@ -1505,7 +1505,8 @@ test("Yokofudori 3c bishop bundled line replays the complete cited sequence", as
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
 });
 
-test("Yokofudori 2c pawn bundled line replays the complete cited sequence", async ({ page }) => {
+test("Yokofudori 2c pawn bundled line replays the complete cited sequence", async ({ page }, testInfo) => {
+  test.setTimeout(60_000);
   await page.goto("/openings");
   await showOpeningTypeLines(page, "横歩取り△2三歩");
   const card = openingLineByExactTitle(page, "横歩取り△2三歩");
@@ -1581,7 +1582,7 @@ test("Yokofudori 2c pawn bundled line replays the complete cited sequence", asyn
   const jumpTo = async (ply: 12 | 16, usi: "P*2c" | "B*2e") => {
     const path = Array(ply).fill("1").join("-");
     const jump = disclosure.getByRole("button", {
-      name: `${ply}手目 ${usi}、USI ${usi}、ルート、経路 ${path}、ここへ移動`, exact: true,
+      name: `${ply}手目 ${usi}、USI ${usi}、${ply === 16 ? "△2三歩基本手順" : "ルート"}、経路 ${path}、ここへ移動`, exact: true,
     });
     await jump.click();
     await expect(history).toHaveCount(ply);
@@ -1608,6 +1609,104 @@ test("Yokofudori 2c pawn bundled line replays the complete cited sequence", asyn
   await expect(source).toContainText("図1-Bへ至る基本16手");
   await expect(source).toContainText("引用対象の基本16手をすべて収録");
   await expect(source.getByRole("link")).toHaveAttribute("href", /oldid=92929426/);
+
+  // All branch operations below run at 360px, using exact structural names.
+  await page.setViewportSize({ width: 360, height: 800 });
+  await back.click();
+  await expect(history).toHaveCount(15);
+  const branches = page.getByTestId("opening-branches");
+  await expect(branches.locator(".branch-card")).toHaveCount(2);
+  await expect(branches.getByRole("button", { name: "本線 B*2e、この変化を見る", exact: true })).toBeVisible();
+  await expect(branches.getByRole("button", { name: "変化 B*4e、この変化を見る", exact: true })).toBeVisible();
+  await page.screenshot({ path: testInfo.outputPath("ply15-branches-360.png"), fullPage: true });
+
+  // A real board drop accepts the alternative as a registered correct move.
+  await goteHand.getByRole("button", { name: "後手の持ち駒 角 1枚", exact: true }).click();
+  await board.locator('[data-square="45"]').click();
+  await expect(feedback).toContainText("正解: B*4e");
+  await expect(history).toHaveCount(16);
+  await expect(history.last()).toHaveText("(B*4e)");
+  await expect(board.locator('[data-square="45"]')).toHaveAccessibleName(/4五.*後手の角/);
+  await expect(next).toBeEnabled();
+  await next.click(); // 17: 3d3e
+  await expect(board.locator('[data-square="27"]')).toHaveAccessibleName(/2七.*空きマス/);
+  await next.click(); // 18: 4e2g+
+  await expect(history.last()).toHaveText("(4e2g+)");
+  await expect(board.locator('[data-square="27"]')).toHaveAccessibleName(/2七.*後手の馬/);
+  await expect(board.locator('[data-square="45"]')).toHaveAccessibleName(/4五.*空きマス/);
+  await expect(senteHand.getByRole("button", { name: "先手の持ち駒 角 1枚", exact: true })).toHaveCount(1);
+  await expect(goteHand).toHaveText("なし");
+  await next.click(); // 19: B*1e
+  await expect(history.last()).toHaveText("(B*1e)");
+  await expect(board.locator('[data-square="15"]')).toHaveAccessibleName(/1五.*先手の角/);
+  await expect(senteHand.getByRole("button", { name: "先手の持ち駒 角 1枚", exact: true })).toHaveCount(0);
+  await next.click(); // 20: 5a5b
+  await next.click(); // 21: 3g3f, figure 1-C
+
+  const expectBranchPosition = async (ply: 21 | 23) => {
+    await expect(history).toHaveCount(ply);
+    await expect(history.last()).toHaveText(ply === 21 ? "(3g3f)" : "(1e4h)");
+    await expect(board.locator('[data-square="27"]')).toHaveAccessibleName(/2七.*後手の馬/);
+    await expect(board.locator('[data-square="35"]')).toHaveAccessibleName(/3五.*先手の飛/);
+    await expect(board.locator('[data-square="52"]')).toHaveAccessibleName(/5二.*後手の玉/);
+    await expect(board.locator('[data-square="36"]')).toHaveAccessibleName(/3六.*先手の歩/);
+    await expect(board.locator(`[data-square="${ply === 21 ? "15" : "48"}"]`)).toHaveAccessibleName(ply === 21 ? /1五.*先手の角/ : /4八.*先手の角/);
+    await expect(board.getByTestId("turn-indicator")).toHaveText("手番: △後手");
+    await expect(senteHand.getByRole("button", { name: "先手の持ち駒 歩 2枚", exact: true })).toHaveCount(1);
+    await expect(goteHand).toHaveText("なし");
+    await expect(disclosure.locator("summary")).toContainText(`1分岐・現在${ply}手`);
+    await expect(disclosure.locator('[aria-current="step"]')).toHaveCount(1);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
+  };
+  await expectBranchPosition(21);
+  await page.screenshot({ path: testInfo.outputPath("ply21-figure1c-360.png"), fullPage: true });
+  await next.click();
+  await expect(history.last()).toHaveText("(1c1d)");
+  await next.click();
+  await expectBranchPosition(23);
+  await expect(board.locator('[data-square="15"]')).toHaveAccessibleName(/1五.*空きマス/);
+  await expect(board.locator('[data-square="14"]')).toHaveAccessibleName(/1四.*後手の歩/);
+  await expect(next).toBeDisabled();
+  await expect(page.getByRole("button", { name: "ここから本線を最後まで再生", exact: true })).toBeDisabled();
+  await expect(feedback).toContainText("この定跡手順を完了しました");
+  await page.screenshot({ path: testInfo.outputPath("ply23-leaf-360.png"), fullPage: true });
+
+  const branchPath = (ply: number) => [...Array(15).fill("1"), "2", ...Array(ply - 16).fill("1")].join("-");
+  const branchJump = (ply: number, usi: string) => disclosure.getByRole("button", {
+    name: `${ply}手目 ${usi}、USI ${usi}、△4五角の変化、経路 ${branchPath(ply)}、ここへ移動`, exact: true,
+  });
+  await expect(disclosure.locator(".opening-variation-jump")).toHaveCount(24);
+  await expect(branchJump(23, "1e4h")).toHaveAttribute("aria-current", "step");
+  await expect(branchJump(21, "3g3f").locator(".variation-state-label")).toContainText("通過");
+  await branchJump(21, "3g3f").click();
+  await expectBranchPosition(21);
+  await expect(branchJump(21, "3g3f")).toHaveAttribute("aria-current", "step");
+  await expect(page.getByTestId("opening-current-move")).toContainText("1c1d");
+  await back.click();
+  await expect(history).toHaveCount(20);
+  await next.click();
+  await expectBranchPosition(21);
+  await page.getByRole("button", { name: "ここから本線を最後まで再生", exact: true }).click();
+  await expectBranchPosition(23);
+  await branchJump(23, "1e4h").click();
+  await expect(feedback).toContainText("この定跡手順を完了しました");
+  await expect(source).toContainText("追加の△4五角変化は23手目▲4八角まで");
+  await expect(source).toContainText("記事全体・小節全体・E2全体の網羅や完了を意味しない");
+  await expect(source).toContainText("CC BY-SA 4.0");
+  await expect(source).toContainText("取得日: 2026-10-06");
+  await expect(source.getByRole("link")).toHaveAttribute("href", /oldid=92929426/);
+  await disclosure.getByRole("button", {
+    name: `この分岐点の本線へ切り替える、第16手の分岐点 ルート、経路 ${Array(15).fill("1").join("-")}`, exact: true,
+  }).click();
+  await expect(history).toHaveCount(16);
+  await expect(history.last()).toHaveText("(B*2e)");
+  await expectPly16();
+  await expect(next).toBeDisabled();
+  await expect(feedback).toContainText("この定跡手順を完了しました");
+  await expect(disclosure.getByRole("button", {
+    name: `16手目 B*2e、USI B*2e、△2三歩基本手順、経路 ${Array(16).fill("1").join("-")}、ここへ移動`, exact: true,
+  })).toHaveAttribute("aria-current", "step");
+  await page.screenshot({ path: testInfo.outputPath("main16-restored-360.png"), fullPage: true });
 
   await page.getByRole("button", { name: "最初に戻る", exact: true }).click();
   await expect(history).toHaveCount(0);
