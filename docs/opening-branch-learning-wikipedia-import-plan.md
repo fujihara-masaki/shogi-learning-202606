@@ -475,7 +475,7 @@ PR #58はWikipedia provenance validatorの実装・レビューを通して責�
      - `backend/tests/fixtures/yokofudori-2c-pawn-e2f.json` は開始時base SHA `3601e15d57d2bd4fa73de1a3d4c93f809d2764da` のartifactを `git show` で抽出した固定snapshot（新artifactの切り詰めではない）。旧baselineのimportでlegacy comments配列をそろえてから、旧16keyと他の横歩取り5lineに非空commentを設定した状態を比較した。初回E2g import直後に既存ID・tree・comment・line/type/tag・分類identityの保持と8keyだけの追加をassertし、新branchにもcommentを設定した通常seed＋bundled import再実行で全24keyのID/comment/direct parentを保持することを確認。`updated_at` は比較から除外し、派生 `opening_positions` はrow IDではなく本線のply/SFENを確認した。
      - 通常起動の既定DBでもAPI一覧は16手、detailは24node、canonical/runtime比較は `unchanged`。既存別line「横歩取り△4五角」やcatalog件数を変えていない。汎用importer・validator・DB schema・UIとstatic seedは変更不要だった。
      - validator全9bundled artifact、backend `421 passed`、frontend Vitest `223 passed`、lint、型チェックを含むbuild、代表Chromium E2E `1 passed`、Chromium全体 `99 passed`、`git diff --check` が成功。E2Eは既存12／16手目検査を残し、360pxで2候補、盤面からの△4五角打、18手目の空き升への成り、19手目角打ち、21手目・23手目の盤面／手番／持駒、jump・undo・redo・reset、本線への切替、出典・収録範囲と横あふれなしを確認し、15／21／23手目と本線切替後の画像を出力した。
-   - [ ] **PR-E2h以降** — 13手目▲2八飛／▲2六飛と後続、本線16手目△2五角後の17手目▲3二飛成／▲3六飛と後続、横歩取り△3三角の追加変化・竹部スペシャル・2一角の攻め、横歩取り△8五飛／中座飛車、5二玉型、4一玉型、青野流、PR-E2cで未収録の深い変化、および今回明示した経路以外の手順を根拠となるarticle/section単位で扱う。E2全体は継続中とする。
+   - [ ] **PR-E2h以降** — 13手目▲2八飛／▲2六飛と後続、本線16手目△2五角後の17手目▲3二飛成／▲3六飛と後続、横歩取り△3三角の追加変化・竹部スペシャル・2一角の攻め、横歩取り△8五飛／中座飛車、5二玉型、4一玉型、青野流、勇気流、PR-E2cで未収録の深い変化、および今回明示した経路以外の手順を根拠となるarticle/section単位で扱う。E2全体は継続中とする。
 
 3. **PR-E3 角換わり系**
 4. **PR-E4 棒銀系**

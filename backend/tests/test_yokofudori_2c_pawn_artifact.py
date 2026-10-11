@@ -302,7 +302,7 @@ def test_upgrade_from_exact_e2f_snapshot_preserves_ids_comments_and_other_lines(
 
     def old_bundle():
         for filename in seed_module.BUNDLED_WIKIPEDIA_OPENING_ARTIFACTS:
-            data = old_artifact if filename == PATH.name else json.loads((PATH.parent / filename).read_text())
+            data = old_artifact if filename == PATH.name else json.loads((PATH.parent / filename).read_text(encoding="utf-8"))
             apply_wikipedia_opening_artifact(conn, data)
 
     def clean(row):
