@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { Position } from "tsshogi";
+import { Position, Square, Color, PieceType } from "tsshogi";
 import { applyOpeningPath, continueOpeningMainLine, expectedOpeningMove, flattenMainLine, openingFromImportedLine, enumerateOpeningTree, countOpeningBranchPoints, openingMainPathAt, openingPathState, openingNodeJumpAccessibleName, findOpeningChoiceIndex } from "./openings";
 
 type Node = { key: string; parent_key: string | null; usi: string; from_sfen: string; to_sfen: string; sort_order: number; is_main: boolean; variation_group: string };
@@ -14,22 +14,24 @@ const main = Array.from({ length: 16 }, (_, index) => byKey.get(`main-${index + 
 const tail = "B*4e 3d3e 4e2g+ B*1e 5a5b 3g3f 1c1d 1e4h".split(" ");
 const branchPath = (ply: number): number[] => [...Array(15).fill(0), 1, ...Array(ply - 16).fill(0)];
 
-function fixture() {
+function fixture(mainLast = false) {
   const ids = new Map(record.nodes.map((node, index) => [node.key, index + 1]));
   return openingFromImportedLine({ id: 203, name: record.line_name, opening_type: "相居飛車", initial_sfen: record.initial_sfen,
     moves: [...record.nodes].reverse().map((node) => ({ id: ids.get(node.key), parent_move_id: node.parent_key ? ids.get(node.parent_key)! : null,
-      usi: node.usi, from_sfen: node.from_sfen, to_sfen: node.to_sfen, sort_order: node.sort_order,
+      usi: node.usi, from_sfen: node.from_sfen, to_sfen: node.to_sfen,
+      sort_order: mainLast && node.parent_key === "main-12" ? (node.sort_order + 2) % 3 : node.sort_order,
       is_main: node.is_main, move_key: node.key, variation_group: node.variation_group })),
     source: { name: record.source.title, license_name: record.license, license_url: "", source_url: record.source.url, source_section: record.source.section, source_note: record.source_note, source_retrieved_at: record.retrieved_date },
   });
 }
 
 describe("Yokofudori 2c pawn production canonical line", () => {
-  it("validates all 24 edges and canonical SFENs with tsshogi", () => {
+  it("validates all 26 edges and canonical SFENs with tsshogi", () => {
     expect(main.map((node) => node.usi)).toEqual("7g7f 3c3d 2g2f 8c8d 2f2e 8d8e 6i7h 4a3b 2e2d 2c2d 2h2d P*2c 2d3d 2b8h+ 7i8h B*2e".split(" "));
-    expect(record.nodes).toHaveLength(24);
+    expect(record.nodes).toHaveLength(26);
     expect(Array.from({ length: 8 }, (_, index) => byKey.get(`bishop-4e-${16 + index}`)!.usi)).toEqual(tail);
     for (const node of record.nodes) {
+      expect(node.from_sfen).toBe(node.parent_key ? byKey.get(node.parent_key)!.to_sfen : record.initial_sfen);
       const position = Position.newBySFEN(node.from_sfen)!;
       const move = position.createMoveByUSI(node.usi);
       expect(move).not.toBeNull(); expect(position.isValidMove(move!)).toBe(true);
@@ -75,8 +77,8 @@ describe("Yokofudori 2c pawn production canonical line", () => {
     const opening = fixture();
     const entries = enumerateOpeningTree(opening);
     const leaves = entries.filter(({ node }) => !node.next?.length);
-    expect([entries.length, flattenMainLine(opening).length, Math.max(...entries.map((entry) => entry.path.length)), countOpeningBranchPoints(opening), leaves.length]).toEqual([24, 16, 23, 1, 2]);
-    expect(leaves.map(({ node }) => node.usi).sort()).toEqual(["1e4h", "B*2e"]);
+    expect([entries.length, flattenMainLine(opening).length, Math.max(...entries.map((entry) => entry.path.length)), countOpeningBranchPoints(opening), leaves.length]).toEqual([26, 16, 23, 2, 4]);
+    expect(leaves.map(({ node }) => node.usi).sort()).toEqual(["1e4h", "2d2f", "2d2h", "B*2e"]);
     const choices = applyOpeningPath(opening, Array(15).fill(0)).steps.at(-1)!.node.next!;
     expect(choices.map((node) => node.usi)).toEqual(["B*2e", "B*4e"]);
     expect(findOpeningChoiceIndex(choices, { usi: "B*2e" })).toBe(0);
@@ -120,5 +122,51 @@ describe("Yokofudori 2c pawn production canonical line", () => {
     expect(openingNodeJumpAccessibleName(opening, mainPath)).toContain("△2三歩基本手順、経路");
     expect(openingNodeJumpAccessibleName(opening, fullBranch)).toContain("△4五角の変化、経路");
     expect(applyOpeningPath(opening, []).position.sfen).toBe(record.initial_sfen);
+  });
+
+  it("replays both 13th-move leaves, preserving the pawn, bishops, hands and selection", () => {
+    const opening = fixture();
+    const parentPath = Array(12).fill(0);
+    const choices = applyOpeningPath(opening, parentPath).steps.at(-1)!.node.next!;
+    expect(choices.map((n) => [n.usi, n.isMain])).toEqual([["2d3d", true], ["2d2h", false], ["2d2f", false]]);
+    for (const [index, usi, rank, label] of [
+      [1, "2d2h", 8, "▲2八飛（相掛かりへ）"], [2, "2d2f", 6, "▲2六飛（相掛かりへ）"],
+    ] as const) {
+      const path = [...parentPath, index];
+      const result = applyOpeningPath(opening, path);
+      expect(result.moves.map((m) => m.usi)).toEqual([..."7g7f 3c3d 2g2f 8c8d 2f2e 8d8e 6i7h 4a3b 2e2d 2c2d 2h2d P*2c".split(" "), usi]);
+      expect(result.position.board.at(new Square(2, rank))).toEqual({ color: Color.BLACK, type: PieceType.ROOK });
+      expect(result.position.board.at(new Square(2, 4))).toBeNull();
+      expect(result.position.board.at(new Square(3, 4))).toEqual({ color: Color.WHITE, type: PieceType.PAWN });
+      expect(result.position.board.at(new Square(8, 8))).toEqual({ color: Color.BLACK, type: PieceType.BISHOP });
+      expect(result.position.board.at(new Square(2, 2))).toEqual({ color: Color.WHITE, type: PieceType.BISHOP });
+      expect(result.position.sfen.split(" ").slice(1, 3)).toEqual(["w", "P"]);
+      expect(result.steps.at(-1)!.node.next ?? []).toHaveLength(0);
+      expect(expectedOpeningMove(opening, path)).toBeNull();
+      expect(continueOpeningMainLine(opening, path)).toEqual(path);
+      expect(openingPathState(path, path)).toBe("current");
+      expect(openingPathState(parentPath, path)).toBe("ancestor");
+      expect(openingNodeJumpAccessibleName(opening, path)).toBe(`13手目 ${usi}、USI ${usi}、${label}、経路 ${[...Array(12).fill(1), index + 1].join("-")}、ここへ移動`);
+      expect(result.steps.at(-1)!.node.sourceNote).toBe(record.source_note);
+      expect(result.steps.at(-1)!.node.sourceUrl).toContain("oldid=92929426");
+      const undone = path.slice(0, -1);
+      expect(applyOpeningPath(opening, undone).moves).toHaveLength(12);
+      expect(applyOpeningPath(opening, [...undone, index]).position.sfen).toBe(result.position.sfen);
+      const switched = openingMainPathAt(opening, undone);
+      expect(switched).toEqual(Array(13).fill(0)); // switch selects ONLY one move
+      expect(applyOpeningPath(opening, switched).moves.at(-1)!.usi).toBe("2d3d");
+      expect(continueOpeningMainLine(opening, switched)).toEqual(Array(16).fill(0));
+    }
+  });
+
+  it("keeps semantic main independent from sibling display order and reversed API input", () => {
+    const opening = fixture(true);
+    const choices = applyOpeningPath(opening, Array(12).fill(0)).steps.at(-1)!.node.next!;
+    expect(choices.map((n) => n.usi)).toEqual(["2d2h", "2d2f", "2d3d"]);
+    const expectedPath = [...Array(12).fill(0), 2, 0, 0, 0];
+    expect(continueOpeningMainLine(opening, [])).toEqual(expectedPath);
+    expect(flattenMainLine(opening).map((n) => n.usi)).toEqual("7g7f 3c3d 2g2f 8c8d 2f2e 8d8e 6i7h 4a3b 2e2d 2c2d 2h2d P*2c 2d3d 2b8h+ 7i8h B*2e".split(" "));
+    expect(openingMainPathAt(opening, Array(12).fill(0))).toEqual([...Array(12).fill(0), 2]);
+    expect(applyOpeningPath(opening, expectedPath).moves.at(-1)!.usi).toBe("B*2e");
   });
 });
