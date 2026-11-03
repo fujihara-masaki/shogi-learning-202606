@@ -34,8 +34,11 @@ TAIL = "B*4e 3d3e 4e2g+ B*1e 5a5b 3g3f 1c1d 1e4h".split()
 SECTION = "戦法の概要／導入～△2三歩からの展開（図1-Bへ至る基本16手、△4五角の明示変化23手目まで、13手目▲2八飛／▲2六飛）"
 
 
-def test_exact_e2g_snapshot_bytes():
-    assert hashlib.sha256(E2G_PATH.read_bytes()).hexdigest() == "7713c1402afe0bde3bb2224139fa5a93637eef81db981b27048935286bbfa42c"
+def test_exact_e2g_snapshot_utf8_content():
+    # The committed Git blob was checked byte-for-byte against PR #76. Allow
+    # Git's Windows CRLF checkout conversion while fixing all UTF-8 content.
+    content = E2G_PATH.read_text(encoding="utf-8").encode("utf-8")
+    assert hashlib.sha256(content).hexdigest() == "7713c1402afe0bde3bb2224139fa5a93637eef81db981b27048935286bbfa42c"
 
 
 def test_contract_legality_sfens_and_branch_signature():
