@@ -133,3 +133,8 @@ backend起動後のOpenAPI UIは <http://localhost:8000/docs> です。主要ル
 - 次の一手専用DB: 外部定跡の出典・局面・候補手、抽出run、学習サンプル。アプリ実行時は読み取り専用
 
 スキーマと運用手順は [データ管理ガイド](data-management.md) を参照してください。
+
+## Wikipedia Seed 検証・停止再開基盤
+
+既存artifactと全体検証を一括実行するCLI、認証不要のCI、使用量readとpause/resumeは
+[運用基盤計画](opening-seed-loop-plan.md)を参照してください。新しいSeed追加や推論・PR自動化は後続です。

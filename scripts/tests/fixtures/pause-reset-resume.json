@@ -1,0 +1,10 @@
+{
+  "schema_version": 1,
+  "events": [
+    {"action": "start", "result": {"rateLimits": {"limitId": "codex", "primary": {"usedPercent": 24}, "secondary": {"usedPercent": 10}}}},
+    {"action": "observe", "result": {"rateLimits": {"limitId": "codex", "primary": {"usedPercent": 30}, "secondary": {"usedPercent": 10}}}},
+    {"action": "observe", "result": {"rateLimits": {"limitId": "codex", "primary": {"usedPercent": 0}, "secondary": {"usedPercent": 0}}}},
+    {"action": "resume", "result": {"rateLimits": {"limitId": "codex", "primary": {"usedPercent": 0}, "secondary": {"usedPercent": 0}}}},
+    {"action": "pause"}
+  ]
+}
