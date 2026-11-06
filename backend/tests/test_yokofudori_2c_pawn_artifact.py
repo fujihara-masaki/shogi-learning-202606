@@ -1,8 +1,10 @@
 import json
+import hashlib
 from collections import defaultdict
 from pathlib import Path
 
 import shogi
+import pytest
 
 import app.seed as seed_module
 from app.database import get_connection, init_db
@@ -24,13 +26,24 @@ def artifact():
 # truncation of the new production artifact.
 BASE_SHA = "3601e15d57d2bd4fa73de1a3d4c93f809d2764da"
 OLD_PATH = Path(__file__).parent / "fixtures/yokofudori-2c-pawn-e2f.json"
+# git show 55f86b256851d4dc904a50a0065473d3d78dbfdb:
+#   backend/app/wikipedia_opening_artifacts/yokofudori-2c-pawn.json
+# Git blob: c3652ee4062eeecffe0c5213dfd0e959f0c5511b (byte-identical).
+E2G_PATH = Path(__file__).parent / "fixtures/yokofudori-2c-pawn-e2g.json"
 TAIL = "B*4e 3d3e 4e2g+ B*1e 5a5b 3g3f 1c1d 1e4h".split()
-SECTION = "戦法の概要／導入～△2三歩からの展開（図1-Bへ至る基本16手と△4五角の明示変化23手目まで）"
+SECTION = "戦法の概要／導入～△2三歩からの展開（図1-Bへ至る基本16手、△4五角の明示変化23手目まで、13手目▲2八飛／▲2六飛）"
+
+
+def test_exact_e2g_snapshot_utf8_content():
+    # The committed Git blob was checked byte-for-byte against PR #76. Allow
+    # Git's Windows CRLF checkout conversion while fixing all UTF-8 content.
+    content = E2G_PATH.read_text(encoding="utf-8").encode("utf-8")
+    assert hashlib.sha256(content).hexdigest() == "7713c1402afe0bde3bb2224139fa5a93637eef81db981b27048935286bbfa42c"
 
 
 def test_contract_legality_sfens_and_branch_signature():
     data = artifact()
-    old = json.loads(OLD_PATH.read_text(encoding="utf-8"))
+    old = json.loads(E2G_PATH.read_text(encoding="utf-8"))
     assert validate_wikipedia_opening_artifact(old) == ()
     assert validate_wikipedia_opening_artifact(data) == ()
     record = data["records"][0]
@@ -38,14 +51,14 @@ def test_contract_legality_sfens_and_branch_signature():
         "wikipedia.yokofudori.pawn-2c", "wikipedia.yokofudori.pawn-2c", "横歩取り△2三歩")
     assert (record["provenance"], record["coverage_status"]) == ("A", "complete_for_cited_sequence")
     assert record["revision"] == 92929426
-    assert record["retrieved_date"] == "2026-10-06"
+    assert record["retrieved_date"] == data["review"]["reviewed_on"] == "2026-11-03"
     assert record["license"] == "CC BY-SA 4.0"
     assert "oldid=92929426" in record["source"]["url"]
     assert record["source"]["section"] == SECTION
     assert record["coverage"] == {"covered_through_ply": 16, "covered_through_move": "B*2e", "omitted_after": None}
     nodes = {node["key"]: node for node in record["nodes"]}
     # Retain every prior node, including its audit metadata, byte-for-value.
-    assert len(old["records"][0]["nodes"]) == 16
+    assert len(old["records"][0]["nodes"]) == 24
     for node in old["records"][0]["nodes"]:
         assert nodes[node["key"]] == node
     assert [nodes[f"main-{ply}"]["usi"] for ply in range(1, 17)] == MOVES
@@ -68,6 +81,8 @@ def test_contract_legality_sfens_and_branch_signature():
         assert sum(n["is_main"] for n in siblings) == 1
     assert [(n["key"], n["usi"], n["sort_order"], n["is_main"]) for n in children["main-15"]] == [
         ("main-16", "B*2e", 0, True), ("bishop-4e-16", "B*4e", 1, False)]
+    assert [(n["key"], n["usi"], n["sort_order"], n["is_main"]) for n in children["main-12"]] == [
+        ("main-13", "2d3d", 0, True), ("rook-2h-13", "2d2h", 1, False), ("rook-2f-13", "2d2f", 2, False)]
     for ply, usi in enumerate(TAIL, 16):
         node = nodes[f"bishop-4e-{ply}"]
         assert node["usi"] == usi
@@ -83,8 +98,8 @@ def test_contract_legality_sfens_and_branch_signature():
         return result[::-1]
 
     leaves = [n for n in record["nodes"] if not children[n["key"]]]
-    assert {n["key"] for n in leaves} == {"main-16", "bishop-4e-23"}
-    assert [path(n) for n in leaves] == [MOVES, MOVES[:15] + TAIL]
+    assert {n["key"] for n in leaves} == {"main-16", "bishop-4e-23", "rook-2h-13", "rook-2f-13"}
+    assert [path(n) for n in leaves] == [MOVES, MOVES[:15] + TAIL, MOVES[:12] + ["2d2h"], MOVES[:12] + ["2d2f"]]
     main = []
     parent = None
     while children[parent]:
@@ -92,9 +107,22 @@ def test_contract_legality_sfens_and_branch_signature():
         main.append(node["usi"]); parent = node["key"]
     assert main == MOVES
     assert (len(nodes), len(main), max(map(lambda n: len(path(n)), leaves)),
-            sum(len(c) > 1 for c in children.values()), len(leaves)) == (24, 16, 23, 1, 2)
-    # Independent physical checks: 18 is promotion onto an EMPTY square, not capture.
+            sum(len(c) > 1 for c in children.values()), len(leaves)) == (26, 16, 23, 2, 4)
     square = lambda name: shogi.SQUARE_NAMES.index(name)
+    for dest, label in (("2h", "▲2八飛（相掛かりへ）"), ("2f", "▲2六飛（相掛かりへ）")):
+        node = nodes[f"rook-{dest}-13"]
+        assert node["variation_group"] == label
+        assert node["source_section"] == "戦法の概要 > △2三歩からの展開（冒頭）"
+        assert "14手目以降の具体的手順がない" in node["evidence_note"]
+        board = shogi.Board(node["to_sfen"])
+        assert board.piece_at(square(dest)).symbol() == "R"
+        assert board.piece_at(square("2d")) is None
+        assert board.piece_at(square("3d")).symbol() == "p"
+        assert board.piece_at(square("8h")).symbol() == "B"
+        assert board.piece_at(square("2b")).symbol() == "b"
+        assert board.pieces_in_hand == [{shogi.PAWN: 1}, {}]
+        assert board.turn == shogi.WHITE
+    # Independent physical checks: 18 is promotion onto an EMPTY square, not capture.
     before18 = shogi.Board(nodes["bishop-4e-18"]["from_sfen"])
     after18 = shogi.Board(nodes["bishop-4e-18"]["to_sfen"])
     assert before18.piece_at(square("2g")) is None
@@ -111,7 +139,7 @@ def assert_runtime_tree(conn, line_id):
     rows = conn.execute("SELECT * FROM opening_line_moves WHERE line_id=?", (line_id,)).fetchall()
     by = {row["move_key"]: row for row in rows}
     expected = {node["key"]: node for node in artifact()["records"][0]["nodes"]}
-    assert len(rows) == len(by) == 24
+    assert len(rows) == len(by) == 26
     assert set(by) == set(expected)
     for key, node in expected.items():
         row = by[key]
@@ -141,7 +169,9 @@ def test_fresh_and_existing_seed_are_idempotent_and_preserve_other_lines(tmp_pat
             protected[name] = (line, [dict(row) for row in conn.execute("SELECT * FROM opening_line_moves WHERE line_id=? ORDER BY id", (line["id"],))])
         line = dict(conn.execute("SELECT * FROM opening_lines WHERE line_key='wikipedia.yokofudori.pawn-2c'").fetchone())
         rows = [dict(row) for row in conn.execute("SELECT * FROM opening_line_moves WHERE line_id=? ORDER BY id", (line["id"],))]
-        assert (line["name"], line["seed_key"], len(rows)) == ("横歩取り△2三歩", "sample:横歩取り△2三歩", 24)
+        assert (line["name"], line["seed_key"], len(rows)) == ("横歩取り△2三歩", "sample:横歩取り△2三歩", 26)
+        assert_runtime_tree(conn, line["id"])
+        assert compare_canonical_to_runtime(conn, artifact()["records"][0])["status"] == "unchanged"
         conn.execute("UPDATE opening_line_moves SET comment='runtime memo' WHERE line_id=? AND move_key='main-16'", (line["id"],))
         first_ids = [(row["id"], row["move_key"], row["parent_move_id"]) for row in rows]
         for _ in range(2):
@@ -265,9 +295,27 @@ def test_upgrade_from_pre_e2e_database_adds_line_without_changing_existing_trees
 def test_api_catalog_projection_and_type_routes(client):
     summary = next(item for item in client.get("/api/openings").json() if item["name"] == "横歩取り△2三歩")
     detail = client.get(f"/api/openings/{summary['id']}").json()
-    assert (summary["move_count"], len(detail["moves"]), detail["opening_type"]) == (16, 24, "相居飛車")
+    assert (summary["move_count"], len(detail["moves"]), detail["opening_type"]) == (16, 26, "相居飛車")
     assert [tag["tag"] for tag in detail["tags"]] == ["yokofudori"]
     assert detail["source"]["source_section"] == SECTION
+    assert detail["source"]["source_retrieved_at"] == "2026-11-03"
+    assert "各13手目で終端" in detail["source"]["source_note"]
+    # Reconstruct from API direct parents, independent of the API array order.
+    by_id = {node["id"]: node for node in reversed(detail["moves"])}
+    by_key = {node["move_key"]: node for node in by_id.values()}
+    children = defaultdict(list)
+    for node in by_id.values():
+        children[node["parent_move_id"]].append(node)
+    choices = sorted(children[by_key["main-12"]["id"]], key=lambda n: n["sort_order"])
+    assert [(n["usi"], n["is_main"]) for n in choices] == [("2d3d", True), ("2d2h", False), ("2d2f", False)]
+    for key, expected in (("main-16", MOVES), ("bishop-4e-23", MOVES[:15] + TAIL),
+                          ("rook-2h-13", MOVES[:12] + ["2d2h"]), ("rook-2f-13", MOVES[:12] + ["2d2f"])):
+        node, path = by_key[key], []
+        assert not children[node["id"]]
+        while node:
+            path.append(node["usi"])
+            node = by_id.get(node["parent_move_id"])
+        assert path[::-1] == expected
     types = client.get("/api/opening-types").json()
     own = next(item for item in types if item["name_ja"] == "横歩取り△2三歩")
     parent = next(item for item in types if item["name_ja"] == "横歩取り")
@@ -291,12 +339,13 @@ def test_catalog_reseed_updates_old_description_without_changing_type_id(tmp_pat
         conn.close()
 
 
-def test_upgrade_from_exact_e2f_snapshot_preserves_ids_comments_and_other_lines(tmp_path, monkeypatch):
-    """Fixture exported from BASE_SHA; compare the FIRST E2g import, then repeats."""
-    monkeypatch.setenv("SHOGI_DB_PATH", str(tmp_path / "e2f-upgrade.db"))
+@pytest.mark.parametrize("snapshot,old_count", [(OLD_PATH, 16), (E2G_PATH, 24)], ids=["e2f", "e2g"])
+def test_upgrade_from_exact_snapshots_preserves_ids_comments_and_other_lines(tmp_path, monkeypatch, snapshot, old_count):
+    """Exact historical fixtures; compare the FIRST E2h import, then repeats."""
+    monkeypatch.setenv("SHOGI_DB_PATH", str(tmp_path / "upgrade.db"))
     init_db()
     conn = get_connection()
-    old_artifact = json.loads(OLD_PATH.read_text(encoding="utf-8"))
+    old_artifact = json.loads(snapshot.read_text(encoding="utf-8"))
     own_key = "wikipedia.yokofudori.pawn-2c"
     protected_names = ("横歩取り", "相横歩取り", "横歩取り△4五角", "横歩取り△3三桂", "横歩取り△3三角")
 
@@ -328,10 +377,10 @@ def test_upgrade_from_exact_e2f_snapshot_preserves_ids_comments_and_other_lines(
         seed_openings_if_empty(conn)
         old_bundle()
         old_line, old_nodes = line_and_nodes(own_key)
-        assert len(old_nodes) == 16
+        assert len(old_nodes) == old_count
         assert json.loads(old_line["moves"]) == MOVES
-        for key in ("main-1", "main-15", "main-16"):
-            conn.execute("UPDATE opening_line_moves SET comment=? WHERE id=?", (f"E2f memo {key}", old_nodes[key]["id"]))
+        for key in old_nodes:
+            conn.execute("UPDATE opening_line_moves SET comment=? WHERE id=?", (f"old memo {key}", old_nodes[key]["id"]))
         for name in protected_names:
             line_id = conn.execute("SELECT id FROM opening_lines WHERE name=?", (name,)).fetchone()[0]
             conn.execute("UPDATE opening_line_moves SET comment=? WHERE line_id=? AND move_key='main-1'",
@@ -349,14 +398,21 @@ def test_upgrade_from_exact_e2f_snapshot_preserves_ids_comments_and_other_lines(
         def assert_preserved():
             current_line, current_nodes = line_and_nodes(own_key)
             assert {k: current_line[k] for k in preserved_line_fields} == {k: old_line[k] for k in preserved_line_fields}
-            assert len(current_nodes) == 24
-            assert set(current_nodes) - set(old_nodes) == {f"bishop-4e-{ply}" for ply in range(16, 24)}
+            assert len(current_nodes) == 26
+            expected_added = {"rook-2h-13", "rook-2f-13"}
+            if old_count == 16:
+                expected_added |= {f"bishop-4e-{ply}" for ply in range(16, 24)}
+            assert set(current_nodes) - set(old_nodes) == expected_added
             for key, node in old_nodes.items():
                 assert current_nodes[key] == node  # includes ID, direct parent and nonempty comments
             assert protected() == old_protected
             assert catalog() == old_catalog
             assert conn.execute("SELECT COUNT(*) FROM opening_lines").fetchone()[0] == line_count
             assert_runtime_tree(conn, current_line["id"])
+            record = artifact()["records"][0]
+            assert current_line["source_section"] == SECTION
+            assert current_line["source_note"] == record["source_note"]
+            assert current_line["source_retrieved_at"] == "2026-11-03"
             assert compare_canonical_to_runtime(conn, artifact()["records"][0])["status"] == "unchanged"
             return current_line, current_nodes
 
@@ -365,16 +421,16 @@ def test_upgrade_from_exact_e2f_snapshot_preserves_ids_comments_and_other_lines(
         apply_bundled_wikipedia_opening_artifacts(conn)
         # No repair-like second import before these upgrade assertions.
         first_line, first_nodes = assert_preserved()
-        for key in ("bishop-4e-16", "bishop-4e-21", "bishop-4e-23"):
-            conn.execute("UPDATE opening_line_moves SET comment=? WHERE id=?", (f"E2g memo {key}", first_nodes[key]["id"]))
+        for key in set(first_nodes) - set(old_nodes):
+            conn.execute("UPDATE opening_line_moves SET comment=? WHERE id=?", (f"E2h memo {key}", first_nodes[key]["id"]))
         expected = line_and_nodes(own_key)[1]
         for _ in range(2):
             seed_opening_catalog_if_empty(conn)
             seed_openings_if_empty(conn)
             apply_bundled_wikipedia_opening_artifacts(conn)
             _, current_nodes = assert_preserved()
-            assert current_nodes == expected  # all 24 IDs/comments/direct parents, not just projection diff
-            assert json.loads(line_and_nodes(own_key)[0]["comments"])[-1] == "E2f memo main-16"
+            assert current_nodes == expected  # all 26 IDs/comments/direct parents, not just projection diff
+            assert json.loads(line_and_nodes(own_key)[0]["comments"])[-1] == "old memo main-16"
         assert first_line["id"] == old_line["id"]
     finally:
         conn.close()

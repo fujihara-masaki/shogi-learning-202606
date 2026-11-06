@@ -2,8 +2,8 @@
   "artifact_version": 1,
   "review": {
     "review_status": "reviewed",
-    "reviewed_by": "ChatGPT (external source review 2026-10-04); Codex (HTTPS source, artifact and legality verification)",
-    "reviewed_on": "2026-10-06",
+    "reviewed_by": "ChatGPT (external source reviews 2026-10-04, 2026-11-02); Codex (2026-10-06 HTTPS verification; 2026-11-03 HTTPS/Web source review, structured extraction and legality verification)",
+    "reviewed_on": "2026-11-03",
     "legality_checks": {
       "backend_python_shogi": "passed",
       "frontend_tsshogi": "passed"
@@ -18,10 +18,10 @@
       "source": {
         "url": "https://ja.wikipedia.org/w/index.php?title=%E6%A8%AA%E6%AD%A9%E5%8F%96%E3%82%8A2%E4%B8%89%E6%AD%A9&oldid=92929426",
         "title": "Wikipedia 横歩取り2三歩",
-        "section": "戦法の概要／導入～△2三歩からの展開（図1-Bへ至る基本16手と△4五角の明示変化23手目まで）"
+        "section": "戦法の概要／導入～△2三歩からの展開（図1-Bへ至る基本16手、△4五角の明示変化23手目まで、13手目▲2八飛／▲2六飛）"
       },
       "license": "CC BY-SA 4.0",
-      "retrieved_date": "2026-10-06",
+      "retrieved_date": "2026-11-03",
       "revision": 92929426,
       "provenance": "A",
       "coverage_status": "complete_for_cited_sequence",
@@ -31,8 +31,8 @@
         "covered_through_move": "B*2e",
         "omitted_after": null
       },
-      "source_note": "2026-10-04の外部ChatGPTレビューは固定版revision 92929426の2022年12月16日16:51 UTCの版表示・本文・末尾のoldidを確認した。Codexも2026-10-06に同じ固定版をHTTPS GETで取得（curl終了0、HTTP 200、最終URLのoldidと本文・版IDが一致）し、本文との対応、全24nodeのpython-shogi／tsshogiによる合法性とSFENを検証した。既定本線は引用対象の基本16手をすべて収録し、追加の△4五角変化は23手目▲4八角までの明示列を収録する。13手目の別応、本線16手目後の17手目▲3二飛成／▲3六飛と後続等は対象外。このPRの引用対象は完了したが、△2三歩記事全体・小節全体・E2全体の網羅や完了を意味しない。",
-      "evidence_note": "「戦法の概要 > 導入」の1～12手と「△2三歩からの展開」冒頭の13～16手（図1-Bまで）を既定本線として保持。同節第2段落の16手目△4五角から21手目▲3六歩（図1-C相当）、括弧内の△1四歩～23手目▲4八角までを追加する。本文の後手不利という説明を根拠とし、エンジン評価や23手目以後の捕獲手順は追加しない。13手目▲2八飛／▲2六飛、本線16手目後の17手目2候補と後続等は今回の対象外。引用対象の完了と記事・E2全体の完了は区別する。",
+      "source_note": "履歴: 2026-10-04の外部ChatGPTレビューは固定版revision 92929426の2022年12月16日16:51 UTCの版表示・本文・末尾のoldidを確認した。Codexも2026-10-06に同じ固定版をHTTPS GETで取得（curl終了0、HTTP 200、最終URLのoldidと本文・版IDが一致）し、本文との対応、旧24nodeのpython-shogi／tsshogiによる合法性とSFENを検証した。今回: 2026-11-02の外部ChatGPTレビューで「戦法の概要 > △2三歩からの展開」冒頭の12手目△2三歩後の▲2八飛／▲2六飛を確認した。2026-11-03にCodexの最初の端末HTTPS GETはsandbox内のプロキシ接続失敗（curl終了7、HTTP 000、本文未取得）。Web閲覧ツールで固定版本文・版表示・末尾oldidを確認した後、ネットワーク利用可能な実行で端末HTTPS GETも再取得に成功（curl終了0、HTTP 200、164910 bytes）。本文・wgRevisionId=92929426・2022年12月16日16:51 UTCの版表示・末尾oldid=92929426の一致を確認した。既定本線は引用対象の基本16手をすべて収録し、追加の△4五角変化は23手目▲4八角までを保持する。今回の13手目▲2八飛／▲2六飛は各13手目で終端。当該箇所には14手目以降の具体的手順がなく、相掛かりへ進むという説明から後続を補間しない。本線16手目後の17手目▲3二飛成／▲3六飛と後続等は対象外。このPRの引用対象は完了したが、記事全体・小節全体・E2全体の網羅や完了を意味しない。",
+      "evidence_note": "「戦法の概要 > 導入」の1～12手と「△2三歩からの展開」冒頭の13～16手（図1-Bまで）を既定本線として保持。同節第2段落の16手目△4五角から21手目▲3六歩（図1-C相当）、括弧内の△1四歩～23手目▲4八角も保持する。2026-11-03にCodexが外部レビューとWeb閲覧の固定版本文を解釈し、12手目△2三歩を親とする13手目▲2八飛（2d2h）／▲2六飛（2d2f）をprovenance Aとしてstructured extractionした。親局面と各着手は本文で明示されるが、その後の具体的手順はないため各13手目で終了する。図からの逆算、一般的な相掛かりの知識、別記事の未確認手順、エンジン評価による補間はしない。本線16手目以後と△4五角変化23手目以後は今回の対象外。引用対象の完了と記事・E2全体の完了は区別する。 2026-11-03 Codex: 全26edgeのpython-shogi／tsshogiによる合法性とfrom/to SFEN一致を実行確認した。",
       "nodes": [
         {
           "key": "main-1",
@@ -345,6 +345,32 @@
           "provenance": "A",
           "source_section": "戦法の概要 > △2三歩からの展開（第2段落・括弧内を含む）",
           "evidence_note": "同段落の本文に順序どおり明記された△4五角の変化。図1-Cは21手目▲3六歩後であり、22～23手目は括弧内の続き。23手目以後は補間しない。"
+        },
+        {
+          "key": "rook-2h-13",
+          "parent_key": "main-12",
+          "usi": "2d2h",
+          "sort_order": 1,
+          "is_main": false,
+          "variation_group": "▲2八飛（相掛かりへ）",
+          "from_sfen": "lnsgk1snl/1r4gb1/p1pppp1pp/6pR1/1p7/2P6/PP1PPPP1P/1BG6/LNS1KGSNL b P 13",
+          "to_sfen": "lnsgk1snl/1r4gb1/p1pppp1pp/6p2/1p7/2P6/PP1PPPP1P/1BG4R1/LNS1KGSNL w P 14",
+          "provenance": "A",
+          "source_section": "戦法の概要 > △2三歩からの展開（冒頭）",
+          "evidence_note": "2026-11-02外部ChatGPTレビューと2026-11-03 CodexのWeb閲覧で固定版revision 92929426の本文・版表示・oldidを確認。12手目△2三歩後の具体的着手▲2八飛（相掛かりへ）は本文に明示される。当該箇所には14手目以降の具体的手順がないため13手目で終端とし、通常の相掛かりという説明から後続を補間しない。"
+        },
+        {
+          "key": "rook-2f-13",
+          "parent_key": "main-12",
+          "usi": "2d2f",
+          "sort_order": 2,
+          "is_main": false,
+          "variation_group": "▲2六飛（相掛かりへ）",
+          "from_sfen": "lnsgk1snl/1r4gb1/p1pppp1pp/6pR1/1p7/2P6/PP1PPPP1P/1BG6/LNS1KGSNL b P 13",
+          "to_sfen": "lnsgk1snl/1r4gb1/p1pppp1pp/6p2/1p7/2P4R1/PP1PPPP1P/1BG6/LNS1KGSNL w P 14",
+          "provenance": "A",
+          "source_section": "戦法の概要 > △2三歩からの展開（冒頭）",
+          "evidence_note": "2026-11-02外部ChatGPTレビューと2026-11-03 CodexのWeb閲覧で固定版revision 92929426の本文・版表示・oldidを確認。12手目△2三歩後の具体的着手▲2六飛（相掛かりへ）は本文に明示される。当該箇所には14手目以降の具体的手順がないため13手目で終端とし、通常の相掛かりという説明から後続を補間しない。"
         }
       ]
     }
