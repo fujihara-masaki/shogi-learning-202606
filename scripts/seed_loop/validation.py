@@ -7,9 +7,11 @@ import socket
 import subprocess
 import sys
 import time
+import uuid
 
-from .process import spawn, terminate
-from .state import LoopError, now
+from .process import spawn
+from .ownership import RECOVERY, recovery_problem
+from .state import LoopError, atomic_json, now, read_json
 
 
 @dataclass
@@ -105,32 +107,73 @@ def execute(stage, directory, config, attempt):
               "started_at": now(), "exit_code": None, "status": "operational_error",
               "stdout": str(stdout), "stderr": str(stderr), "diagnostic": None}
     child = None
+    interrupted = False
     started = time.monotonic()
+    owner_path = directory / (prefix + ".ownership.json")
+    spec_path = directory / (prefix + ".spec.json")
+    result_path = directory / (prefix + ".result.json")
+    supervisor_log = directory / (prefix + ".supervisor.log")
+    token = uuid.uuid4().hex
+    result.update(ownership=str(owner_path), supervisor_log=str(supervisor_log))
     try:
+        problem = recovery_problem(directory)
+        if problem:
+            result.update(reason=problem["reason"], recovery=problem["recovery"], cleanup_confirmed=False)
+            return result
         if stage.e2e:
             check_ports(config)
-        with stdout.open("wb") as out, stderr.open("wb") as err:
-            child = spawn(stage.command, cwd=stage.cwd,
-                          env=child_environment(directory, config, stage.e2e),
-                          stdin=subprocess.DEVNULL, stdout=out, stderr=err)
-            result["exit_code"] = child.wait(timeout=config["stage_timeout_seconds"])
-        result["status"] = "success" if result["exit_code"] == 0 else "failed"
-        if stage.diagnostic:
-            result["diagnostic"] = parse_diagnostic(stdout, result["exit_code"])
-            if result["exit_code"] == 2:
-                result["status"] = "operational_error"
-    except subprocess.TimeoutExpired:
-        result["status"] = "timeout"
-    except KeyboardInterrupt:
-        result["status"] = "interrupted"
+        atomic_json(spec_path, {"token": token, "command": stage.command, "cwd": stage.cwd,
+                               "timeout": config["stage_timeout_seconds"], "owner": str(owner_path),
+                               "result": str(result_path), "stdout": str(stdout), "stderr": str(stderr)})
+        atomic_json(owner_path, {"schema_version": 1, "token": token,
+                                "status": "starting", "cleanup_confirmed": False})
+        with supervisor_log.open("wb") as log:
+            try:
+                child = spawn([sys.executable, str(Path(__file__).with_name("supervisor.py")), str(spec_path)],
+                              cwd=stage.cwd, env=child_environment(directory, config, stage.e2e),
+                              stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=log)
+            except OSError:
+                atomic_json(owner_path, {"schema_version": 1, "token": token, "status": "cleaned",
+                                        "cleanup_confirmed": True, "reason": "supervisor_not_started"})
+                raise
+            try:
+                child.wait(timeout=config["stage_timeout_seconds"] + 15)
+            except (KeyboardInterrupt, subprocess.TimeoutExpired) as exc:
+                interrupted = isinstance(exc, KeyboardInterrupt)
+                # EOF is the guard's cancellation request; it cleans detached descendants too.
+                child.stdin.close()
+                try:
+                    child.wait(timeout=12)
+                except subprocess.TimeoutExpired:
+                    result.update(reason="supervisor_not_finished", cleanup_confirmed=False,
+                                  recovery=RECOVERY)
+                    return result
+        completed = read_json(result_path)
+        owner = read_json(owner_path)
+        if (not isinstance(completed, dict) or completed.get("token") != token or
+                not isinstance(owner, dict) or owner.get("token") != token or
+                completed.get("status") not in ("success", "failed", "timeout", "interrupted", "operational_error") or
+                (completed.get("status") == "success" and
+                 (completed.get("exit_code") != 0 or child.returncode != 0))):
+            raise LoopError("invalid supervisor result/attempt identity")
+        result.update(completed)
+        if owner.get("cleanup_confirmed") is not True or owner.get("status") != "cleaned":
+            result.update(status="operational_error", reason="cleanup_unconfirmed", recovery=RECOVERY)
+        elif interrupted:
+            result["status"] = "interrupted"
+        if result["status"] == "success" or (stage.diagnostic and result["status"] == "failed"):
+            if stage.diagnostic:
+                result["diagnostic"] = parse_diagnostic(stdout, result["exit_code"])
+                if result["exit_code"] == 2:
+                    result["status"] = "operational_error"
     except (OSError, LoopError) as exc:
         result["reason"] = str(exc) if isinstance(exc, LoopError) else type(exc).__name__
         result["status"] = "operational_error"
+        if owner_path.exists():
+            result["recovery"] = RECOVERY
     finally:
-        if child is not None:
-            terminate(child)
-            if result["exit_code"] is None:
-                result["exit_code"] = child.returncode
+        if child is not None and child.stdin is not None and not child.stdin.closed:
+            child.stdin.close()  # Parent writes no buffered data on this lifecycle pipe.
         result["finished_at"] = now()
         result["duration_seconds"] = round(time.monotonic() - started, 3)
     return result

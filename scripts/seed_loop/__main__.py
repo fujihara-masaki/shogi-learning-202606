@@ -11,6 +11,7 @@ from .controller import control, pause, replay
 from .state import LoopError, Store, config_from, environment, identity
 from .usage import AppServerUsage
 from .validation import plan
+from .ownership import recovery_problem
 
 
 def summary(state):
@@ -47,6 +48,7 @@ def main(argv=None):
             state = store.load()
             result = summary(state)
             result["pause_requested"] = store.pause_path.exists()
+            result["process_recovery"] = recovery_problem(store.directory)
             try:
                 with store.lock():
                     result["worker_active"] = False

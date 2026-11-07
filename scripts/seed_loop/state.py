@@ -153,33 +153,8 @@ class Store:
         self.path = self.directory / "state.json"
         self.pause_path = self.directory / "pause.json"
 
-    @contextmanager
     def lock(self):
-        self.directory.mkdir(parents=True, exist_ok=True)
-        # OS locks release after crashes. Never unlink the shared lock inode.
-        with (self.directory / "worker.lock").open("a+b") as stream:
-            stream.seek(0, os.SEEK_END)
-            if stream.tell() == 0:
-                stream.write(b"0")
-                stream.flush()
-            stream.seek(0)
-            try:
-                if os.name == "nt":
-                    import msvcrt
-                    msvcrt.locking(stream.fileno(), msvcrt.LK_NBLCK, 1)
-                else:
-                    import fcntl
-                    fcntl.flock(stream, fcntl.LOCK_EX | fcntl.LOCK_NB)
-            except OSError as exc:
-                raise LoopError("run is locked by an active worker") from exc
-            try:
-                yield
-            finally:
-                stream.seek(0)
-                if os.name == "nt":
-                    msvcrt.locking(stream.fileno(), msvcrt.LK_UNLCK, 1)
-                else:
-                    fcntl.flock(stream, fcntl.LOCK_UN)
+        return file_lock(self.directory / "worker.lock")
 
     def load(self):
         s = read_json(self.path)
@@ -223,3 +198,33 @@ class Store:
     def save(self, state):
         state["updated_at"] = now()
         atomic_json(self.path, state)
+
+
+@contextmanager
+def file_lock(path):
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    # OS locks release after crashes. Never unlink the shared lock inode.
+    with path.open("a+b") as stream:
+        stream.seek(0, os.SEEK_END)
+        if stream.tell() == 0:
+            stream.write(b"0")
+            stream.flush()
+        stream.seek(0)
+        try:
+            if os.name == "nt":
+                import msvcrt
+                msvcrt.locking(stream.fileno(), msvcrt.LK_NBLCK, 1)
+            else:
+                import fcntl
+                fcntl.flock(stream, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except OSError as exc:
+            raise LoopError("run is locked by an active worker") from exc
+        try:
+            yield
+        finally:
+            stream.seek(0)
+            if os.name == "nt":
+                msvcrt.locking(stream.fileno(), msvcrt.LK_UNLCK, 1)
+            else:
+                fcntl.flock(stream, fcntl.LOCK_UN)

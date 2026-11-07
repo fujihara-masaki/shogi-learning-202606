@@ -165,11 +165,21 @@ class ValidationTests(unittest.TestCase):
                 stage = Stage(name, [sys.executable, "-c", code], tmp, diagnostic=diagnostic)
                 self.assertEqual(execute(stage, root, {**config_from(), "stage_timeout_seconds": 0.1}, 1)["status"], expected)
             stage = Stage("interrupt", [sys.executable, "-c", "pass"], tmp)
-            with patch("scripts.seed_loop.validation.spawn") as spawning, patch("scripts.seed_loop.validation.terminate") as terminating:
-                spawning.return_value.wait.side_effect = KeyboardInterrupt()
-                spawning.return_value.returncode = -2
+            from scripts.seed_loop.process import spawn as real_spawn
+            def interrupting_spawn(*args, **kwargs):
+                child = real_spawn(*args, **kwargs)
+                wait = child.wait
+                calls = 0
+                def interrupted_wait(*args, **kwargs):
+                    nonlocal calls
+                    calls += 1
+                    if calls == 1:
+                        raise KeyboardInterrupt()
+                    return wait(*args, **kwargs)
+                child.wait = interrupted_wait
+                return child
+            with patch("scripts.seed_loop.validation.spawn", side_effect=interrupting_spawn):
                 self.assertEqual(execute(stage, root, config_from(), 1)["status"], "interrupted")
-                terminating.assert_called_once_with(spawning.return_value)
             self.assertEqual(stage.record()["status"], "not_run")
 
     def test_e2e_sanitization_and_port_conflict(self):

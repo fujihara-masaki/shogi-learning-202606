@@ -106,6 +106,8 @@ class AppServerUsage:
         child = None
         reader = None
         closing = threading.Event()
+        observation = None
+        cleanup_errors = []
         try:
             if version is None:
                 p = subprocess.run([config["codex_binary"], "--version"], capture_output=True,
@@ -184,18 +186,41 @@ class AppServerUsage:
             send({"method": "initialized"})
             send({"id": 2, "method": "account/rateLimits/read", "params": {}})
             result = response(2)
-            return normalize(result, config, version)
+            observation = normalize(result, config, version)
         except ProtocolError as exc:
-            return unknown(exc.reason, config["bucket"], version)
+            observation = unknown(exc.reason, config["bucket"], version)
         except subprocess.TimeoutExpired:
-            return unknown("timeout", config["bucket"], version)
-        except (OSError, ValueError):
-            return unknown("cli_or_transport_unavailable", config["bucket"], version)
+            observation = unknown("timeout", config["bucket"], version)
+        except BrokenPipeError:
+            observation = unknown("closed_stdin", config["bucket"], version)
+        except OSError:
+            observation = unknown("cli_or_transport_unavailable", config["bucket"], version)
         finally:
             if child is not None:
                 closing.set()
-                terminate(child)
+                try:
+                    terminate(child)
+                except (OSError, subprocess.TimeoutExpired) as exc:
+                    cleanup_errors.append("terminate_" + type(exc).__name__)
+                    try:
+                        child.kill()  # The held Popen handle, never a persisted bare PID.
+                        child.wait(timeout=2)
+                    except (OSError, subprocess.TimeoutExpired) as fallback:
+                        cleanup_errors.append("fallback_" + type(fallback).__name__)
                 if reader is not None:
                     reader.join(timeout=2)
                 for stream in (child.stdin, child.stdout):
-                    stream.close()
+                    if stream is child.stdout and reader is not None and reader.is_alive():
+                        cleanup_errors.append("stdout_reader_not_stopped")
+                        continue  # Do not block forever on a BufferedReader lock.
+                    try:
+                        stream.close()
+                    except OSError as exc:
+                        cleanup_errors.append("stream_close_" + type(exc).__name__)
+        if cleanup_errors:
+            if observation is not None:
+                observation["cleanup_errors"] = cleanup_errors
+                if observation["status"] == "known":
+                    observation = {**unknown("cleanup_failed", config["bucket"], version),
+                                   "cleanup_errors": cleanup_errors}
+        return observation

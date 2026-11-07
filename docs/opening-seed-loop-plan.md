@@ -132,11 +132,20 @@ Chromiumはlockfile対応のPlaywrightで導入する。既存branch/360pxシナ
 CIでは標準downloadを試みる。ローカルの代替指定をworkflowへ固定しない。
 
 stage timeoutは既定900秒。通常pauseは現在の検証をdrainし、結果保存後に停止する。
-SIGINT/SIGTERMでは中断を記録し、起動したプロセス群だけを終了する。
-POSIXは専用sessionのprocess groupへTERM/KILL、Windowsは生成したPIDのtreeへtaskkillを使う。
+SIGINT/SIGTERMでは中断を記録し、専用supervisorへlifecycle pipeのEOFを通知する。
+検証はLinux（pidfd/subreaper対応kernel・`/proc`）またはWindows Job Objectsで監督する。
+これらを利用できないOSでは、検証プロセスを起動せずoperational_errorになる。
+Linux supervisorはsubreaperとして別process groupのPlaywright webServerも子孫として回収する。
+`/proc`の親子関係・start_ticksを再確認し、pidfdで参照した所有プロセスだけへTERM/KILLを送る。
+終了確認は`/proc`列挙だけに依存せず、subreaperのwaitpidでECHILDを確認する。
+Windowsはsuspendedで生成したrootを非breakaway Jobへ割り当ててから再開し、
+Jobの終了とActiveProcesses=0を確認する。kill-on-closeでsupervisor終了時も所有子群を終了させる。
+通常終了時も残った所有子孫を後片付けし、timeout/中断時のcleanupは最大8秒を別途確保する。
+controller側は起動/cleanup余裕を含めstage timeout+15秒を待ち、キャンセル後は最大12秒待つ。
+終了を確認できなければoperational_error/cleanup_unconfirmedとして保存し、成功扱いしない。
+判定は保存済みの裸PIDへのkill、ポート番号でのkill、全node/pythonの一括killに依存しない。
+App Server readの終了処理は別経路で、close/終了の想定I/Oエラーをsanitizeしたcleanup_errorsへ残す。
 timeout、interrupted、failed、operational_error、not_runを区別する。
-強制kill・OS障害時の孤児プロセスはworkerが後から無差別終了せず、管理者が状況確認する。
-外部プロセスの列挙や一般名での一括killは行わない。
 
 ## 使用量と25/30%の意味
 
@@ -158,10 +167,18 @@ selectionと選択IDを記録する。usedPercent、利用可能なduration/rese
 任意のduration/resetの欠落はnullのまま。指定監視windowやusedPercentのnull/欠落はunknown。
 未認証等のRPC error、EOF、timeout、壊れた応答はunknown、method未対応はunsupported。
 理由はsanitizeした分類で保存し、real失敗時のfixture fallbackはない。
+initialize前後の入力側切断は実stdio試験で確認し、BrokenPipeはclosed_stdinとしてunknownにする。
+stream.closeの再flush等のI/Oエラーで元の診断を上書きせず、cleanup_errorsへ分類だけを残す。
+通常のEOFとは別経路であり、以前の実アカウントEOFの原因をこの不具合とは断定しない。
 
 unknown/unsupported、120秒を超えるstale、未来の観測、観測後のreset跨ぎは開始を拒否する。
 reset時刻を過ぎたという理由だけで0%を推定しない。
 pausedは再起動・期間reset・replayのobserveだけでは解除せず、明示resumeで最新readする。
+controlled resumeは、全stage成功済みでnext_stageが末尾でも最新usageを評価する。
+budget_stop/unknown/staleが残れば停止を維持し、回復時は保存済み成功を再実行せず完了できる。
+usage readの前後でpause要求を確認し、read待ち中に要求されたpauseで未開始stageを起動しない。
+pause publicationとnot_run→runningの開始記録は短いlaunch lockで直列化する。
+開始記録が済んだattemptは進行中としてdrainする。この境界前のpauseではattemptも追加しない。
 status/pauseは追加LLMなし。ログイン・購入・利用枠reset操作・thread/turn起動はない。
 
 公式確認先は [App Server](https://learn.chatgpt.com/docs/app-server)、
@@ -180,7 +197,12 @@ Git管理外 `.seed-loop/runs/ID/state.json` とattempt別 `.stdout.log` / `.std
 ローカルfilesystem上のatomic replaceとOS lockが前提。電源断に対するdirectory永続化や
 共有network filesystem上のlockを保証する実装ではない。
 同じrunはOSの非待機exclusive lockで二重起動・二重resumeを拒否する。lock fileは削除しない。
-worker強制終了でOS lockは解放されるのでPID再利用や手動lock削除に依存しない。
+worker強制終了でworker.lockが解放されても、独立supervisorのexecution.lockとownership journalを確認する。
+controllerの死をpipe EOFで検出したsupervisorは、所有子群をcleanupしてからexecution.lockを解放する。
+resumeはexecution.lockが有効ならprevious_attempt_activeで停止し、新attemptを起動しない。
+lease解放後もjournalがcleaned/cleanup_confirmed:trueでなければcleanup_unconfirmedで停止する。
+supervisor自体の強制終了、起動前後の不確実な保存、壊れたjournalも再開許可に変換しない。
+PID再利用を無視した自動killや、lockファイルの手動削除で再開する実装ではない。
 
 phase（validation/validated）、execution_status（running/paused/failed/completed）、stop_reasonを分離する。
 次stage、attempt、config/version/hash、対象artifact/hash、Git HEAD、実内容digest、環境、usage履歴を保存する。
@@ -191,13 +213,26 @@ base/head/checkoutはCIから与えられた別項目で保持する。
 
 開始前にrunningを保存し、結果確定後にsuccess等を保存する。
 保存前に落ちたstageはrunningのまま（成功ではない）。明示resumeでinterrupted/worker_lostとし、
-通常DBを変更しない固定検証だけ再実行する。保存後に落ちたsuccessは同一入力なら再利用できる。
+所有プロセスの終了確認が済んだ場合に限り、通常DBを変更しない固定検証だけ再実行する。
+保存後に落ちたsuccessは同一入力なら再利用できる。
 exactly-onceは保証しない。state破損はエラーとし、黙って初期化しない。
 対象artifact・コード（未追跡含む）・config・HEAD・profile/modeの変化は旧成功を再利用せず、
 入力変更理由を示す。変更後は新run IDで全検証を行う。
 
+各attemptには `.spec.json`（引数/cwd/timeout、環境変数一覧は含めない）、
+`.ownership.json`（attempt token、supervisor/root、所有情報、cleanup確定状態）、
+`.result.json`、`.supervisor.log` を追加保存する。resultとjournalのtokenを照合して旧結果の混入を拒否する。
+
 pause後の復帰は、まずstatusとログで原因を確認する。予算停止なら利用枠回復後にresume、
 未認証・未対応なら環境を直してlive preflight、検証失敗なら修正後に新run IDを使う。
+previous_attempt_activeならsupervisorのcleanup完了を待ち、statusのprocess_recoveryがnullになってからresumeする。
+cleanup_unconfirmedなら自動再実行を止める。stateのrecoveryと該当ownership/result/supervisor logを確認し、
+所有情報を根拠にOS側で当該検証と子孫が全て終了したか調べる。Linuxのstart_ticksは`/proc/PID/stat`、
+Windowsの実プロセスはJobの監督範囲で確認し、裸PIDだけで終了対象を決めない。
+判定できなければ停止を維持する。終了を確認できた場合も壊れたjournalを手で成功へ書き換えず、
+runを証拠ごと保管して新IDで検証する。未確認のまま新IDや別portで回避しない。
+workerだけを強制終了した通常ケースはsupervisorが自動cleanupするため、終了確認後の同一run resumeが可能。
+
 validation-onlyの中断を同一内容で再実行する例:
 
 ```bash
@@ -222,7 +257,12 @@ PRで新workflowが承認待ち/未起動/skip/pendingならsuccessとせず、�
 
 専用試験は実D1bの0/1/2・壊れた診断・対象0・timeout/中断、25/30境界・複数枠・null/stale/reset、
 実adapter対模擬stdio server、保存失敗・worker終了/再起動・二重lock・入力変更・破損、
-日本語/空白path・CRLFを確認する。Linux上のpath/CRLF試験はWindows実機確認ではない。
+日本語/空白path・CRLFを確認する。追加の境界試験は実Playwrightの404 readiness待ちtimeout、
+別groupの所有server終了・port解放・無関係serverの生存、実子起動後のcontroller強制終了とresume、
+不確実な所有情報での再開拒否、実stdioの入力切断、read中pause、最終stage後の停止継続と回復を確認する。
+実Playwright小試験はLinux full CIで依存導入後に必須実行する。Windows jobはアプリ依存を入れず
+このLinux専用試験をskipし、Job Objectsを使う実子起動/worker終了の試験とC〜Eは実行する。
+Linux上のpath/CRLF試験はWindows実機確認ではない。
 ローカル実行件数・対象commit/digest・CI状態はPR本文へ記録し、証拠更新のためにコードを変更し続けない。
 必須gate失敗/未実施ならDraft維持。live usageだけ未確認ならその制限を明示してコードレビューを依頼できる。
 

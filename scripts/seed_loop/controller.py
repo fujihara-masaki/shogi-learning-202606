@@ -1,8 +1,9 @@
 """Checkpoint orchestration. A stage is bounded, read-only validation work."""
 import uuid
 
-from .state import LoopError, Store, atomic_json, digest, environment, identity, now, read_json
-from .usage import AppServerUsage, decision, normalize
+from .state import LoopError, Store, atomic_json, digest, environment, file_lock, identity, now, read_json
+from .usage import AppServerUsage, decision, normalize, unknown
+from .ownership import recovery_problem
 from .validation import execute, plan
 
 
@@ -41,7 +42,11 @@ def control(root, run_id, config, profile="artifacts", mode="controlled", resume
             if changes:
                 state["invalidated_by"] = changes
                 return stop(store, state, "inputs_changed")
-            if state["execution_status"] == "completed":
+            problem = recovery_problem(store.directory)
+            if problem:
+                state["recovery"] = problem
+                return stop(store, state, problem["reason"])
+            if state["execution_status"] == "completed" and mode == "validation-only":
                 return state
             if store.pause_path.exists():
                 store.pause_path.unlink()
@@ -74,22 +79,32 @@ def control(root, run_id, config, profile="artifacts", mode="controlled", resume
             if store.pause_path.exists():
                 return "manual_pause"
             if mode == "controlled":
-                state["usage"] = reader()
+                try:
+                    state["usage"] = reader()
+                except OSError:
+                    state["usage"] = unknown("usage_io_error", config["bucket"])
                 state["usage_history"].append(state["usage"])
+                if store.pause_path.exists():
+                    return "manual_pause"
                 return decision(state["usage"], config)
             return None
 
         try:
+            # Includes controlled resume with zero pending stages. Saved budget pauses cannot vanish.
+            reason = gate()
+            if reason:
+                return stop(store, state, reason)
             while state["next_stage"] < len(stages):
-                reason = gate()
-                if reason:
-                    return stop(store, state, reason)
                 index = state["next_stage"]
                 stage = state["stages"][index]
-                stage["status"] = "running"
-                stage["attempts"].append({"status": "running", "started_at": now(),
-                                           "command": stages[index].command, "exit_code": None})
-                store.save(state)  # Before launch: no manufactured success after crash.
+                # Serialize the not_run->running reservation against pause publication.
+                with file_lock(store.directory / "launch.lock"):
+                    if store.pause_path.exists():
+                        return stop(store, state, "manual_pause")
+                    stage["status"] = "running"
+                    stage["attempts"].append({"status": "running", "started_at": now(),
+                                               "command": stages[index].command, "exit_code": None})
+                    store.save(state)  # Before launch: no manufactured success after crash.
                 result = executor(stages[index], store.directory, config, len(stage["attempts"]))
                 stage["attempts"][-1] = result
                 stage["status"] = result["status"]
@@ -120,7 +135,9 @@ def pause(root, run_id):
     state = store.load()  # Fail closed; never initialize a missing/corrupt run.
     if state["execution_status"] == "completed":
         return state
-    atomic_json(store.pause_path, {"requested_at": now(), "reason": "manual_pause"})
+    with file_lock(store.directory / "launch.lock"):
+        state = store.load()
+        atomic_json(store.pause_path, {"requested_at": now(), "reason": "manual_pause"})
     try:
         with store.lock():
             state = store.load()
