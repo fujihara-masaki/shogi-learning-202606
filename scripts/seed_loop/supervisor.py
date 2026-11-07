@@ -59,8 +59,13 @@ def supervise(spec_path):
             confirmed = tree is None  # Backend setup failure occurred before spawning any child.
             try:
                 if tree is not None:
-                    owner['owned_processes'] = tree.identities()
-                    atomic_json(owner_path, owner)
+                    try:
+                        owner['owned_processes'] = tree.identities()
+                        atomic_json(owner_path, owner)
+                    except OSError as exc:
+                        result['journal_error'] = type(exc).__name__
+                        result.update(status='operational_error', reason='ownership_journal_io_error')
+                    # Diagnostic writes must never prevent an attempt to end owned children.
                     confirmed = tree.cleanup()
             except (OSError, subprocess.TimeoutExpired) as exc:
                 result['cleanup_error'] = type(exc).__name__

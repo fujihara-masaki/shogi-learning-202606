@@ -143,6 +143,8 @@ Jobの終了とActiveProcesses=0を確認する。kill-on-closeでsupervisor終�
 通常終了時も残った所有子孫を後片付けし、timeout/中断時のcleanupは最大8秒を別途確保する。
 controller側は起動/cleanup余裕を含めstage timeout+15秒を待ち、キャンセル後は最大12秒待つ。
 終了を確認できなければoperational_error/cleanup_unconfirmedとして保存し、成功扱いしない。
+ownership journalのI/O失敗でも、診断保存とは独立して所有子群のcleanupを試みる。
+子群の終了に成功してもjournalが未確定なら自動resumeを拒否し、失敗証拠を保持する。
 判定は保存済みの裸PIDへのkill、ポート番号でのkill、全node/pythonの一括killに依存しない。
 App Server readの終了処理は別経路で、close/終了の想定I/Oエラーをsanitizeしたcleanup_errorsへ残す。
 timeout、interrupted、failed、operational_error、not_runを区別する。
@@ -229,6 +231,7 @@ previous_attempt_activeならsupervisorのcleanup完了を待ち、statusのproc
 cleanup_unconfirmedなら自動再実行を止める。stateのrecoveryと該当ownership/result/supervisor logを確認し、
 所有情報を根拠にOS側で当該検証と子孫が全て終了したか調べる。Linuxのstart_ticksは`/proc/PID/stat`、
 Windowsの実プロセスはJobの監督範囲で確認し、裸PIDだけで終了対象を決めない。
+Windowsのroot記録はcreation_filetimeも保持し、現在のPIDと生成時刻を照合できる。
 判定できなければ停止を維持する。終了を確認できた場合も壊れたjournalを手で成功へ書き換えず、
 runを証拠ごと保管して新IDで検証する。未確認のまま新IDや別portで回避しない。
 workerだけを強制終了した通常ケースはsupervisorが自動cleanupするため、終了確認後の同一run resumeが可能。

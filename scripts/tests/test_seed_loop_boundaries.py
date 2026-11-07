@@ -197,6 +197,57 @@ class ProcessBoundaryTests(unittest.TestCase):
                 if ref is not None:
                     ref.close()
 
+    def test_journal_io_failure_still_terminates_actual_owned_child(self):
+        with tempfile.TemporaryDirectory(prefix='journal 障害 ') as tmp:
+            root = Path(tmp)
+            marker = root/'child.pid'
+            owner = root/'attempt.ownership.json'
+            spec = root/'attempt.spec.json'
+            token = 'journal-io-fixture'
+            atomic_json(owner, {'schema_version':1,'token':token,'status':'starting','cleanup_confirmed':False})
+            child_code = "import os,sys,time; from pathlib import Path; Path(sys.argv[1]).write_text(str(os.getpid())); time.sleep(30)"
+            atomic_json(spec, {'token':token,'owner':str(owner),'result':str(root/'attempt.result.json'),
+                              'stdout':str(root/'stdout.log'),'stderr':str(root/'stderr.log'),
+                              'cwd':tmp,'command':[sys.executable,'-c',child_code,str(marker)],'timeout':10})
+            code = """import sys,time
+from pathlib import Path
+from scripts.seed_loop import supervisor as s
+real=s.atomic_json
+def failing(path,value):
+    if value.get('root_pid'):
+        deadline=time.monotonic()+5
+        while not Path(sys.argv[2]).exists():
+            if time.monotonic()>deadline: raise AssertionError('child not launched')
+            time.sleep(.02)
+        raise OSError('fixture journal write failure')
+    real(path,value)
+s.atomic_json=failing
+s.supervise(Path(sys.argv[1]))
+"""
+            guard=subprocess.Popen([sys.executable,'-c',code,str(spec),str(marker)],cwd=ROOT,
+                                   stdin=subprocess.PIPE,stdout=subprocess.DEVNULL,stderr=subprocess.PIPE)
+            ref=None
+            try:
+                until(marker.is_file)
+                try:
+                    ref=ProcessReference(int(marker.read_text()))
+                except ProcessLookupError:
+                    pass
+                guard.wait(timeout=12)
+                self.assertTrue(ref is None or not ref.alive(),'journal write failure skipped process cleanup')
+                result=json.loads((root/'attempt.result.json').read_text())
+                self.assertTrue(result['cleanup_confirmed'])
+                self.assertEqual(result['status'],'operational_error')
+                self.assertIsNotNone(recovery_problem(root),'unconfirmed journal must block reuse')
+            finally:
+                guard.stdin.close()
+                if guard.poll() is None:
+                    guard.kill()
+                guard.wait(timeout=5)
+                guard.stderr.close()
+                if ref is not None:
+                    ref.close()
+
     def test_b_controller_kill_after_real_child_launch_cannot_overlap_resume(self):
         with repo() as root:
             fixture = root / "backend/scripts/validate_wikipedia_opening_artifact.py"
