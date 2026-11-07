@@ -1,0 +1,95 @@
+name: Seed validation
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: seed-validation-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      SEED_LOOP_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+      SEED_LOOP_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install backend dependencies
+        run: python -m pip install -r backend/requirements.txt
+      - name: Install locked frontend dependencies
+        working-directory: frontend
+        run: npm ci
+      - name: Install matching Chromium
+        working-directory: frontend
+        run: npx playwright install --with-deps chromium
+      - name: Record checkout context
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          python - <<'PY'
+          import json, os, pathlib, subprocess
+          p = pathlib.Path('.seed-loop/ci-context.json')
+          p.parent.mkdir(exist_ok=True)
+          p.write_text(json.dumps({
+              'event': os.environ['EVENT_NAME'],
+              'pr_head_sha': os.environ.get('SEED_LOOP_HEAD_SHA'),
+              'pr_base_sha': os.environ.get('SEED_LOOP_BASE_SHA'),
+              'github_sha': os.environ['GITHUB_SHA'],
+              'checkout_sha': subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip(),
+              'checkout_kind': 'pull_request merge result' if os.environ['EVENT_NAME'] == 'pull_request' else 'dispatch ref'
+          }, indent=2), encoding='utf-8')
+          PY
+      - name: Validate existing artifacts and all required gates (no Codex)
+        run: python -m scripts.seed_loop validate --profile full --run-id ci
+      - name: Preserve checkpoints, diagnostics, logs and browser traces
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: seed-validation-linux
+          include-hidden-files: true
+          retention-days: 14
+          path: |
+            .seed-loop/ci-context.json
+            .seed-loop/runs/**/*.json
+            .seed-loop/runs/**/*.log
+            frontend/playwright-report/
+            frontend/test-results/
+
+  windows-foundation:
+    runs-on: windows-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Install only real D1b test dependencies
+        run: python -m pip install jsonschema python-shogi
+      - name: Check paths, atomic files, process locks, protocol and replay
+        shell: pwsh
+        run: |
+          python -m unittest discover -s scripts/tests -v 2>&1 | Tee-Object -FilePath windows-foundation.log
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: seed-validation-windows
+          path: windows-foundation.log
+          retention-days: 14

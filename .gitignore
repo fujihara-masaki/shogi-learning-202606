@@ -25,3 +25,7 @@ frontend/dist/
 frontend/.e2e/
 frontend/playwright-report/
 frontend/test-results/
+
+# Seed validation checkpoints, logs and implementation scratch
+.seed-loop/
+work/

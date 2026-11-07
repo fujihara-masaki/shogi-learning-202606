@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "bucket": "codex",
+  "windows": ["primary", "secondary"],
+  "new_task_percent": 25,
+  "stop_percent": 30,
+  "max_usage_age_seconds": 120,
+  "usage_timeout_seconds": 15,
+  "stage_timeout_seconds": 900,
+  "codex_binary": "codex",
+  "e2e_backend_port": 18000,
+  "e2e_frontend_port": 15173
+}

@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "enabled": false,
+  "consumer": "L2b future source/implementation worker; L2a never executes this queue",
+  "tasks": [
+    {
+      "task_id": "investigate-e2i-yokofudori-2c-pawn",
+      "status": "awaiting_research",
+      "enabled": false,
+      "artifact": "backend/app/wikipedia_opening_artifacts/yokofudori-2c-pawn.json",
+      "line_key": "wikipedia.yokofudori.pawn-2c",
+      "source": {
+        "article": "横歩取り2三歩",
+        "revision": null,
+        "section": null,
+        "retrieved_at": null,
+        "material_sha256": null
+      },
+      "connection_parent": null,
+      "scope": "調査候補のみ。接続親・出典節・revision・収録範囲の独立確認待ち",
+      "moves": null,
+      "depends_on": [],
+      "allowed_paths": [],
+      "required_validation": ["D1b", "D1c", "backend", "Vitest", "lint", "build", "Chromium"],
+      "source_review": {"status": "not_performed", "evidence": null},
+      "pr": null
+    }
+  ]
+}
