@@ -1,10 +1,12 @@
 """Checkpoint orchestration. A stage is bounded, read-only validation work."""
 import uuid
 
-from .state import LoopError, Store, atomic_json, digest, environment, file_lock, identity, now, read_json
+from .state import LockTimeout, LoopError, Store, atomic_json, digest, environment, file_lock, identity, now, read_json
 from .usage import AppServerUsage, decision, normalize, unknown
 from .ownership import recovery_problem
 from .validation import execute, plan
+
+LAUNCH_LOCK_TIMEOUT_SECONDS = 5
 
 
 def stop(store, state, reason, failed=False):
@@ -98,7 +100,7 @@ def control(root, run_id, config, profile="artifacts", mode="controlled", resume
                 index = state["next_stage"]
                 stage = state["stages"][index]
                 # Serialize the not_run->running reservation against pause publication.
-                with file_lock(store.directory / "launch.lock"):
+                with file_lock(store.directory / "launch.lock", timeout=LAUNCH_LOCK_TIMEOUT_SECONDS):
                     if store.pause_path.exists():
                         return stop(store, state, "manual_pause")
                     stage["status"] = "running"
@@ -126,6 +128,9 @@ def control(root, run_id, config, profile="artifacts", mode="controlled", resume
             state.update(phase="validated", execution_status="completed", stop_reason=None)
             store.save(state)
             return state
+        except LockTimeout as exc:
+            state["recovery"] = str(exc)
+            return stop(store, state, "launch_lock_timeout")
         except KeyboardInterrupt:
             return stop(store, state, "interrupted")
 
@@ -135,9 +140,12 @@ def pause(root, run_id):
     state = store.load()  # Fail closed; never initialize a missing/corrupt run.
     if state["execution_status"] == "completed":
         return state
-    with file_lock(store.directory / "launch.lock"):
-        state = store.load()
-        atomic_json(store.pause_path, {"requested_at": now(), "reason": "manual_pause"})
+    try:
+        with file_lock(store.directory / "launch.lock", timeout=LAUNCH_LOCK_TIMEOUT_SECONDS):
+            state = store.load()
+            atomic_json(store.pause_path, {"requested_at": now(), "reason": "manual_pause"})
+    except LockTimeout as exc:
+        raise LockTimeout(f"pause request not published: {exc}") from exc
     try:
         with store.lock():
             state = store.load()

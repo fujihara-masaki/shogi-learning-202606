@@ -7,9 +7,57 @@ import subprocess
 import sys
 import time
 
+PROC_ROOT = Path('/proc')
+
+
+class OwnershipUnavailable(OSError):
+    """A pre-spawn ownership prerequisite failed, rather than cleanup failing."""
+    def __init__(self, reason, message):
+        self.reason = reason
+        super().__init__(message)
+
+
+def check_proc_identity():
+    """/proc IDs must be usable by getpid/Popen/pidfd in this namespace."""
+    def identity(path):
+        try:
+            raw = path.read_text()
+            pid = int(raw.split(' ', 1)[0])
+            fields = raw.rpartition(')')[2].split()
+            start = int(fields[19])
+            if pid <= 0 or start < 0:
+                raise ValueError('invalid process identity')
+            return pid, start
+        except (OSError, ValueError, IndexError) as exc:
+            raise OwnershipUnavailable('linux_proc_self_unavailable',
+                                       'Cannot read a usable /proc self identity; validation child not started') from exc
+
+    pid = os.getpid()
+    own = identity(PROC_ROOT / 'self/stat')
+    if own[0] != pid:
+        raise OwnershipUnavailable('linux_proc_pid_namespace_mismatch',
+                                   f'/proc self PID {own[0]} differs from getpid {pid}; validation child not started')
+    try:
+        status = (PROC_ROOT / 'self/status').read_text()
+        line = next(line for line in status.splitlines() if line.startswith('NSpid:'))
+        namespace_pids = [int(value) for value in line.split()[1:]]
+        if not namespace_pids:
+            raise ValueError('missing namespace PID')
+    except (OSError, ValueError, StopIteration) as exc:
+        raise OwnershipUnavailable('linux_proc_self_unavailable',
+                                   'Cannot read /proc self NSpid; validation child not started') from exc
+    if namespace_pids != [pid]:
+        raise OwnershipUnavailable('linux_proc_pid_namespace_mismatch',
+                                   '/proc NSpid indicates a different PID namespace; validation child not started')
+    numeric = identity(PROC_ROOT / str(pid) / 'stat')
+    if numeric != own:
+        raise OwnershipUnavailable('linux_proc_self_inconsistent',
+                                   '/proc numeric self reference differs from /proc/self; validation child not started')
+
 
 class LinuxTree:
     def __init__(self):
+        check_proc_identity()
         if not hasattr(os, "pidfd_open") or not hasattr(signal, "pidfd_send_signal"):
             raise OSError("Linux pidfd support is required")
         libc = ctypes.CDLL(None, use_errno=True)

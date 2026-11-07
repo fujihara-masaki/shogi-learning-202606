@@ -135,6 +135,13 @@ stage timeoutは既定900秒。通常pauseは現在の検証をdrainし、結果
 SIGINT/SIGTERMでは中断を記録し、専用supervisorへlifecycle pipeのEOFを通知する。
 検証はLinux（pidfd/subreaper対応kernel・`/proc`）またはWindows Job Objectsで監督する。
 これらを利用できないOSでは、検証プロセスを起動せずoperational_errorになる。
+LinuxTree生成時には、`/proc/self/stat`のPIDと`os.getpid()`の一致、`NSpid`が現在のPIDだけを示すこと、
+`/proc/<pid>/stat`が同じPID/start_ticksを参照することを、検証子の起動前に確認する。
+外側のPID名前空間の`/proc`が見える場合等は`linux_proc_pid_namespace_mismatch`、
+自己参照の読取不能は`linux_proc_self_unavailable`、数値PID参照の不整合は`linux_proc_self_inconsistent`を
+supervisor result/stateのattemptへ保存してoperational_errorにする。これはcleanup_unconfirmedとは別の起動拒否である。
+監督用supervisorは動作しても、検証子は起動せずroot_pid/検証終了コードは付かない。
+PID変換、`/proc`の再マウント、隔離や権限の変更でこの環境を新たにサポートする処理はない。
 Linux supervisorはsubreaperとして別process groupのPlaywright webServerも子孫として回収する。
 `/proc`の親子関係・start_ticksを再確認し、pidfdで参照した所有プロセスだけへTERM/KILLを送る。
 終了確認は`/proc`列挙だけに依存せず、subreaperのwaitpidでECHILDを確認する。
@@ -180,6 +187,11 @@ controlled resumeは、全stage成功済みでnext_stageが末尾でも最新usa
 budget_stop/unknown/staleが残れば停止を維持し、回復時は保存済み成功を再実行せず完了できる。
 usage readの前後でpause要求を確認し、read待ち中に要求されたpauseで未開始stageを起動しない。
 pause publicationとnot_run→runningの開始記録は短いlaunch lockで直列化する。
+launch.lockだけは通常競合を最大5秒待機して扱い、worker.lock/execution.lockは従来の非待機拒否を維持する。
+controllerが先なら予約済みattemptをdrainして停止し、pause publicationが先ならattemptを追加しない。
+controllerの待機上限到達時はpaused/launch_lock_timeoutと診断を保存する。
+pause操作側が上限に達した場合は`pause request not published`のエラー（CLI終了2）で、
+要求が記録された・受理されたとは返さない。状態/既存markerを確認し、競合解消後にpauseを再実行する。
 開始記録が済んだattemptは進行中としてdrainする。この境界前のpauseではattemptも追加しない。
 status/pauseは追加LLMなし。ログイン・購入・利用枠reset操作・thread/turn起動はない。
 
@@ -266,6 +278,9 @@ PRで新workflowが承認待ち/未起動/skip/pendingならsuccessとせず、�
 実Playwright小試験はLinux full CIで依存導入後に必須実行する。Windows jobはアプリ依存を入れず
 このLinux専用試験をskipし、Job Objectsを使う実子起動/worker終了の試験とC〜Eは実行する。
 Linux上のpath/CRLF試験はWindows実機確認ではない。
+追加のlock境界試験は実OS lockの競合を観測するEventで両取得順序を固定し、実Store.save/pauseを通す。
+Linux所有監督の単体試験では不整合な自己識別情報を模擬し、検証起動が呼ばれないことと原因コードの保存を確認する。
+これは実際のPID名前空間を変更した試験でも、外側の`/proc`が見えるレビュー環境の全試験成功の主張でもない。
 ローカル実行件数・対象commit/digest・CI状態はPR本文へ記録し、証拠更新のためにコードを変更し続けない。
 必須gate失敗/未実施ならDraft維持。live usageだけ未確認ならその制限を明示してコードレビューを依頼できる。
 

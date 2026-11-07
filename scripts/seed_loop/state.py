@@ -4,6 +4,7 @@ from __future__ import annotations
 from contextlib import contextmanager
 from datetime import datetime, timezone
 import hashlib
+import errno
 import json
 import math
 import os
@@ -13,10 +14,15 @@ import re
 import subprocess
 import sys
 import tempfile
+import time
 
 
 class LoopError(Exception):
     pass
+
+
+class LockTimeout(LoopError):
+    """A transition lock was not acquired; no protected operation ran."""
 
 
 def now():
@@ -201,7 +207,7 @@ class Store:
 
 
 @contextmanager
-def file_lock(path):
+def file_lock(path, *, timeout=0):
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     # OS locks release after crashes. Never unlink the shared lock inode.
@@ -211,15 +217,23 @@ def file_lock(path):
             stream.write(b"0")
             stream.flush()
         stream.seek(0)
-        try:
-            if os.name == "nt":
-                import msvcrt
-                msvcrt.locking(stream.fileno(), msvcrt.LK_NBLCK, 1)
-            else:
-                import fcntl
-                fcntl.flock(stream, fcntl.LOCK_EX | fcntl.LOCK_NB)
-        except OSError as exc:
-            raise LoopError("run is locked by an active worker") from exc
+        deadline = time.monotonic() + timeout
+        while True:
+            try:
+                if os.name == "nt":
+                    import msvcrt
+                    msvcrt.locking(stream.fileno(), msvcrt.LK_NBLCK, 1)
+                else:
+                    import fcntl
+                    fcntl.flock(stream, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                break
+            except OSError as exc:
+                if timeout == 0 or exc.errno not in (errno.EACCES, errno.EAGAIN, errno.EDEADLK):
+                    raise LoopError("run is locked by an active worker") from exc
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    raise LockTimeout(f"timed out waiting for {path.name}; lock not acquired") from exc
+                time.sleep(min(0.02, remaining))
         try:
             yield
         finally:

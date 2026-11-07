@@ -9,7 +9,7 @@ import time
 # Direct script launch also works when a test's validation cwd is another repository.
 if __package__ in (None, ''):
     sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
-from scripts.seed_loop.process_tree import owned_tree
+from scripts.seed_loop.process_tree import OwnershipUnavailable, owned_tree
 from scripts.seed_loop.state import atomic_json, file_lock, now, read_json
 
 
@@ -53,6 +53,8 @@ def supervise(spec_path):
                         lost.wait(0.02)
                     else:
                         result['status'] = 'success' if child.returncode == 0 else 'failed'
+        except OwnershipUnavailable as exc:
+            result.update(status='operational_error', reason=exc.reason, detail=str(exc))
         except OSError as exc:
             result.update(status='operational_error', reason=type(exc).__name__)
         finally:
