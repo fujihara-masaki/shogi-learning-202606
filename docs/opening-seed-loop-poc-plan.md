@@ -85,6 +85,38 @@ sanitize済み応答・正規化結果・判定・設定hashを新たに保存�
 推奨は、まず案Aを維持したまま案Bの根拠・試験・制限をレビューし、案Bを採用する場合だけ
 PoC固有の明示設定として固定すること。採用前にprimary単独診断を実行許可へ昇格させない。
 
+#### 3.2.1 L2b-0の受入要件：正規化前の枠集合監査
+
+案Bの採否は未決のままとする。L2b-0では、案Bの実行を有効化する前提として、以下の監査と
+模擬応答による試験を必須受入要件に含める。試験成功だけでは案Bを採用したことにならず、
+未採用の案B設定では開始を拒否する。既存L2a adapterや既定2枠の契約を今回変更しない。
+
+現行 `normalize` は設定で選択したwindowだけを出力するため、正規化結果から提供集合を復元できない。
+L2b-0は、要求IDを照合済みの**正規化前のAPI応答**から、既存規則で選んだbucket全体を監査し、
+監査成功後に既存の正規化・25/30%判定へ渡す。`rateLimitsByLimitId`に指定bucketがなければ停止し、
+互換viewへ逃げない。選択外windowも監査対象とし、`windows:["primary"]`だけを見て許可しない。
+
+| raw応答の状態 | 監査記録と停止条件 |
+| --- | --- |
+| 有効なwindow object | `primary` / `secondary`各keyの存在と型、有効値を記録し、有効objectの集合を提供集合Sとする。採用済み期待Sと完全一致し、その全枠を監視する必要がある |
+| 明示null | keyが存在して値がnullである状態として記録する。非提供の根拠と利用者の採用記録がその枠について揃う場合だけ、案Bの期待状態にできる。null単独・過去の低使用率では許可しない |
+| キー欠落 | 明示nullと区別して記録し、期待上非提供とした枠でも停止する。欠落から非提供を推定しない |
+| 不正object・未知の形式 | 不正な使用率、型、bucket、未知のwindow形式等は停止。objectを非提供へ分類し直して監視から除外しない |
+| 集合・状態の変更 | Sの増減、null↔object、null↔欠落、window key集合・CLI/API条件の変化は停止する。新たなsecondaryが有効objectになった場合も自動追加で続行しない |
+
+採用記録には期待S、各windowの期待状態（object/明示null）、非提供根拠、CLI/API・account条件、bucket、
+判断者・日時、設定hashを持たせる。各readではrawのkey存在/状態一覧、S、取得時刻、sanitize済み資料の
+保管先/SHA-256、監査結果・停止理由、正規化結果を同じrequest/attemptへ結合する。
+sanitizeでnullと欠落の区別や選択外枠を失わないことを確認し、認証値・生応答の無差別出力は行わない。
+空のS、期待Sとの不一致、根拠/採用記録/監査証拠の欠落もfail-closedとする。
+
+L2b-0の必須試験は、primaryのみ/secondaryのみ/両方、明示nullと欠落、不正object、Sの増減、
+Sが同じでもnullから欠落へ変わる場合、選択外枠の出現、版/bucket変化、監査証拠の保存失敗、resumeを含む。
+特に「primary単独の正規化結果は同じでもrawのsecondaryが変化した2応答」で開始を拒否できることを検査する。
+正常時は監査後に既存25/30%・freshness/reset判定が必ず実行され、監査成功だけで開始できないことも確認する。
+停止後は原因解消・期待状態の再確認、集合変更時は利用者による方針再採用と設定更新を要し、
+旧証拠を失効させて新validation runで再検証する。fresh raw応答の再監査と明示resumeなしに再開しない。
+
 ### 3.3 維持する停止条件とL2b提案
 
 採用済みの使用済み**絶対割合25%以上は新規開始禁止、30%以上は`budget_stop`**を維持する。
@@ -130,7 +162,7 @@ PoCで保存する証拠一式は次とする。取得した原文はGit管理�
 | 資料SHA-256 | 取得原文の実byte列のhashとbytes数。抽出用に整形した本文には別hash・変換方法・元資料hashを持たせる。再取得で変われば同一資料とみなさない |
 | 接続と収録範囲 | 基準artifactのHEAD/hash、line key、親node key/to SFEN、最初の追加手、各着手の順序・USI・from/to SFEN・根拠位置、各branchの収録終端と未収録境界 |
 | 構造化抽出 | 入出力hash、prompt/モデル・実行設定、thread/turn ID、A/B/C/M判定、候補artifact hash。既存canonical schemaへ変換し、別canonical schemaを作らない |
-| 独立レビュー | 抽出担当と異なる担当/別セッション、確認日時、原資料hash、親・各手・終端との対応、判定・不一致点、候補artifact/hashと対象diff hash |
+| 独立レビュー | §5.4で採用するAI別セッションまたは人間レビューの方式・担当、確認日時、原資料hash、親・各手・終端との対応、明示的な合否・承認記録、不一致点、候補artifact/hashと対象diff hash |
 
 Step 2は範囲を確定する事前調査、Step 3の独立レビューは生成された全追加edgeを照合する受入gateである。
 同一担当の自己確認やD1b合法性成功で独立レビューを代替しない。
@@ -148,7 +180,7 @@ Step 2は範囲を確定する事前調査、Step 3の独立レビューは生�
 | --- | --- | --- |
 | usage・task開始 | Step 1の採用設定、1 taskの確定入力、親HEAD、許可path、task hashを照合。開始前にattemptを保存 | 調査待ち見本の直接実行、複数task、無制限の任意shell commandを拒否 |
 | 出典・構造化抽出 | 固定版取得証拠を結び、Codexの実turnで1候補を生成。途中出力は隔離し、成功・保存済み結果だけ採用候補へ | 推論失敗時の手動生成物への無記録置換、未明示手の補間なし |
-| 独立出典レビュー | 別担当/別セッションが原文・親・全追加手・終端を照合。レビュー結果を台帳に取り込み、対象hash一致を検査 | 自己承認・単なる合法性確認・過去reviewの流用なし。不一致は適用前に停止 |
+| 独立出典レビュー | §5.4で採用した方式の担当が原文・親・全追加手・終端を照合。承認記録を台帳に取り込み、担当・対象hash・明示合格を検査 | 方式未決・自己承認・単なる合法性確認・過去review流用では通過しない。不一致は適用前に停止 |
 | canonical適用 | 確定した許可pathだけにpatch適用し、既存stable key/tree・分類・帰属を保持。適用前後hashを保存 | 別line、新schema、DB migration、汎用UI/importer/validatorの拡張は含めない。必要なら保留 |
 | 検証 | 実D1b、D1c、関連backend/frontendと最終full profileを既存runnerで実行 | 診断parserエラー、not_run/skip/pendingを成功扱いしない。通常DBは操作しない |
 | 限定修正 | 診断・元資料・許可pathに基づき同じtaskだけを修正。回数/原因/差分を保存し再レビュー・再検証 | 出典不明を知識で埋める修正、試験の弱体化、上限到達後の別runによる回数回避なし |
@@ -204,11 +236,71 @@ DB隔離、固定command、全gateの詳細は基盤計画と開発ガイドを�
 内容が変われば対象diffの独立reviewを取り直す。インフラ再試行はrepairと別記し、同じ操作の
 自動連続再試行は行わず、原因解消と結果照合後の明示resumeだけにする。
 
+### 5.4 独立出典レビューの方式選択・承認・停止再開
+
+PoCで**AIの別セッション方式と人間レビュー方式のどちらを採用するかは未決**である。
+実行前に利用者が方式・担当・独立性の条件を選び、判断者・日時・理由・本計画の固定版を採用記録へ残す。
+方式の採用記録と、個別の抽出結果に対する出典レビュー合格記録は別物であり、両方をcontrollerが検査する。
+いずれの方式も原文・親・全追加edge・終端の確認条件は同じで、レビュー合格はReady化やmerge承認を意味しない。
+
+| 方式 | 承認記録・合格条件 | 不合格・未完了時の停止と再開 |
+| --- | --- | --- |
+| AIの別セッション | 抽出セッションと異なるthread/session ID、モデル/設定、prompt hash、入力資料・artifact・diff hash、出力と判定・時刻を保存。原資料を直接参照して照合した明示的な合格と、そのsessionを担当として採用した記録を結合する。同じAI/モデルである場合の限界も記載する | 不合格、不一致、応答喪失、独立sessionを確認できない場合はartifact適用・PR作成前に停止。結果不明なら同じturnを照合し、必要な再レビューを記録する。内容修正後は新hashについて別セッションで再レビューし、明示合格後だけresumeできる |
+| 人間レビュー | 抽出担当と異なる確認者を特定し、本人の判断と確認できるレビュー記録の所在（コメントURLまたは保管ファイル/hash）、日時、原資料・artifact・diff hash、各手/親/終端の照合結果、明示的な承認を保存。PR作成前にも取得できる形式を使い、沈黙を承認とみなさない | 不合格/差戻し、返答待ち、本人性・対象hashを照合できない記録では停止。指摘を保存し、内容修正後は新hashに対する人間の再承認を得る。待ち時間経過やAIへの自動切替では再開しない |
+
+共通して不合格理由・対象hash・判定者・修正履歴を保持し、不合格を削除して合格で上書きしない。
+修正可能な不一致は残り修正枠内で直し、再レビューする。本文根拠不足は保留、修正上限到達は§8.2に従う。
+レビュー方式・担当の変更は利用者の新たな採用記録を要し、不合格を回避するための無記録切替は認めない。
+修正・原資料・接続親・対象diffが変われば旧承認を失効させる。記録の不足だけを復旧した場合も、
+本人/セッション・入力hash・明示合格を照合するまで停止し、未確認の承認を推定しない。
+再開には有効な採用記録と現入力に対する合格、所有終了確認、fresh usage、明示resumeが必要である。
+両方式の合格/不合格/結果不明/古いhash/方式未採用のgateを模擬試験し、実PoCは選んだ方式だけを実証する。
+
 ## 6. Step 4：Draft PR作成・CI確認
 
-#78 が未マージであることを前提に、base候補は **`codex/wikipedia-seed-loop-foundation`**、
-親HEADは **`b438609f4bd7c04ff812d64e7de74718b935a39f`** に固定する。
-#78 のbase `claude/clever-hopper-bphezm` はPoC子PRのbaseと取り違えない。
+### 6.1 計画書PR・L2b-0・PoC実装PRの依存と取り込み
+
+本書の提出PRは [#79](https://github.com/fujihara-masaki/shogi-learning-202606/pull/79) であり、
+現在のbaseは `codex/wikipedia-seed-loop-foundation`、親HEADは
+`b438609f4bd7c04ff812d64e7de74718b935a39f`（#78）である。
+今回レビューの開始HEADは `f67640b88251f37a3c35920456278b40596212c4` で、今回の修正も#79だけへpushする。
+**現段階で#78へのpush、#78/#79のmerge、retarget、新規PR作成は行わない。**
+
+将来の準備は次の依存順を推奨する。以下は手動で準備する依存関係の計画であり、controllerによる
+複数Stacked PR自動生成の対象追加ではない。#79を取り込まずに#78だけから実装を開始しない。
+
+| 対象 | 計画書の取り込み方・固定する親 | Draft段階のbaseと将来のマージ先 |
+| --- | --- | --- |
+| 計画書 #79 | #78の固定HEADから作成。本書のレビュー後、使用する#79のhead commitをPとして固定し、ファイルSHA-256も記録する。今回の開始HEADをレビュー後の最終版とみなさない | 現在のbaseは#78のbranch。今は未マージ。将来の統合先Iへretarget・再検証後に取り込む |
+| L2b-0準備PR | Pから専用branchを作り、本書をGit履歴ごと継承する。Pのancestryと本書hashを検査し、#79へコードをpushしない | 未マージ依存を比較する場合のbaseは#79のbranch。ここへmergeして#79を更新せず、将来の統合先Iへretargetして取り込む |
+| PoC実装PR | 独立提出するL2b-0のレビュー済み固定head Lから専用branchを作り、本書と準備コードを履歴ごと継承する。必要な後続workerも確定してから実行する | 未マージ依存を比較する場合のbaseはL2b-0のbranch。将来の統合先Iへretargetして再検証する。PoC成果物はDraft・未マージを維持し、mergeは本PoCの対象外 |
+
+L2b-0を独立PRにせず同じPoC branchで準備する場合は、Pをそのbranchの固定親とし、準備完了時の
+コードHEAD/hashも台帳へ保存する。いずれも#79は計画書のみとし、別の正本コピーを作らない。
+依存PRが既に統合先Iへ取り込まれている場合は、その内容を含むIの固定HEADから子branchを作り、
+元のP/Lと取り込みcommitの対応・本書hashを照合する。履歴の異なる古い親へ自動的に戻さない。
+本書を将来変更する必要が生じた場合は変更理由・差分をレビューして計画版を更新し、旧版を黙って置換しない。
+
+将来の統合先Iの候補は、#78の現在のbase **`claude/clever-hopper-bphezm`** とする。
+これは依存PRの比較用baseとは別で、default branchとは仮定しない。実際の取り込み先・方式は将来別途承認して固定する。
+取り込みを承認した段階では、#78をIへ取り込む→#79をIへretarget・再検証して取り込む→
+独立したL2b-0をIへretarget・再検証して取り込む、の順とする。PoC PRも親の取り込み後にIへretarget・再検証するが、
+Draft・未マージを維持する。子PRを#78/#79等の依存branchへmergeして親PRのHEADを更新する手順にはしない。
+この将来手順は今回のmerge/retargetを許可するものではない。
+
+開始前にP/L・本書hash・基盤SHA、実際のbase名/期待SHA/実SHA、実装コードHEADを依存台帳へ保存する。
+開始・resume・push/PR作成前・CI照合時は直接のbaseだけでなく、未マージの#78/#79/L2b-0各refも
+固定値と照合する。直接のbaseが動いていなくても上流の計画版・基盤が変われば停止する。
+親の更新・merge/squash・base変更時は新規stageを止め、旧検証証拠を失効させる。
+再開は、取り込み元/先と方式の承認記録、新しい親SHAでの再統合、本書の継承・内容hashと依存差分の確認、
+出典の接続親とreview対象hashの再照合、新validation runによる全gate、最新head/baseのCI取得の順で行う。
+squash等でancestryが変わる場合は元commitと取り込みcommit・本書hashの対応も記録する。
+古いhead単体やmerge結果の成功を新しい組合せへ持ち越さず、fresh usageと明示resumeを要求する。
+
+### 6.2 固定した親に対するPR作成・CI確認
+
+§6.1で選んだ依存経路の実際のbase/固定親SHAを使用する。#78のHEADは基盤の識別子として残すが、
+計画書・L2b-0を含む実行時の親HEADと取り違えない。
 GitHubのbaseは可変refなので、台帳に固定SHAを持つだけでは固定されない。開始・resume・push前・PR作成前・
 CI照合時にGitHub refを再読し、期待SHAとの差異で停止する。親の更新・merge・削除時に自動retarget/rebaseしない。
 合意した再統合後に新しい親SHAを記録し、出典接続・全検証・CI証拠を取り直す。
@@ -219,7 +311,7 @@ CI照合時にGitHub refを再読し、期待SHAとの差異で停止する。�
    diff check、必須検証と独立reviewの対象hashを報告する。push後はremote head SHAも照合する。
 3. GitHub上で全状態（open/closed/merged）の既存PRを確認する。repo＋head branch＋base＋task IDを照合し、
    同一taskの別base PRも調べる。一致1件なら再利用、複数・不整合・closed/mergedなら停止して判断する。
-4. task単位の排他と永続intentを保存し、Draft指定で1回だけ作成する。PR本文に依存 #78、固定親SHA、
+4. task単位の排他と永続intentを保存し、Draft指定で1回だけ作成する。PR本文に依存 #78/#79と該当するL2b-0、計画版P・固定親SHA、
    task ID、出典/抽出/review/検証の証拠と制限を載せる。番号・URL・base/head SHA・Draft/未マージを再取得して保存する。
 5. 応答喪失・timeout・controller終了後は、作成済みか不明なままcreateを再送しない。
    同じtask/head/baseの既存PRをGitHubで再照合する。存在しないと確定しない通信断では停止を維持する。
@@ -245,7 +337,7 @@ Step 1以外の開始・resumeにもStep 1のfresh usage判定を適用する。
 | --- | --- | --- | --- | --- |
 | 1：usage | 監視方針を採用済み、CLI/API/実行環境を特定。read-only取得を実行する段階であること | 採用した全監視枠のfresh値が有効・25%未満。設定と採用判断が結合 | EOF/unknown/unsupported、不正/古い値、枠不一致、25%以上/30%以上。方針未決では後続へ進まない | CLI/OS、時刻、bucket/window/duration/reset、sanitize済み応答、判定・設定hash |
 | 2：候補 | Step 1通過、候補は横歩取り△2三歩の1件のみ、参照artifact/lineを固定 | 固定原文/revision/節/親/範囲が確定し、Aとして追加可能な連続列が根拠付きで特定 | 取得不能・版不一致・親不明・本文に手順なし・B/M/Cのみ。候補変更で迂回しない | 原文とSHA-256、取得結果、節、親key/SFEN、境界、事前確認者・結果 |
-| 3：実装・検証 | L2b最小機能と試験が準備済み、Step 2確定、修正上限とpath固定 | Codex抽出、独立review、canonical差分が対応しD1b/D1c・関連試験・最終fullすべて成功。停止復帰証拠がある | 抽出不一致、検証失敗、通信断、controller終了、入力/親変更、所有不明、修正上限。原因別に保留/修正待ち | task/attempt/turn台帳、入出力/diff hash、review、修正累計、各validation run/log/result/cleanup |
+| 3：実装・検証 | L2b最小機能と試験が準備済み、Step 2確定、修正上限とpath固定、独立review方式・担当の採用記録あり | Codex抽出、現入力の独立review合格記録、canonical差分が対応しD1b/D1c・関連試験・最終fullすべて成功。停止復帰証拠がある | 方式未決・不合格/レビュー待ち、抽出不一致、検証失敗、通信断、controller終了、入力/親変更、所有不明、修正上限。原因別に保留/修正待ち | task/attempt/turn台帳、入出力/diff hash、方式採用・review承認記録、修正累計、各validation run/log/result/cleanup |
 | 4：Draft PR | Step 3完了、最新usage許可、変更ファイル/base/HEAD報告済み、remote親/head一致・重複照合済み | Draft PRが1件だけ存在し、最新head/baseのLinux full・Windows基盤jobが成功、証拠保存済み、未マージ | PR結果不明、重複/remote不一致、親変更、CI失敗/未起動/待ち上限、Draft解除/merge検出 | remote intent/result、PR照合、URL/番号/Draft状態、base/head/checkout SHA、CI run/job/attempt・artifact |
 
 ## 8. 試験計画とPoC受入基準
@@ -261,13 +353,15 @@ Step 1以外の開始・resumeにもStep 1のfresh usage判定を適用する。
 | --- | --- | --- |
 | 正常系1件 | 模擬workerで順序・証拠hashを検査した後、実usage・実Codex抽出・独立review・実検証・実Draft PR/CIを1経路で確認 | 2件目のtask・PR作成呼出は0。最終taskとPRのhash対応が追える |
 | usage不明/不正/古い値 | EOF、null、API error、bucket/window欠落、不正値、120秒超、未来、reset跨ぎ。24.99/25/29.99/30%境界、枠集合変化 | 未開始turn/副作用0、実行中turn中断・途中出力隔離、fresh readと明示resumeまで停止 |
+| 案Bの正規化前監査（L2b-0受入） | §3.2.1のraw応答を用い、正規化結果が同じでも選択外枠の出現・null/欠落・状態/集合変更を検知する。未採用の案B、監査保存失敗、resumeも検査 | 監査成功と有効な採用記録がなければ停止。既存の閾値判定も必須。採否未決のまま模擬試験できるが、案Bを有効化しない |
 | 出典取得不能・版違い | HTTP失敗、通信切断、別revision、壊れた/部分本文、資料hash不一致 | canonical変更/推論による補完0。原資料確定・再レビュー後に再開 |
 | 抽出不一致 | 原文にない着手、親/順序/成/駒打ち/終端違い、review対象diff hash違い | D1bが合法でも適用拒否。残り修正枠内で修正・独立再レビュー |
+| 独立review方式・承認 | §5.4の両方式について未採用、自己レビュー、不合格、記録喪失/本人・session不明、古いhashの承認を模擬する | canonical適用/PR作成を拒否。方式採用記録と現入力の明示合格、fresh usage、明示resumeでだけ復帰 |
 | 検証失敗 | D1b違反/運用error、D1c差分、両ライブラリ不一致、旧ID/comment退行、E2E失敗 | 失敗以後は未実施。上限内修正後に新validation run、試験の弱体化なし |
 | 通信断・結果保存失敗 | turn送信/応答、push/PR作成直後、CI取得中、atomic replace失敗を注入 | 成功を捏造せず結果不明で保存。remote照合前に再送しない。秘密値をログへ出さない |
 | controller異常終了 | turn起動後、patch適用後、commit/push/PR直後、結果保存の前後で強制終了 | lease/所有子とremote turnを照合し重複実行0。不明時停止、確定成功は同一入力なら再利用 |
 | pause競合・復帰 | usage read中、attempt予約前後、最終stage後にpause。2 worker/resume競合、壊れた台帳も試す | 既存A〜E/lock境界を保持。停止解除をreset経過で推測せず、修正回数も維持 |
-| 親HEAD/入力変更 | Step 3途中・push直前・PR作成後・CI待ちに親refを変更 | 子の旧検証を失効させ新規stage停止。自動rebase/retargetなし。再統合後に全検証 |
+| 親HEAD/入力変更 | Step 3途中・push直前・PR作成後・CI待ちに親refを変更。#79の計画版変更、依存PR取り込み後のretarget/squashも一時repoで検査 | 子の旧検証を失効させ新規stage停止。自動rebase/retargetなし。§6.1の継承/hash確認と再統合後に全検証 |
 | CI失敗・未起動 | failed/cancelled/skip/pending、承認待ち、run未検出、古いhead成功、job欠落、rerunを模擬 | 成功に変換しない。同一PRに復帰し新HEAD/run attemptを正しく照合 |
 | 重複PR防止 | 作成応答喪失後に既存PRが見つかる/不存在/照合不能/複数一致、closed/merged PR、二重起動 | 一致PR再利用、create再送を抑止。照合不能・複数・履歴衝突は停止。実repositoryに重複PRを作って試さない |
 
@@ -297,21 +391,24 @@ Step 1以外の開始・resumeにもStep 1のfresh usage判定を適用する。
 | 基盤/候補/成果物 | 参照HEADのL0/L1/L2a、横歩取り△2三歩候補、Seed task1件・Draft PR1件・未マージを確定条件とする |
 | usage方針 | 既定2枠必須は有効。API提供枠のみを監視する案Bの採否・非提供判定の根拠が未決。単独診断で代替しない |
 | 出典と実装範囲 | revision `92929426` は候補。今回の節・後続手・親・終端・許可path・資料hash・独立review担当はStep 2/3で確定する |
+| 独立出典レビュー方式 | AIの別セッション方式/人間方式の採否・担当・独立性条件は未決。§5.4の方式採用記録と対象hash付き承認記録を別に要求する |
+| 計画版・依存の取り込み | #79は文書のみ、現在は#78依存でDraft・未マージ。§6.1の計画版P、L2b-0を独立提出するか、将来の統合先I・取り込み方式・新親SHAは実行前に承認・固定する。今は#78を更新/mergeしない |
 | 修正上限 | 既存初期案3回に対しPoC推奨2回。同一原因で改善なし2回停止は維持。採用値を実行前に記録する |
 | L2b実行契約 | task台帳/CLI、推論turnの監視・中断確認、poll/turn上限、CI待ち上限、remote照合方式を後続実装で採用・試験する |
 | remote操作 | 専用head branch名、credentialのイベント起動条件、証拠保管先を実行前に確定。親SHAが変われば再計画する |
 
 次に実装する最小PRは **「L2b-0：1件task台帳・監視方針gate・再開境界」** を推奨する。
-#78 の固定HEADに依存し、1 task制約、版付き台帳、既存usage adapterへの接続、明示した監視集合の固定、
+§6.1の固定計画版Pを継承し、#78への依存も保持する。1 task制約、版付き台帳、既存usage adapterへの接続、明示した監視集合の固定、
 入力hash・pause/resume・修正累計の保持、模擬worker境界と障害注入試験に限定する。
 新しいlive取得、推論worker、canonical変更、GitHub書込はこの準備PRでは実行しない。
-案Bを採用する場合は提供集合の監査試験も含めるが、既定2枠を黙って緩和しない。
+§3.2.1の正規化前監査と停止・復帰試験をL2b-0の受入要件とし、案B未採用時の開始拒否も検査する。
+監査試験成功と案B採用を区別し、既定2枠を黙って緩和しない。
 この最小PRだけでは本書のStep 3/4を実行できない。続く実worker・独立review gate・remote照合の実装と
 試験が揃ってからPoCを開始し、準備段階の模擬成功をPoC成功に数えない。
 
 準備コードをPoC最終Draft PRの同一branchで積み上げる場合、最終成果物はL2bコードと1件Seed差分を含む1 PRとなる。
-基盤コードだけのPRを先に独立提出する運用を選ぶ場合は、PoC実行前の準備PRとして件数を区別し、
-依存base/親SHAを再合意する。本書は準備PRを含む複数Stacked PRの自動生成を許可しない。
+L2b-0を独立提出する場合はPoC実行前の準備PRとして件数を区別し、いずれも§6.1の取り込み・親固定・再検証手順に従う。
+本書は準備PRを含む複数Stacked PRの自動生成を許可しない。
 
 ## 10. 次段階への移行条件
 
