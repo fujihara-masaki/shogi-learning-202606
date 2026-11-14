@@ -1,8 +1,9 @@
 """L2b-0: fictional inputs + real disk/locks/stdio/supervised mock worker processes."""
-from contextlib import contextmanager
+from contextlib import contextmanager, redirect_stdout
 from copy import deepcopy
 from datetime import datetime, timedelta, timezone
 import json
+import io
 import os
 from pathlib import Path
 import subprocess
@@ -726,6 +727,199 @@ control(root,data,dependency_example(),'crashing',root/'work/usage.json')
             self.assertFalse((root / 'backend').exists())
             self.assertFalse((root / 'work/l2b0-mock-output.json').exists())
             self.assertEqual(subprocess.check_output(['git', '-C', str(root), 'status', '--porcelain']), b'')
+
+
+class CommitBoundaryTests(unittest.TestCase):
+    """Real imports/repos/audits/worker journals; advance time without sleeps."""
+    def paused_success(self, root, data):
+        init(root, data)
+        def draining(*args):
+            result = execute(*args)
+            l2b.pause(root, store(root, data).task_id)
+            return result
+        state = run(root, data, executor=draining)
+        self.assertEqual((state['stop_reason'], len(state['attempts'])), ('manual_pause', 1))
+        return state
+
+    @contextmanager
+    def clock(self, current):
+        # Existing normalize/decision and the actual stdio adapter share this
+        # simulated clock; no copied transport, audit, decision or worker body.
+        with patch('scripts.seed_loop.usage.datetime', wraps=datetime) as date, \
+             patch('scripts.seed_loop.usage.now', side_effect=lambda: current[0].isoformat()), \
+             patch.object(l2b, 'now', side_effect=lambda: current[0].isoformat()):
+            date.now.side_effect = lambda tz: current[0]
+            yield
+
+    def start_expiry(self, kind):
+        for repair in (False, True):
+            with self.subTest(kind=kind, repair=repair), repo() as (root, data):
+                if repair:
+                    data['queue']['tasks'][0]['steps'].append({
+                        'operation': 'repair', 'outcome': 'success', 'cause': 'fixture-a', 'improved': True})
+                    adopt_repair(data)
+                    self.paused_success(root, data)
+                else:
+                    init(root, data)
+                s = store(root, data)
+                before = s.load()
+                current = [datetime(2030, 1, 1, tzinfo=timezone.utc)]
+                raw = usage_example()
+                if kind == 'reset':
+                    raw['result']['rateLimitsByLimitId']['codex']['primary']['resetsAt'] = int(current[0].timestamp()) + 1
+                atomic_json(root / 'work/usage.json', raw)
+                original = l2b.Ledger.evidence
+                crossed = []
+                def checking(ledger, state):
+                    original(ledger, state)
+                    if len(state['usage_history']) > len(before['usage_history']) and not crossed:
+                        # Initial read passed; inside the launch lock, AFTER the
+                        # real evidence hashes, BEFORE any reservation/consumption.
+                        self.assertIsNone(state['last_gate']['decision'])
+                        current[0] += timedelta(seconds=2 if kind == 'reset' else 121)
+                        crossed.append(True)
+                worker = Mock(wraps=execute)
+                with self.clock(current), patch.object(l2b.Ledger, 'evidence', checking):
+                    state = run(root, data, resume=repair, executor=worker)
+                    print(json.dumps({'boundary': 'L2b0-start-expiry', 'simulated_time': True, 'case': kind,
+                                      'repair': repair, 'worker_calls_before_resume': worker.call_count,
+                                      'attempt_delta_before_resume': len(state['attempts']) - len(before['attempts']),
+                                      'repair_delta_before_resume': state['repair_count'] - before['repair_count'],
+                                      'observed_stop': state['stop_reason']}))
+                    self.assertEqual(state['stop_reason'], 'usage_stale')
+                    self.assertEqual(len(state['attempts']), len(before['attempts']))
+                    self.assertEqual(state['repair_count'], before['repair_count'])
+                    self.assertEqual(state['usage_history'][-1]['decision'], None)
+                    self.assertEqual(state['boundary_checks'][-1]['boundary'], 'start')
+                    self.assertEqual(state['boundary_checks'][-1]['usage_decision'], 'usage_stale')
+                    worker.assert_not_called()
+                    self.assertTrue(crossed)
+                    # Neither restart nor the old permit clears the stop. An
+                    # explicit resume obtains and audits a new actual stdio read.
+                    with self.assertRaisesRegex(LoopError, 'explicit resume'):
+                        run(root, data)
+                    atomic_json(root / 'work/usage.json', usage_example())
+                    resumed = run(root, data, True)
+                    self.assertEqual(resumed['execution_status'], 'mock_completed')
+                    self.assertEqual(len(resumed['attempts']), len(before['attempts']) + 1)
+                    self.assertGreater(len(resumed['usage_history']), len(state['usage_history']))
+                    self.assertEqual(resumed['repair_count'], before['repair_count'] + int(repair))
+
+    def test_start_reset_crossing_after_checks_consumes_nothing(self):
+        self.start_expiry('reset')
+
+    def test_start_121_second_age_after_checks_consumes_nothing(self):
+        self.start_expiry('age')
+
+    def test_start_elapsed_time_within_limits_still_runs(self):
+        for elapsed in (1, 120):
+            with self.subTest(elapsed=elapsed), repo() as (root, data):
+                init(root, data)
+                current = [datetime(2030, 1, 1, tzinfo=timezone.utc)]
+                original = l2b.Ledger.evidence
+                advanced = []
+                def checking(ledger, state):
+                    original(ledger, state)
+                    if state['usage_history'] and not advanced:
+                        current[0] += timedelta(seconds=elapsed)
+                        advanced.append(True)
+                with self.clock(current), patch.object(l2b.Ledger, 'evidence', checking):
+                    worker = Mock(wraps=execute)
+                    state = run(root, data, executor=worker)
+                self.assertEqual(state['execution_status'], 'mock_completed')
+                self.assertEqual(worker.call_count, 1)
+                self.assertEqual(len(state['attempts']), 1)
+
+    def test_completion_rechecks_reset_and_age_after_final_evidence(self):
+        for kind in ('reset', 'age'):
+            with self.subTest(kind=kind), repo() as (root, data):
+                before = self.paused_success(root, data)
+                current = [datetime(2030, 1, 1, tzinfo=timezone.utc)]
+                raw = usage_example()
+                if kind == 'reset':
+                    raw['result']['rateLimitsByLimitId']['codex']['secondary']['resetsAt'] = int(current[0].timestamp()) + 1
+                atomic_json(root / 'work/usage.json', raw)
+                original = l2b.Ledger.evidence
+                def checking(ledger, state):
+                    original(ledger, state)
+                    if len(state['usage_history']) > len(before['usage_history']):
+                        self.assertIsNone(state['last_gate']['decision'])
+                        current[0] += timedelta(seconds=2 if kind == 'reset' else 121)
+                worker = Mock(side_effect=AssertionError('success must not be rerun'))
+                with self.clock(current), patch.object(l2b.Ledger, 'evidence', checking):
+                    state = run(root, data, True, executor=worker)
+                self.assertEqual((state['execution_status'], state['stop_reason']), ('paused', 'usage_stale'))
+                self.assertEqual(state['attempts'], before['attempts'])
+                self.assertEqual(state['repair_count'], before['repair_count'])
+                self.assertIsNone(state['usage_history'][-1]['decision'])
+                self.assertEqual(state['boundary_checks'][-1]['boundary'], 'completion')
+                self.assertEqual(state['boundary_checks'][-1]['usage_decision'], 'usage_stale')
+                worker.assert_not_called()
+
+    def test_zero_remaining_resume_rechecks_old_worker_and_new_audit_evidence(self):
+        for kind in ('worker', 'audit'):
+            for damage in ('delete', 'change', 'unreadable'):
+                with self.subTest(kind=kind, damage=damage), repo() as (root, data):
+                    before = self.paused_success(root, data)
+                    s = store(root, data)
+                    factory = l2b.simulated_reader(root / 'work/usage.json')
+                    damaged = []
+                    class Damaging:
+                        def read_audited(self, callback):
+                            observation = factory(config(data)).read_audited(callback)
+                            if kind == 'worker':
+                                path = s.directory / next(iter(before['attempts'][0]['journal_hashes']))
+                            else:
+                                entry = s.load()['usage_history'][-1]
+                                path = s.directory / 'audits' / (entry['audit_id'] + '.json')
+                            if damage == 'delete':
+                                path.unlink()
+                            elif damage == 'change':
+                                path.write_text('{}', encoding='utf-8')
+                            damaged.append(path)
+                            return observation
+                    original = l2b.sha
+                    def hashing(path):
+                        if damage == 'unreadable' and Path(path) in damaged:
+                            raise PermissionError('simulated evidence read failure')
+                        return original(path)
+                    worker = Mock(side_effect=AssertionError('missing evidence must not rerun success'))
+                    with patch.object(l2b, 'sha', hashing):
+                        state = run(root, data, True, reader_factory=lambda _: Damaging(), executor=worker)
+                    print(json.dumps({'boundary': 'L2b0-completion-evidence', 'case': kind, 'damage': damage,
+                                      'actual_local_file_damage': damage != 'unreadable',
+                                      'status': state['execution_status'], 'stop_reason': state['stop_reason'],
+                                      'attempts': len(state['attempts']), 'worker_calls': worker.call_count}))
+                    expected = 'completion_evidence_unavailable' if damage == 'unreadable' else 'completion_evidence_invalid'
+                    self.assertEqual((state['execution_status'], state['stop_reason']), ('paused', expected))
+                    self.assertEqual(s.load()['stop_reason'], expected)
+                    self.assertEqual(state['attempts'], before['attempts'])
+                    self.assertEqual(state['cause_history'], before['cause_history'])
+                    self.assertEqual(state['repair_count'], before['repair_count'])
+                    self.assertEqual(len(state['usage_history']), len(before['usage_history']) + 1)
+                    self.assertEqual(state['boundary_checks'][-1]['boundary'], 'completion')
+                    worker.assert_not_called()
+
+    def test_completion_cli_returns_nonzero_when_new_audit_disappears(self):
+        with repo() as (root, data):
+            before = self.paused_success(root, data)
+            s = store(root, data)
+            factory = l2b.simulated_reader(root / 'work/usage.json')
+            class Damaging:
+                def read_audited(self, callback):
+                    observation = factory(config(data)).read_audited(callback)
+                    entry = s.load()['usage_history'][-1]
+                    (s.directory / 'audits' / (entry['audit_id'] + '.json')).unlink()
+                    return observation
+            output = io.StringIO()
+            with patch.object(l2b, 'simulated_reader', return_value=lambda _: Damaging()), redirect_stdout(output):
+                code = l2b.main(['--root', str(root), 'resume', '--input', str(root / 'work/input.json'),
+                                 '--dependencies', str(root / 'work/dependencies.json'), '--run-id', 'cli-boundary',
+                                 '--simulated', '--usage-fixture', str(root / 'work/usage.json')])
+            self.assertEqual(code, 3)
+            state = json.loads(output.getvalue())
+            self.assertEqual(state['stop_reason'], 'completion_evidence_invalid')
+            self.assertEqual(state['attempts'], before['attempts'])
 
 
 if __name__ == '__main__':

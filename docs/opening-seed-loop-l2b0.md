@@ -78,7 +78,7 @@ payloadにはtask/run/attempt ID、時刻、`phase:mock_worker`、execution stat
 4. sanitized資料とSHA-256、request ID/取得時刻、入力/設定/方針/採用hash、run/次attempt indexを保存する。
    資料保存と台帳保存が成功して初めて監査が通る。
 5. 同じ応答を既存normalize/decisionへ渡し、正規化結果と判定を同じaudit IDで保存する。
-6. pause・入力・証拠を開始境界でも照合して、開始予約を保存する。
+6. launch lock取得・入力/証拠照合後、予約直前の最新時刻で同じusageを再判定してから開始予約を保存する。
 
 案Aが既定で両枠必須。L2bでは期間・resetも有効な正の整数を要求する（L2aの任意metadata契約は変更しない）。
 名前から週次/短時間を決めず、入力の期待durationと照合する。
@@ -90,6 +90,11 @@ payloadにはtask/run/attempt ID、時刻、`phase:mock_worker`、execution stat
 bool/NaN/無限/範囲外は許可しない。120秒超、未来時刻、観測後reset跨ぎは既存decisionで拒否する。
 reset経過から0%を推定しない。2026-11-09の週次1%は使っていない。
 
+read時点の監査・正規化・判定は保存当時の記録として保持する。別の `boundary_checks` に
+`start` / `completion`、audit ID、run/次attempt index、確認時刻、証拠照合結果、usage再判定を記録する。
+read後の待機・照合中に120秒超/reset跨ぎになれば `usage_stale` で停止し、未開始attempt/repair消費を増やさない。
+自動再取得ループはなく、再開には従来どおり明示resumeと新しいraw監査を要求する。
+
 ## pause・予約・異常終了・resume
 
 同taskのcontrollerは別プロセス間のtask lockで排他する。二重simulate/resumeは終了2。
@@ -98,6 +103,11 @@ pause publicationとattempt予約は同じlaunch lock（最大5秒待機）を�
 - pauseが先なら未開始attempt/worker呼出は0。usage read中のpauseもread後に確認する。
 - 予約が先なら、その1 attemptを所有監督内でdrainする。pauseは次の予約を防ぐ。
 - 最終結果後/全step完了後でも停止理由を評価し、停止を完了に読み替えない。
+- `mock_completed` の保存もlaunch lock内で行い、入力・全audit証拠・再利用するworker証拠を照合した後、
+  最新時刻でusageを再判定する。残step=0のresumeも同じ。read中に失われた/変更された証拠は
+  `completion_evidence_invalid`、読取不能は `completion_evidence_unavailable` として原因付き停止を保存する。
+  開始側の証拠エラーは同じ規則の `start_evidence_invalid` / `start_evidence_unavailable`。
+  模擬実行/resumeの停止は終了3で、証拠を作り直すための成功attempt再実行や累計リセットは行わない。
 - lock待機上限ではcontrollerは `launch_lock_timeout`、pause側は `pause request not published` を返す。
 - repairは起動前に累計へ加算する。応答喪失・run ID変更・失敗・resumeで返却しない。
   `repair_limit_reached` と `same_cause_no_improvement`（同一原因の直近2修正が改善なし）を区別する。

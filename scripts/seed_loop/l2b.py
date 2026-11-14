@@ -302,6 +302,25 @@ def control(root, data, deps, run_id, fixture, *, resume=False, reader_factory=N
                 return 'inputs_changed'
             return reason
 
+        def boundary_check(boundary):
+            # Keep the read-time audit/decision immutable. Reusing that snapshot
+            # requires intact evidence and a NEW decision after locks and hashes.
+            check = {'boundary': boundary, 'run_id': run_id,
+                     'audit_id': state['last_gate']['audit_id'],
+                     'next_attempt_index': len(state['attempts']),
+                     'usage_decision': 'not_evaluated'}
+            state.setdefault('boundary_checks', []).append(check)
+            try:
+                store.evidence(state)
+            except (LoopError, OSError) as exc:
+                category = 'invalid' if isinstance(exc, LoopError) else 'unavailable'
+                check.update(checked_at=now(), evidence=category,
+                             evidence_reason=str(exc) if isinstance(exc, LoopError) else type(exc).__name__)
+                return boundary + '_evidence_' + category
+            check.update(checked_at=now(), evidence='verified')
+            check['usage_decision'] = decision(state['last_gate']['usage'], cfg)
+            return check['usage_decision']
+
         try:
             # Always a new read, even when all steps have already finished.
             reason = gate()
@@ -326,7 +345,9 @@ def control(root, data, deps, run_id, fixture, *, resume=False, reader_factory=N
                     if current_binding() != state['binding']:
                         state['invalidated_by'] = ['launch_boundary_inputs']
                         return stop(store, state, 'inputs_changed')
-                    store.evidence(state)
+                    reason = boundary_check('start')
+                    if reason:
+                        return stop(store, state, reason)
                     attempt = {'attempt_id': uuid.uuid4().hex, 'index': len(state['attempts']),
                                'run_id': run_id, 'operation': step['operation'], 'step': deepcopy(step),
                                'input_hash': state['binding']['input_hash'], 'status': 'reserved',
@@ -355,8 +376,20 @@ def control(root, data, deps, run_id, fixture, *, resume=False, reader_factory=N
             # Stops apply at the tail too. A failed last result is never completion.
             if state['attempts'][-1]['status'] != 'success':
                 return stop(store, state, repair_stop(state) or 'mock_failed')
-            state.update(execution_status='mock_completed', stop_reason=None)
-            store.save(state)
+            # Includes zero-remaining resume: the read may have outlived usage
+            # validity or lost old/new evidence. Serialize the final transition
+            # with pause and check at the point where success is actually reused.
+            with store.transition():
+                if store.pause_path.exists():
+                    return stop(store, state, 'manual_pause')
+                if current_binding() != state['binding']:
+                    state['invalidated_by'] = ['completion_boundary_inputs']
+                    return stop(store, state, 'inputs_changed')
+                reason = boundary_check('completion')
+                if reason:
+                    return stop(store, state, reason)
+                state.update(execution_status='mock_completed', stop_reason=None)
+                store.save(state)
             return state
         except LockTimeout:
             return stop(store, state, 'launch_lock_timeout')
