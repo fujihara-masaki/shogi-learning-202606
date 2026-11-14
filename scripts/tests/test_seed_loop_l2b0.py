@@ -711,11 +711,15 @@ control(root,data,dependency_example(),'crashing',root/'work/usage.json')
             def forbidden(*args, **kwargs):
                 raise AssertionError('real path invoked')
             original = subprocess.run
-            def git_only(command, **kwargs):
-                if command[0] != 'git':
+            def fixed_operations_only(command, **kwargs):
+                # Windows adapter cleanup uses the held Popen child's PID. This
+                # fixed local cleanup is required, just like killpg on Linux.
+                cleanup = (os.name == 'nt' and len(command) == 5 and command[:2] == ['taskkill', '/PID'] and
+                           command[2].isdigit() and command[3:] == ['/T', '/F'])
+                if command[0] != 'git' and not cleanup:
                     raise AssertionError('unexpected executable: ' + str(command))
                 return original(command, **kwargs)
-            with patch('scripts.seed_loop.usage.subprocess.run', side_effect=git_only), \
+            with patch('scripts.seed_loop.usage.subprocess.run', side_effect=fixed_operations_only), \
                  patch('urllib.request.urlopen', side_effect=forbidden):
                 state = run(root, data)
             self.assertEqual(state['execution_status'], 'mock_completed')
