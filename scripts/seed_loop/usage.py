@@ -101,6 +101,18 @@ class AppServerUsage:
         self.version = version
 
     def read(self):
+        return self._read()
+
+    def read_audited(self, auditor):
+        """Audit the ID-matched result before normalize; a reason denies the read.
+
+        auditor(result, context) must persist its sanitized evidence before returning
+        None. Exceptions still run transport cleanup and never grant permission.
+        No notifications, unrelated IDs or protocol error payloads reach this hook.
+        """
+        return self._read(auditor)
+
+    def _read(self, auditor=None):
         config = self.config
         version = self.version
         child = None
@@ -186,7 +198,12 @@ class AppServerUsage:
             send({"method": "initialized"})
             send({"id": 2, "method": "account/rateLimits/read", "params": {}})
             result = response(2)
-            observation = normalize(result, config, version)
+            observed_at = now()
+            reason = auditor(result, {"request_id": 2, "method": "account/rateLimits/read",
+                                     "cli_version": version, "observed_at": observed_at,
+                                     "provider": "codex-app-server"}) if auditor else None
+            observation = (unknown(reason, config["bucket"], version) if reason else
+                           normalize(result, config, version, observed_at=observed_at))
         except ProtocolError as exc:
             observation = unknown(exc.reason, config["bucket"], version)
         except subprocess.TimeoutExpired:
