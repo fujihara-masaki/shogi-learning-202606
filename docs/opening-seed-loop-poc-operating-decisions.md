@@ -111,6 +111,7 @@ Windows利用者は現説明・導入済み版のschema・自分の条件も確�
 
 記録先はGit管理外`.seed-loop/live-usage/SESSION/`。旧`.seed-loop/runs/`、L2b-0 task台帳には触れない。
 各操作の`request/audit/read/result`と候補/承認は別kind/version・UUIDで原子的保存し、上書きしない。
+承認済み判定は使用した候補/承認の実byte hashと承認元観測も結合し、statusでその欠落/変更を検出する。
 監査保存→同一rawの正規化→read判定保存→証拠/入力/承認照合→完了時再判定→結果保存の順。
 保存失敗は成功にせず、requestだけ残れば`incomplete_or_evidence_invalid`。再開は別操作・別証拠を追加する。
 旧auditが消えても旧resultを修復/成功へ書き換えず、statusは実効的に無効と表示する。

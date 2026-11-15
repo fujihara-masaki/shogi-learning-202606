@@ -77,7 +77,10 @@ class Store:
     def approval(self, approval_id):
         return self.directory / 'approvals' / (identifier(approval_id) + '.json')
 
-    def evidence(self, operation_id):
+    def evidence(self, operation_id, seen=None):
+        seen = set() if seen is None else seen
+        require(operation_id not in seen, 'cyclic_evidence_reference')
+        seen = seen | {operation_id}
         directory = self.op(operation_id)
         request = get(directory / 'request.json', KIND + '-request')
         result = get(directory / 'result.json', KIND)
@@ -86,6 +89,16 @@ class Store:
             require(name in ('audit.json', 'read.json'), 'invalid_evidence_name')
             require(contract.sha(directory / name) == expected, 'diagnostic_evidence_changed')
         require(request['operation_id'] == operation_id == result['operation_id'], 'operation_identity_changed')
+        proof = result.get('approval_evidence')
+        require(not result['monitoring_budget_permit'] or proof is not None, 'approval_evidence_missing')
+        if proof is not None:
+            require(proof == approval_evidence(self, result['approval_id']), 'approval_evidence_changed')
+            candidate = get(self.candidate(result['approval_id']), KIND + '-candidate')
+            approval = get(self.approval(result['approval_id']), KIND + '-approval')
+            require(contract.approval_valid(approval, candidate, result['origin']), 'approval_evidence_invalid')
+            self.evidence(candidate['observation_id'], seen)
+            require(contract.sha(self.op(candidate['observation_id']) / 'result.json') ==
+                    candidate['observation_hash'], 'approval_observation_changed')
         return result
 
     def history(self):
@@ -218,6 +231,14 @@ def approval_check(store, approval_id, binding, account, grounds_path, condition
     return None
 
 
+def approval_evidence(store, approval_id):
+    if approval_id is None:
+        return None
+    return {'approval_id': approval_id,
+            'candidate_sha256': contract.sha(store.candidate(approval_id)),
+            'approval_sha256': contract.sha(store.approval(approval_id))}
+
+
 def diagnose(store, settings_path, *, action='observe', approval_id=None, grounds_path=None,
              conditions_path=None, runtime=None):
     runtime = runtime or Runtime()
@@ -273,9 +294,14 @@ def diagnose(store, settings_path, *, action='observe', approval_id=None, ground
                 require(current_binding == binding and current_value == value, 'inputs_changed')
                 # Check the key itself, never recreate lost identity evidence.
                 require((store.directory / 'identity-key.bin').read_bytes() == key, 'identity_key_changed')
+                # Bind the exact approval bytes that were checked, including concurrent changes.
+                proof = approval_evidence(store, approval_id)
                 approval_reason = approval_check(store, approval_id, binding,
                     raw_audit['account'] if raw_audit else None, grounds_path, conditions_path, runtime)
+                require(proof == approval_evidence(store, approval_id), 'approval_evidence_changed')
                 check.update(evidence='verified', approval=approval_reason or 'approved')
+                if approval_reason is None:
+                    check['approval_evidence'] = proof
             except (LoopError, OSError, ValueError, KeyError, TypeError) as exc:
                 category = 'invalid' if isinstance(exc, LoopError) else 'unavailable'
                 check.update(evidence=category, checked_at=now(),
@@ -301,6 +327,7 @@ def diagnose(store, settings_path, *, action='observe', approval_id=None, ground
                       'diagnostic_complete': 'audit.json' in hashes and not usage.get('cleanup_errors'),
                       'approval_state': approval_state, 'observation_only': action == 'observe',
                       'approval_id': approval_id,
+                      'approval_evidence': boundary_checks[-1].get('approval_evidence'),
                       'approval_invalidated': approval_id is not None and bool(
                           (raw_audit and (raw_audit['monitoring_reason'] or raw_audit['schema_reason'] in
                            ('protocol_conditions_changed', 'account_plan_mismatch',

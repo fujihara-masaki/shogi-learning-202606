@@ -493,6 +493,27 @@ class DiagnosticTests(unittest.TestCase):
             with self.assertRaises(LoopError):
                 adopt(store, runtime, observation)
 
+    def test_saved_gate_loses_effective_integrity_if_approval_evidence_disappears(self):
+        for target in ('candidate', 'approval', 'observation'):
+            with case() as (root, settings, runtime, store):
+                approval_id = adopt(store, runtime)
+                result = read(store, runtime, 'gate', approval_id)
+                self.assertTrue(result['monitoring_budget_permit'])
+                self.assertIsNotNone(result['approval_evidence'])
+                result_path = store.op(result['operation_id']) / 'result.json'
+                preserved = result_path.read_bytes()
+                if target == 'candidate':
+                    store.candidate(approval_id).unlink()
+                elif target == 'approval':
+                    store.approval(approval_id).unlink()
+                else:
+                    candidate = live.get(store.candidate(approval_id), live.KIND + '-candidate')
+                    (store.op(candidate['observation_id']) / 'audit.json').unlink()
+                self.assertEqual(live.inspect(store)['history'][-1]['integrity'], 'incomplete_or_evidence_invalid')
+                self.assertEqual(result_path.read_bytes(), preserved)
+                denied = read(store, runtime, 'resume', approval_id)
+                self.assertFalse(denied['monitoring_budget_permit'])
+
     def test_os_lock_duplicate_operation_and_separate_process_reconfirmation(self):
         with case() as (root, settings, runtime, store):
             approval = adopt(store, runtime)
