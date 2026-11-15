@@ -1,0 +1,11 @@
+{
+  "kind": "seed-loop-live-settings",
+  "version": 1,
+  "bucket": "codex",
+  "expected": {
+    "primary": {"state": "object", "duration_mins": 10080},
+    "secondary": {"state": "null", "duration_mins": null}
+  },
+  "codex_binary": "C:\\REPLACE_WITH_RESOLVED_PATH\\codex.cmd",
+  "cli_version": "codex-cli 0.167.0"
+}

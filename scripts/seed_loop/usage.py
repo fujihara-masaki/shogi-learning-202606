@@ -95,10 +95,14 @@ def decision(usage, config, at=None):
 
 
 class AppServerUsage:
-    def __init__(self, config, command=None, version=None):
+    def __init__(self, config, command=None, version=None, *, account_reader=None,
+                 required_version=None, usage_params=None):
         self.config = config
         self.command = command or [config["codex_binary"], "app-server", "--listen", "stdio://"]
         self.version = version
+        self.account_reader = account_reader
+        self.required_version = required_version
+        self.usage_params = usage_params
 
     def read(self):
         return self._read()
@@ -127,6 +131,8 @@ class AppServerUsage:
                 if p.returncode:
                     raise ProtocolError("cli_unavailable")
                 version = p.stdout.strip()[:100]
+            if self.required_version is not None and version != self.required_version:
+                raise ProtocolError("cli_version_changed")
             child = spawn(self.command, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                           stderr=subprocess.DEVNULL)
             messages = queue.Queue(maxsize=256)
@@ -191,17 +197,31 @@ class AppServerUsage:
                         raise ProtocolError("malformed_response")
                     return message["result"]
 
+            capabilities = {"experimentalApi": False}
+            if self.account_reader is not None:
+                capabilities["requestAttestation"] = False
             send({"id": 1, "method": "initialize", "params": {
                 "clientInfo": {"name": "shogi_seed_loop", "title": "Seed validation", "version": "1"},
-                "capabilities": {"experimentalApi": False}}})
+                "capabilities": capabilities}})
             response(1)
             send({"method": "initialized"})
-            send({"id": 2, "method": "account/rateLimits/read", "params": {}})
+            account = None
+            if self.account_reader is not None:
+                send({"id": 3, "method": "account/read", "params": {"refreshToken": False}})
+                account = self.account_reader(response(3))
+            send({"id": 2, "method": "account/rateLimits/read",
+                  "params": self.usage_params if self.usage_params is not None else {}})
             result = response(2)
             observed_at = now()
-            reason = auditor(result, {"request_id": 2, "method": "account/rateLimits/read",
-                                     "cli_version": version, "observed_at": observed_at,
-                                     "provider": "codex-app-server"}) if auditor else None
+            context = {"request_id": 2, "method": "account/rateLimits/read",
+                       "cli_version": version, "observed_at": observed_at,
+                       "provider": "codex-app-server"}
+            if self.account_reader is not None:
+                send({"id": 4, "method": "account/read", "params": {"refreshToken": False}})
+                if self.account_reader(response(4)) != account:
+                    raise ProtocolError("account_changed_during_read")
+                context["account"] = account
+            reason = auditor(result, context) if auditor else None
             observation = (unknown(reason, config["bucket"], version) if reason else
                            normalize(result, config, version, observed_at=observed_at))
         except ProtocolError as exc:
