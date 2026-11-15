@@ -57,7 +57,7 @@ def policy(value):
         keys(item, {'state', 'duration_mins'}, 'live window expectation')
         require((item['state'] == 'null' and item['duration_mins'] is None) or
                 (item['state'] == 'object' and type(item['duration_mins']) is int and
-                 item['duration_mins'] > 0), 'invalid_live_expectation')
+                 0 < item['duration_mins'] <= 2**63 - 1), 'invalid_live_expectation')
     require(any(v['state'] == 'object' for v in value['expected'].values()), 'empty_monitoring_set')
     return value
 
@@ -172,6 +172,9 @@ def audit(raw, value, context, key, origin):
                 # The pinned JSON schema uses int32 (the server rounds core percentages).
                 if w['state'] == 'object' and type(w['usedPercent']) is not int:
                     w = {'state': 'invalid', 'type': 'object', 'integer_percent_required': True}
+                if w['state'] == 'object' and any(w[n] > 2**63 - 1 for n in
+                                                ('windowDurationMins', 'resetsAt')):
+                    w = {'state': 'invalid', 'type': 'object', 'int64_required': True}
                 evidence['windows'][name] = w
                 if w['state'] == 'object':
                     evidence['S'].append(name)

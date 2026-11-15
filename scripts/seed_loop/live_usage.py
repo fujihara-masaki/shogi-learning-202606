@@ -206,13 +206,13 @@ def approval_check(store, approval_id, binding, account, grounds_path, condition
         c = get(store.candidate(approval_id), KIND + '-candidate')
         a = get(store.approval(approval_id), KIND + '-approval')
         require(contract.approval_valid(a, c, runtime.origin), 'approval_kind_or_binding_invalid')
-        age = (datetime.now(timezone.utc) - datetime.fromisoformat(a['approved_at'])).total_seconds()
-        require(0 <= age <= APPROVAL_MAX_AGE, 'approval_stale')
         expected = {**binding, **source_binding(grounds_path, conditions_path), 'account': account}
         require(a['binding'] == expected, 'approval_conditions_changed')
         store.evidence(c['observation_id'])
         require(contract.sha(store.op(c['observation_id']) / 'result.json') == c['observation_hash'],
                 'approval_observation_changed')
+        age = (datetime.now(timezone.utc) - datetime.fromisoformat(a['approved_at'])).total_seconds()
+        require(0 <= age <= APPROVAL_MAX_AGE, 'approval_stale')
     except (LoopError, OSError, ValueError, KeyError, TypeError) as exc:
         return str(exc) if isinstance(exc, LoopError) else 'approval_evidence_unavailable'
     return None
@@ -248,7 +248,8 @@ def diagnose(store, settings_path, *, action='observe', approval_id=None, ground
         try:
             usage = runtime.reader(value, key).read_audited(auditor)
         except (OSError, LoopError, ValueError):
-            usage = unknown('audit_or_local_io_failed', value['bucket'], contract.CLI)
+            usage = unknown('audit_or_local_io_failed', value['bucket'],
+                            raw_audit['context']['cli_version'] if raw_audit else None)
         usage['provider'] = 'codex-app-server' if runtime.origin == 'live' else 'test-stdio-app-server'
         usage['origin'] = runtime.origin
         # The adapter captures version output internally; never save arbitrary CLI stdout.
@@ -302,8 +303,10 @@ def diagnose(store, settings_path, *, action='observe', approval_id=None, ground
                       'approval_id': approval_id,
                       'approval_invalidated': approval_id is not None and bool(
                           (raw_audit and (raw_audit['monitoring_reason'] or raw_audit['schema_reason'] in
-                           ('protocol_conditions_changed', 'account_plan_mismatch', 'bucket_identity_mismatch'))) or
-                          usage.get('reason') == 'cli_version_changed' or
+                           ('protocol_conditions_changed', 'account_plan_mismatch',
+                            'bucket_identity_mismatch', 'bucket_unavailable'))) or
+                          usage.get('reason') in ('cli_version_changed', 'account_changed_during_read',
+                                                 'chatgpt_account_conditions_unavailable') or
                           approval_state in ('approval_conditions_changed', 'conditions_evidence_changed',
                                              'approval_previously_invalidated') or
                           any(v.get('evidence_reason') in ('inputs_changed', 'identity_key_changed')

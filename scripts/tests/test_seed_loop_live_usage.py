@@ -134,6 +134,7 @@ class ContractTests(unittest.TestCase):
             lambda v: v['result']['rateLimitsByLimitId']['codex'].update(limitId='other'),
             lambda v: v['result']['rateLimitsByLimitId']['codex'].update(tertiary=None),
             lambda v: v['result']['rateLimitsByLimitId']['codex']['primary'].update(extra=1),
+            lambda v: v['result']['rateLimitsByLimitId']['codex']['primary'].update(resetsAt=2**80),
             lambda v: v['result']['rateLimitsByLimitId']['codex']['primary'].update(windowDurationMins=300),
             lambda v: v['result'].update(rateLimitsByLimitId={}),
             lambda v: v['result'].update(rateLimitsByLimitId=None),
@@ -350,12 +351,23 @@ class DiagnosticTests(unittest.TestCase):
                 self.assertEqual(result['communication'], 'unconfirmed_or_failed')
                 self.assertNotIn('audit.json', result['evidence_hashes'])
         with case() as (root, settings, runtime, store):
+            approval = adopt(store, runtime)
             raw = sample()
             raw['account_after'] = deepcopy(raw['account'])
             raw['account_after']['account']['planType'] = 'plus'
             atomic_json(runtime.fixture, raw)
-            result = read(store, runtime)
+            result = read(store, runtime, 'gate', approval)
             self.assertEqual(result['stop_reason'], 'account_changed_during_read')
+            self.assertTrue(result['approval_invalidated'])
+            atomic_json(runtime.fixture, sample())
+            self.assertFalse(read(store, runtime, 'resume', approval)['monitoring_budget_permit'])
+        with case() as (root, settings, runtime, store):
+            with patch.object(runtime, 'reader', side_effect=OSError('SECRET_CLI_PATH')):
+                result = read(store, runtime)
+            saved = live.get(store.op(result['operation_id']) / 'read.json', live.KIND + '-read')
+            self.assertIsNone(saved['usage']['cli_version'])
+            self.assertFalse(result['monitoring_budget_permit'])
+            self.assertNotIn('SECRET', json.dumps(result))
 
     def test_test_approval_never_live_and_no_noninteractive_real_approval(self):
         with case() as (root, settings, runtime, store):
