@@ -461,7 +461,10 @@ class DiagnosticTests(unittest.TestCase):
                 if target != 'audit.json':
                     self.assertEqual(live.inspect(store)['history'][-1]['integrity'], 'incomplete_or_evidence_invalid')
                 result = read(store, runtime, 'resume', approval)
-                self.assertTrue(result['monitoring_budget_permit'])
+                self.assertFalse(result['monitoring_budget_permit'])
+                self.assertEqual(result['approval_state'], 'approval_history_unknown')
+                fresh_approval = adopt(store, runtime)
+                self.assertTrue(read(store, runtime, 'resume', fresh_approval)['monitoring_budget_permit'])
                 with redirect_stdout(io.StringIO()), self.assertRaises(LoopError):
                     live.confirm(store, approval, 'test-human', runtime,
                         input_fn=lambda p: 'APPROVE ' + digest(live.get(store.candidate(approval), live.KIND + '-candidate')))
@@ -568,6 +571,232 @@ class DiagnosticTests(unittest.TestCase):
             self.assertTrue(live.get(store.op(observation['operation_id']) / 'read.json', live.KIND + '-read')['cleanup_confirmed'])
             approval = adopt(store, runtime, observation)
             self.assertTrue(read(store, runtime, 'gate', approval)['monitoring_budget_permit'])
+
+
+
+class ReviewRegressionTests(unittest.TestCase):
+    def resume_process(self, root, approval_id):
+        env = dict(os.environ)
+        env['PYTHONPATH'] = str(ROOT / 'scripts/tests') + os.pathsep + str(ROOT)
+        command = [sys.executable, '-c',
+            'import sys,json; from pathlib import Path; from test_seed_loop_live_usage import TestRuntime,read; '
+            'from scripts.seed_loop.live_usage import Store; p=Path(sys.argv[1]); '
+            'print(json.dumps(read(Store(p,"test-session"),TestRuntime(p),"resume",sys.argv[2])))',
+            str(root), approval_id]
+        child = subprocess.run(command, capture_output=True, text=True, encoding='utf-8', env=env, timeout=15)
+        self.assertEqual(child.returncode, 0, child.stderr)
+        return json.loads(child.stdout)
+
+    def test_a_invalidated_approval_survives_lost_operation_evidence(self):
+        for damage in ('audit_missing', 'audit_changed', 'read_missing', 'result_missing', 'result_save'):
+            with self.subTest(damage=damage), case() as (root, settings, runtime, store):
+                approval_id = adopt(store, runtime)
+                candidate = live.get(store.candidate(approval_id), live.KIND + '-candidate')
+                source = candidate['observation_id']
+                approval_bytes = store.approval(approval_id).read_bytes()
+                before = {p.name for p in (store.directory / 'operations').iterdir()}
+                alter(runtime, lambda v: v['result']['rateLimitsByLimitId']['codex']['primary'].update(windowDurationMins=300))
+                if damage == 'result_save':
+                    original = live.atomic_json
+                    def saving(path, value):
+                        if path.name == 'result.json':
+                            raise OSError('test result save failure')
+                        return original(path, value)
+                    with patch.object(live, 'atomic_json', saving), self.assertRaises(OSError):
+                        read(store, runtime, 'gate', approval_id)
+                else:
+                    invalidated = read(store, runtime, 'gate', approval_id)
+                    self.assertTrue(invalidated['approval_invalidated'])
+                    self.assertFalse(invalidated['monitoring_budget_permit'])
+                created = {p.name for p in (store.directory / 'operations').iterdir()} - before
+                self.assertEqual(len(created), 1)
+                failed_op = store.op(created.pop())
+                if damage != 'result_save':
+                    name = damage.split('_')[0] + '.json'
+                    if damage.endswith('_changed'):
+                        (failed_op / name).write_bytes(b'{}')
+                    else:
+                        (failed_op / name).unlink()
+                # The original approval/source are intact; only its later use is damaged.
+                self.assertEqual(store.approval(approval_id).read_bytes(), approval_bytes)
+                self.assertTrue(store.evidence(source)['diagnostic_complete'])
+                atomic_json(runtime.fixture, sample())
+                resumed = read(store, runtime, 'resume', approval_id)
+                print(json.dumps({'review': 'A', 'damage': damage, 'approval_state': resumed['approval_state'],
+                                  'permit': resumed['monitoring_budget_permit']}))
+                self.assertFalse(resumed['monitoring_budget_permit'])
+                self.assertEqual(resumed['approval_state'], 'approval_history_unknown')
+                preserved = {p.name: p.read_bytes() for p in failed_op.iterdir()}
+                separate = self.resume_process(root, approval_id)
+                self.assertFalse(separate['monitoring_budget_permit'])
+                self.assertEqual(separate['approval_state'], 'approval_history_unknown')
+                fresh_approval = adopt(store, runtime)
+                self.assertNotEqual(fresh_approval, approval_id)
+                self.assertTrue(self.resume_process(root, fresh_approval)['monitoring_budget_permit'])
+                self.assertEqual({p.name: p.read_bytes() for p in failed_op.iterdir()}, preserved)
+                self.assertEqual(store.approval(approval_id).read_bytes(), approval_bytes)
+                self.assertTrue(store.evidence(source)['diagnostic_complete'])
+
+    def test_a_guard_write_failure_prevents_read_and_remains_scoped(self):
+        for name in ('intent.json', 'request.json'):
+            with self.subTest(name=name), case() as (root, settings, runtime, store):
+                approval_id = adopt(store, runtime)
+                original = live.atomic_json
+                def saving(path, value):
+                    if path.name == name:
+                        raise OSError('test intent/request save failure')
+                    return original(path, value)
+                with patch.object(runtime, 'reader', wraps=runtime.reader) as reader, \
+                     patch.object(live, 'atomic_json', saving), self.assertRaises(OSError):
+                    read(store, runtime, 'gate', approval_id)
+                reader.assert_not_called()
+                result = read(store, runtime, 'resume', approval_id)
+                self.assertFalse(result['monitoring_budget_permit'])
+                self.assertEqual(result['approval_state'], 'approval_history_unknown')
+                new_approval = adopt(store, runtime)
+                self.assertTrue(read(store, runtime, 'resume', new_approval)['monitoring_budget_permit'])
+
+    def test_a_scoped_intent_preserves_attribution_when_request_and_result_are_lost(self):
+        for damage in ('request_and_result', 'intent_missing', 'intent_changed'):
+            with self.subTest(damage=damage), case() as (root, settings, runtime, store):
+                approval_id = adopt(store, runtime)
+                alter(runtime, lambda v: v['result']['rateLimitsByLimitId']['codex']['primary'].update(windowDurationMins=300))
+                result = read(store, runtime, 'gate', approval_id)
+                self.assertTrue(result['approval_invalidated'])
+                operation_id = result['operation_id']
+                if damage == 'request_and_result':
+                    for name in ('request.json', 'result.json'):
+                        (store.op(operation_id) / name).unlink()
+                elif damage == 'intent_missing':
+                    store.approval_use(approval_id, operation_id).unlink()
+                else:
+                    store.approval_use(approval_id, operation_id).write_bytes(b'{}')
+                atomic_json(runtime.fixture, sample())
+                self.assertFalse(read(store, runtime, 'resume', approval_id)['monitoring_budget_permit'])
+                fresh_approval = adopt(store, runtime)
+                self.assertTrue(read(store, runtime, 'resume', fresh_approval)['monitoring_budget_permit'])
+
+    def test_a_unreadable_scoped_index_does_not_become_empty_history(self):
+        with case() as (root, settings, runtime, store):
+            approval_id = adopt(store, runtime)
+            other_approval = adopt(store, runtime)
+            index = store.directory / 'approval-uses' / approval_id
+            list_entries = Path.iterdir
+            def listing(path):
+                if path == index:
+                    raise PermissionError('test unreadable approval index')
+                return list_entries(path)
+            with patch.object(Path, 'iterdir', listing):
+                self.assertFalse(read(store, runtime, 'resume', approval_id)['monitoring_budget_permit'])
+                self.assertTrue(read(store, runtime, 'resume', other_approval)['monitoring_budget_permit'])
+
+    def test_a_unrelated_diagnostic_error_does_not_revoke_a_healthy_approval(self):
+        with case() as (root, settings, runtime, store):
+            approval_id = adopt(store, runtime)
+            diagnostic = read(store, runtime)
+            path = store.op(diagnostic['operation_id']) / 'request.json'
+            path.write_bytes(b'{}')  # result still identifies an unapproved observation
+            self.assertTrue(read(store, runtime, 'resume', approval_id)['monitoring_budget_permit'])
+            self.assertEqual(path.read_bytes(), b'{}')
+
+    def test_a_budget_stop_allows_fresh_recovery_with_the_same_healthy_approval(self):
+        with case() as (root, settings, runtime, store):
+            approval_id = adopt(store, runtime)
+            for percent, reason in ((25, 'no_new_task'), (30, 'budget_stop'), (1, None), (1, None)):
+                alter(runtime, lambda v: v['result']['rateLimitsByLimitId']['codex']['primary'].update(usedPercent=percent))
+                result = read(store, runtime, 'resume', approval_id)
+                self.assertEqual(result['stop_reason'], reason)
+                self.assertTrue(result['diagnostic_complete'])
+                self.assertEqual(result['monitoring_budget_permit'], reason is None)
+                self.assertFalse(result['worker_start_permitted'])
+
+    def test_a_legacy_unknown_operation_requires_new_explicit_approval(self):
+        with case() as (root, settings, runtime, store):
+            approval_id = adopt(store, runtime)
+            orphan = read(store, runtime)['operation_id']
+            for name in ('request.json', 'result.json'):
+                (store.op(orphan) / name).unlink()
+            self.assertFalse(read(store, runtime, 'resume', approval_id)['monitoring_budget_permit'])
+            fresh_approval = adopt(store, runtime)
+            candidate = live.get(store.candidate(fresh_approval), live.KIND + '-candidate')
+            self.assertIn(orphan, candidate['acknowledged_unattributed_operations'])
+            self.assertTrue(read(store, runtime, 'resume', fresh_approval)['monitoring_budget_permit'])
+            self.assertFalse(read(store, runtime, 'resume', approval_id)['monitoring_budget_permit'])
+
+    def test_b_observe_cli_rejects_invalid_completion_evidence(self):
+        for name in ('audit.json', 'read.json', 'request.json'):
+            for damage in ('missing', 'changed', 'unreadable'):
+                with self.subTest(name=name, damage=damage), case() as (root, settings, runtime, store):
+                    original = live.Store.transition
+                    @contextmanager
+                    def transition(current):
+                        with original(current):
+                            directory = next((current.directory / 'operations').iterdir())
+                            path = directory / name
+                            if damage == 'missing':
+                                path.unlink()
+                            elif damage == 'changed':
+                                path.write_bytes(b'{}')
+                            else:
+                                read_bytes = Path.read_bytes
+                                def reading(p):
+                                    if p == path:
+                                        raise PermissionError('test evidence unreadable')
+                                    return read_bytes(p)
+                                with patch.object(Path, 'read_bytes', reading):
+                                    yield
+                                return
+                            yield
+                    output = io.StringIO()
+                    with patch.object(live, 'Runtime', return_value=runtime), \
+                         patch.object(live.Store, 'transition', transition), redirect_stdout(output):
+                        code = live.main(['--root', str(root), '--session', store.session, 'observe',
+                                          '--live-usage', '--settings', str(root / 'work/settings.json')])
+                    result = json.loads(output.getvalue())
+                    print(json.dumps({'review': 'B', 'file': name, 'damage': damage, 'exit': code,
+                                      'complete': result['diagnostic_complete'], 'reason': result['stop_reason']}))
+                    self.assertEqual(result['communication'], 'response_received')
+                    self.assertTrue(result['stop_reason'].startswith('completion_evidence_'))
+                    self.assertFalse(result['worker_start_permitted'])
+                    self.assertFalse(result['diagnostic_complete'])
+                    self.assertEqual(code, 3)
+
+
+
+    def test_b_normal_unapproved_and_high_usage_observations_succeed(self):
+        for percent, reason in ((1, 'policy_pending'), (25, 'no_new_task'), (30, 'budget_stop')):
+            with self.subTest(percent=percent), case() as (root, settings, runtime, store):
+                alter(runtime, lambda v: v['result']['rateLimitsByLimitId']['codex']['primary'].update(usedPercent=percent))
+                output = io.StringIO()
+                with patch.object(live, 'Runtime', return_value=runtime), redirect_stdout(output):
+                    code = live.main(['--root', str(root), '--session', store.session, 'observe',
+                                      '--live-usage', '--settings', str(root / 'work/settings.json')])
+                result = json.loads(output.getvalue())
+                self.assertEqual(code, 0)
+                self.assertEqual(result['communication'], 'response_received')
+                self.assertTrue(result['diagnostic_complete'])
+                self.assertEqual(result['stop_reason'], reason)
+                self.assertFalse(result['monitoring_budget_permit'])
+                self.assertFalse(result['worker_start_permitted'])
+                self.assertTrue(store.evidence(result['operation_id'])['diagnostic_complete'])
+
+    def test_b_observe_cli_result_or_read_save_failure_is_operational_error(self):
+        for name in ('request.json', 'read.json', 'result.json'):
+            with self.subTest(name=name), case() as (root, settings, runtime, store):
+                original = live.atomic_json
+                def saving(path, value):
+                    if path.name == name:
+                        raise OSError('test save failure')
+                    return original(path, value)
+                output = io.StringIO()
+                with patch.object(live, 'Runtime', return_value=runtime), \
+                     patch.object(live, 'atomic_json', saving), redirect_stdout(output):
+                    code = live.main(['--root', str(root), '--session', store.session, 'observe',
+                                      '--live-usage', '--settings', str(root / 'work/settings.json')])
+                self.assertEqual(code, 2)
+                self.assertEqual(json.loads(output.getvalue())['category'], 'OSError')
+                self.assertFalse(list((store.directory / 'operations').glob('*/result.json')))
+                self.assertTrue(read(store, runtime)['diagnostic_complete'])
 
 
 if __name__ == '__main__':

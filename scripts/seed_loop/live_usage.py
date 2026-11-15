@@ -77,6 +77,10 @@ class Store:
     def approval(self, approval_id):
         return self.directory / 'approvals' / (identifier(approval_id) + '.json')
 
+    def approval_use(self, approval_id, operation_id):
+        return (self.directory / 'approval-uses' / identifier(approval_id) /
+                identifier(operation_id) / 'intent.json')
+
     def evidence(self, operation_id, seen=None):
         seen = set() if seen is None else seen
         require(operation_id not in seen, 'cyclic_evidence_reference')
@@ -89,6 +93,13 @@ class Store:
             require(name in ('audit.json', 'read.json'), 'invalid_evidence_name')
             require(contract.sha(directory / name) == expected, 'diagnostic_evidence_changed')
         require(request['operation_id'] == operation_id == result['operation_id'], 'operation_identity_changed')
+        require(request['approval_id'] == result['approval_id'], 'operation_approval_changed')
+        if request.get('approval_use_hash') is not None:
+            use = self.approval_use(request['approval_id'], operation_id)
+            require(contract.sha(use) == request['approval_use_hash'] and
+                    get(use, KIND + '-approval-use') == {
+                        k: request[k] for k in ('operation_id', 'created_at', 'action', 'origin', 'approval_id')},
+                    'approval_use_evidence_changed')
         proof = result.get('approval_evidence')
         require(not result['monitoring_budget_permit'] or proof is not None, 'approval_evidence_missing')
         if proof is not None:
@@ -102,19 +113,40 @@ class Store:
         return result
 
     def history(self):
+        # The scoped directory remains a guard even if intent/request/result writing fails.
+        uses = {}
+        for path in (self.directory / 'approval-uses').glob('*/*'):
+            uses.setdefault(path.name, []).append(path)
         values = []
-        for directory in sorted((self.directory / 'operations').glob('*')):
-            try:
-                request = get(directory / 'request.json', KIND + '-request')
+        operations = {p.name for p in (self.directory / 'operations').glob('*')} | set(uses)
+        for operation_id in sorted(operations):
+            directory = self.op(operation_id)
+            metadata = []
+            for path, kind in [(directory / 'request.json', KIND + '-request'),
+                               (directory / 'result.json', KIND),
+                               *((p / 'intent.json', KIND + '-approval-use') for p in uses.get(operation_id, []))]:
                 try:
-                    result = self.evidence(directory.name)
-                    status = 'verified'
+                    record = get(path, kind)
+                    require(record['operation_id'] == operation_id and
+                            isinstance(record['created_at'], str) and
+                            record['action'] in ('observe', 'gate', 'resume') and
+                            (record['approval_id'] is None or identifier(record['approval_id'])),
+                            'invalid_operation_metadata')
+                    metadata.append(record)
                 except (LoopError, OSError, KeyError, TypeError):
-                    result, status = None, 'incomplete_or_evidence_invalid'
-                values.append({'operation_id': directory.name, 'created_at': request['created_at'],
-                               'action': request['action'], 'integrity': status, 'result': result})
+                    continue
+            related = {p.parent.name for p in uses.get(operation_id, [])}
+            related.update(v['approval_id'] for v in metadata if v['approval_id'] is not None)
+            summary = metadata[0] if metadata else {}
+            try:
+                result = self.evidence(operation_id)
+                status = 'verified'
             except (LoopError, OSError, KeyError, TypeError):
-                raise LoopError('history_corrupt_preserved') from None
+                result, status = None, 'incomplete_or_evidence_invalid'
+            values.append({'operation_id': operation_id, 'created_at': summary.get('created_at', ''),
+                           'action': summary.get('action', 'unknown'), 'related_approval_ids': sorted(related),
+                           'attribution': 'identified' if metadata or related else 'unknown',
+                           'integrity': status, 'result': result})
         return sorted(values, key=lambda v: (v['created_at'], v['operation_id']))
 
 
@@ -177,6 +209,8 @@ def candidate_for(store, observation_id, settings_path, grounds_path, conditions
                      'observation_id': observation_id,
                      'observation_hash': contract.sha(store.op(observation_id) / 'result.json'),
                      'binding': binding, 'approval_max_age_seconds': APPROVAL_MAX_AGE,
+                     'acknowledged_unattributed_operations': [v['operation_id'] for v in store.history()
+                                                             if v['attribution'] == 'unknown'],
                      'scope': contract.SCOPE, 'worker_connected': False}
         put(store.candidate(candidate_id), KIND + '-candidate', candidate)
         return candidate
@@ -209,16 +243,30 @@ def confirm(store, candidate_id, actor, runtime, *, input_fn=input):
                 'worker_connected': False}
 
 
-def approval_check(store, approval_id, binding, account, grounds_path, conditions_path, runtime):
+def approval_check(store, approval_id, binding, account, grounds_path, conditions_path, runtime,
+                   *, current_operation_id=None):
     if approval_id is None:
         return 'policy_pending'
     try:
-        require(not any(v['result'] and v['result'].get('approval_id') == approval_id and
-                        v['result'].get('approval_invalidated') for v in store.history()),
-                'approval_previously_invalidated')
         c = get(store.candidate(approval_id), KIND + '-candidate')
         a = get(store.approval(approval_id), KIND + '-approval')
         require(contract.approval_valid(a, c, runtime.origin), 'approval_kind_or_binding_invalid')
+        history = store.history()
+        known_operations = {v['operation_id'] for v in history}
+        # glob may omit unreadable directories. An unreadable requested index is not empty history.
+        for directory in (store.directory / 'operations', store.directory / 'approval-uses' / identifier(approval_id)):
+            if directory.exists():
+                require(all(p.name in known_operations for p in directory.iterdir()), 'approval_history_unknown')
+        for entry in history:
+            if entry['operation_id'] == current_operation_id:
+                continue  # Only this invocation's checked, in-progress request is excluded.
+            if entry['attribution'] == 'unknown':
+                require(entry['operation_id'] in c.get('acknowledged_unattributed_operations', []),
+                        'approval_history_unknown')
+            if approval_id in entry['related_approval_ids']:
+                require(entry['integrity'] == 'verified' and entry['result']['diagnostic_complete'],
+                        'approval_history_unknown')
+                require(not entry['result']['approval_invalidated'], 'approval_previously_invalidated')
         expected = {**binding, **source_binding(grounds_path, conditions_path), 'account': account}
         require(a['binding'] == expected, 'approval_conditions_changed')
         store.evidence(c['observation_id'])
@@ -257,6 +305,12 @@ def diagnose(store, settings_path, *, action='observe', approval_id=None, ground
         request = {'operation_id': operation_id, 'created_at': now(), 'action': action,
                    'origin': runtime.origin, 'binding': binding, 'approval_id': approval_id,
                    'previous': [{k: v[k] for k in ('operation_id', 'action', 'integrity')} for v in previous]}
+        if approval_id is not None:
+            use = store.approval_use(approval_id, operation_id)
+            # Create the guard BEFORE any read and before its own fallible JSON write.
+            use.parent.mkdir(parents=True, exist_ok=False)
+            request['approval_use_hash'] = put(use, KIND + '-approval-use', {
+                k: request[k] for k in ('operation_id', 'created_at', 'action', 'origin', 'approval_id')})
         request_hash = put(directory / 'request.json', KIND + '-request', request)
         hashes, raw_audit = {}, None
 
@@ -294,10 +348,14 @@ def diagnose(store, settings_path, *, action='observe', approval_id=None, ground
                 require(current_binding == binding and current_value == value, 'inputs_changed')
                 # Check the key itself, never recreate lost identity evidence.
                 require((store.directory / 'identity-key.bin').read_bytes() == key, 'identity_key_changed')
+                if request.get('approval_use_hash') is not None:
+                    require(contract.sha(store.approval_use(approval_id, operation_id)) ==
+                            request['approval_use_hash'], 'approval_use_evidence_changed')
                 # Bind the exact approval bytes that were checked, including concurrent changes.
                 proof = approval_evidence(store, approval_id)
                 approval_reason = approval_check(store, approval_id, binding,
-                    raw_audit['account'] if raw_audit else None, grounds_path, conditions_path, runtime)
+                    raw_audit['account'] if raw_audit else None, grounds_path, conditions_path, runtime,
+                    current_operation_id=operation_id)
                 require(proof == approval_evidence(store, approval_id), 'approval_evidence_changed')
                 check.update(evidence='verified', approval=approval_reason or 'approved')
                 if approval_reason is None:
@@ -324,7 +382,8 @@ def diagnose(store, settings_path, *, action='observe', approval_id=None, ground
                       'usage_status': usage['status'],
                       'communication': 'response_received' if raw_audit is not None and
                           not usage.get('cleanup_errors') else 'unconfirmed_or_failed',
-                      'diagnostic_complete': 'audit.json' in hashes and not usage.get('cleanup_errors'),
+                      'diagnostic_complete': 'audit.json' in hashes and not usage.get('cleanup_errors') and
+                          all(v['evidence'] == 'verified' for v in boundary_checks),
                       'approval_state': approval_state, 'observation_only': action == 'observe',
                       'approval_id': approval_id,
                       'approval_evidence': boundary_checks[-1].get('approval_evidence'),

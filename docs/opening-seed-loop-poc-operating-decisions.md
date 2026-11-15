@@ -116,6 +116,25 @@ Windows利用者は現説明・導入済み版のschema・自分の条件も確�
 保存失敗は成功にせず、requestだけ残れば`incomplete_or_evidence_invalid`。再開は別操作・別証拠を追加する。
 旧auditが消えても旧resultを修復/成功へ書き換えず、statusは実効的に無効と表示する。
 新規readは旧証拠を再作成したふりをしない。承認元の観測が欠ければその承認も使えない。
+
+承認IDを指定する操作では、readとrequest保存の**前**に
+`approval-uses/APPROVAL_ID/OPERATION_ID/`と`intent.json`を作る。
+kindは`seed-loop-live-diagnostic-approval-use / version:1`で、操作ID・承認ID・action・origin・作成時刻を結合する。
+requestはintentのbyte hashを保持し、証拠検査で照合する。intent自体の保存失敗でもdirectoryが結果不明のguardとなり、
+readは起動しない。read後のaudit/read/resultの保存失敗・欠落・hash不一致、request/intentの破損でも、
+その承認に結び付く過去操作を「失効していない」とは扱わない。
+正常な失効履歴は`approval_previously_invalidated`、結合した履歴の結果・失効有無を確認できない場合は
+`approval_history_unknown`で同じ旧承認を拒否する。今回処理中の操作だけを履歴検査から除外する。
+過去の失効や結果不明を、後の正常readで消したり、結果保存の再実行で埋めたりしない。
+
+履歴表示ではrequestが壊れても、保持したresultのメタデータと承認別guardから帰属を復元して不正状態を表示する。
+旧形式は有効なrequest/resultから承認IDを照合し、書き換えや暗黙移行をしない。
+どちらも失われ、承認IDに帰属させられない旧操作が新たに見つかった場合も旧承認を安全側に拒否する。
+新しい候補は既存の帰属不明IDを`acknowledged_unattributed_operations`へ明示し、本人の新しい対話承認のhashへ結合する。
+これは旧操作の成功化ではない。未承認の新しいobserve、根拠確認、新しいcandidate/approve、明示resumeで復帰する。
+既知の無関係な未承認診断のエラーや、別の承認に結び付く結果不明は、新承認を永久停止させない。
+正常な予算停止は失効ではなく、同じ健全な承認を使う明示resumeのfresh readで再判定できる。
+
 同sessionのOS lockで二重操作を拒否。共有network filesystem、電源断時directory永続化、
 全fileを再hashして改ざんする攻撃への耐性は保証しない。保存領域ごとローカルに保全する。
 
@@ -255,6 +274,19 @@ UTF-8で保存し、生ID/メール/tokenを書かない。`contract`表示のha
 現在値がknownでも25/30%以上なら通信と新規作業禁止を分けて記録する。
 結果の`real_usage / communication / diagnostic_complete / approval_state / monitoring_budget_permit / worker_connected`
 を別々に確認する。過去の承認/観測の許可値を次回の開始許可として持ち越さない。
+
+| 結果field | 意味 |
+| --- | --- |
+| `communication` | 既存adapterでID照合した応答を受信し、cleanup errorがない場合は`response_received`。完了境界で証拠が失われても受信済みの事実を成功/失敗へ書き換えない |
+| `diagnostic_complete` | audit保存・終了管理に加え、read後とpublication lock取得後の両境界でrequest/audit/read等の必須証拠を照合できた場合だけtrue。証拠欠落・変更・読取不能ならfalse |
+| `approval_state` | 実承認の検査結果。`policy_pending`や承認拒否は、正常に証拠付き観測を完了したこととは別 |
+| `monitoring_budget_permit` | gate/resumeで現在の監視・予算・承認履歴が適合した場合だけtrue。observeは常にfalse |
+| `worker_connected` / `worker_start_permitted` | 常にfalse。診断成功や監視/予算適合はworker開始許可ではない |
+
+observeは、正常に証拠を保存・照合できれば未承認や25/30%以上でも**終了0**。
+完了境界の証拠異常などを原因付きresultとして保存できた診断未完了は、`diagnostic_complete=false`と**終了3**。
+gate/resumeの不許可も終了3。request/read/result保存不能等で操作結果を確定できない運用エラーは**終了2**で、
+残ったintent/request/auditを保全する。`stop_reason != null`だけでobserveを失敗扱いにはしない。
 
 ## 試験・受入の区分
 
