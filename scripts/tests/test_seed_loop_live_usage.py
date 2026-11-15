@@ -510,9 +510,11 @@ class DiagnosticTests(unittest.TestCase):
             with tempfile.TemporaryDirectory(prefix='PowerShell 日本語 ') as t:
                 path = Path(t) / 'instructions.ps1'
                 path.write_text(block, encoding='utf-8')
-                script = '$t=$null; $e=$null; [void][System.Management.Automation.Language.Parser]::ParseFile($args[0],[ref]$t,[ref]$e); if($e.Count){$e | ForEach-Object {Write-Error $_.Message}; exit 1}'
-                parsed = subprocess.run(['pwsh', '-NoProfile', '-NonInteractive', '-Command',
-                    script, str(path)], capture_output=True, text=True, encoding='utf-8', timeout=10)
+                script = 'param([string]$Target); $t=$null; $e=$null; [void][System.Management.Automation.Language.Parser]::ParseFile($Target,[ref]$t,[ref]$e); if($e.Count){$e | ForEach-Object {Write-Error $_.Message}; exit 1}'
+                checker = Path(t) / 'parse.ps1'
+                checker.write_text(script, encoding='utf-8')
+                parsed = subprocess.run(['pwsh', '-NoProfile', '-NonInteractive', '-File',
+                    str(checker), str(path)], capture_output=True, text=True, encoding='utf-8', timeout=10)
                 self.assertEqual(parsed.returncode, 0, parsed.stderr)
 
     @unittest.skipUnless(os.name == 'nt', 'Windows .cmd launch and termination require Windows')
