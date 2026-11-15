@@ -202,7 +202,9 @@ def audit(raw, value, context, key, origin):
         else:
             reason = reason or 'account_identity_unavailable'
         if isinstance(selected, dict) and metadata_shape(selected):
-            evidence['metadata'] = {'ordinary_usage_allowed': allowed,
+            evidence['metadata'] = {'ordinary_usage_allowed': allowed if type(allowed) is bool else None,
+                'ordinary_usage_allowed_field': {'present': 'ordinaryUsageAllowed' in raw,
+                                                 'type': type(allowed).__name__},
                 'spend_control_reached': selected.get('spendControlReached'),
                 'rate_limit_reached_type': selected.get('rateLimitReachedType'),
                 'plan_type': selected.get('planType'),

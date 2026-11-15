@@ -138,6 +138,7 @@ class ContractTests(unittest.TestCase):
             lambda v: v['result'].update(rateLimitsByLimitId={}),
             lambda v: v['result'].update(rateLimitsByLimitId=None),
             lambda v: v['result'].update(extra='SECRET'),
+            lambda v: v['result'].update(ordinaryUsageAllowed='SECRET'),
             lambda v: v['result'].update(rateLimitUpsell={'unknown': 'SECRET'}),
             lambda v: v['result']['rateLimitsByLimitId']['codex'].update(credits={'extra': 1}),
             lambda v: v['result']['rateLimitsByLimitId']['codex'].update(normalModelSlug=True),
